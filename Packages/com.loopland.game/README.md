@@ -2,15 +2,15 @@
 
 LoopLand is a networked, Monopoly-style board game for VRChat worlds:
 
-- **2-6 players** on a glowing circular "loop" board with 40 spaces, 8 color groups, Portals, utilities,
+- **2-6 players** on an **infinity-loop (figure-8) board** with 40 spaces on a glowing gradient ribbon, 8 color groups, Portals, utilities,
   Twist / Loop Chest cards, the Glitch Zone (jail), Loops and Towers (houses / hotels), mortgages,
   auto-liquidation and bankruptcy, an optional round limit, and AFK auto-play.
 - **Particle tokens** that hop space-by-space with trails, landing bursts and auras.
 - **Animated 3D dice** that always land on the synced result, with skin-specific glow trails.
 - **Loop Coins**, a persistent in-game currency saved with VRChat PlayerData. You earn coins for passing
   LOOP START, buying, building, finishing and winning games, plus a daily bonus.
-- **In-game store** with dice skins, token skins and particle trails bought with Loop Coins. Equipped
-  cosmetics are visible to everyone.
+- **In-game store** with dice skins, token skins, **building styles** (the color of your Loops and Towers on the
+  board) and particle trails bought with Loop Coins. Equipped cosmetics are visible to everyone.
 - **VRChat Creator Economy (CE) integration**: premium packs, VIP (2x coins), and Loop Coin packs bought
   with VRChat Credits through Udon Products.
 - **Live Board**: an overhead camera streams the board (tokens, trails, dice) onto the four hologram
@@ -55,15 +55,16 @@ Generated assets go to `Assets/LoopLand/Generated`, and a reusable prefab is sav
   **RESET** (press it twice) returns to the lobby.
 
 ## Creator Economy setup (selling with VRChat Credits)
-The store ships with 5 premium slots on the `LoopLand/Store` object (`Products` array):
+The store ships with 6 premium slots on the `LoopLand/Store` object (`Products` array):
 
 | # | Default name | Suggested listing type | What it does |
 |---|--------------|------------------------|--------------|
 | 0 | Premium Dice Pack | Permanent | Unlocks Royal Gold + Galaxy Holo dice |
 | 1 | Holo Token Pack | Permanent | Unlocks Diamond + animated Prism tokens |
-| 2 | LoopLand VIP | Permanent or Temporary | 2x Loop Coins, Inferno dice, Golden + Rainbow trails |
+| 2 | LoopLand VIP | Permanent or Temporary | 2x Loop Coins, Inferno dice + buildings, Golden + Rainbow trails |
 | 3 | Coin Pouch | **Instant** (enable quantity purchases) | +500 Loop Coins per purchase |
 | 4 | Coin Vault | **Instant** (enable quantity purchases) | +3000 Loop Coins per purchase |
+| 5 | Skyline Pack | Permanent | Unlocks Royal Gold + Galaxy Holo building styles |
 
 1. On VRChat.com, create an **Udon product** and a **listing** for each one you want to sell.
 2. In Unity, open **VRChat SDK > UdonProducts Manager**, or use **Assets > Create > VRChat > UdonProduct**,
@@ -89,6 +90,13 @@ The 40 board spaces are UI cards on one flat canvas (`LoopLand > Board > Board U
 - **By hand:** select a `Card NN` object, drag your sprite into the Image's **Source Image**, set **Image Type**
   to *Simple* and **Color** to white. Delete or move the `Name` / `Price` texts if your art already has them.
 - Space numbers start at 00 = LOOP START and go clockwise. The card object names show the number and name.
+
+## Custom store art
+Every store picture is generated automatically, but you can replace any of them with your own images.
+Put them in `Assets/LoopLand/Store Art/` and run **Build Game In Scene** again:
+- `dice_0.png` ... `dice_7.png`, `token_0.png` ... `token_5.png`, `building_0.png` ... `building_7.png`,
+  `trail_0.png` ... `trail_4.png`, `premium_0.png` ... `premium_5.png` (square-ish, around 512 x 512)
+- `Background.png` - a full background picture for the store panel (for example a neon city)
 
 ## Customize
 - **Rules** (cash, salary, fines, coin rewards, AFK timer, min players): `LoopLand/Game` inspector.

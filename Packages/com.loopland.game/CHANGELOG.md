@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0
+- Infinity board: the 40 cards follow a figure-8 (two round lobes and crossing lanes) on an infinity-shaped
+  table, over a glowing gradient ribbon with sparkles. Dice roll in the right lobe; logo in the left lobe.
+- Live Board is now a wide 2:1 feed; hologram screens and consoles face the four corners of the table.
+- New cosmetic category: Building styles (color of your Loops/Towers) and a Skyline Pack premium product.
+- Redesigned store: gradient logo, coin badge, icon tabs, picture cards with status pills, detail panel with
+  rarity and preview, info banner, Daily Bonus / World Store buttons. Thumbnails are generated procedurally
+  and can be replaced from Assets/LoopLand/Store Art.
+
 ## 1.3.0
 - Board spaces are now UI cards on a single flat canvas: no overlapping, fewer draw calls.
 - Custom card art: drop images into Assets/LoopLand/Space Art (00-39 or space name) and rebuild.

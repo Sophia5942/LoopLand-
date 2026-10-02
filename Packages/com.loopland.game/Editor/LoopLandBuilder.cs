@@ -32,6 +32,15 @@ namespace LoopLand.EditorTools
         private static readonly List<UdonSharpBehaviour> made = new List<UdonSharpBehaviour>();
         private static readonly System.Random rng = new System.Random(7);
 
+        private const float LobeC = 1.75f;
+        private const float LobeR = 1.35f;
+        private const float CrossGap = 0.55f;
+        private static readonly string[] DiceBodyHex = { "F2EEE4", "15151C", "0B0F1E", "B0102A", "BFE9FF", "E8B730", "2A0E5E", "FF5A00" };
+        private static readonly string[] DicePipHex = { "1A1A22", "E8E8F0", "00F0FF", "FFE3E8", "1B4E8C", "3A2500", "FFFFFF", "FFF3B0" };
+        private static readonly string[] DiceGlowHex = { "FFFFFF", "8A8AFF", "00F0FF", "FF4060", "9AF2FF", "FFD54A", "B07CFF", "FF7A00" };
+        private static readonly string[] RibbonHex = { "FFE14D", "7CFF4F", "00E5FF", "4D8BFF", "B07CFF", "FF3DCB", "FF8A3D", "FFE14D" };
+        private static List<Vector2> pathPts;
+        private static List<float> pathLen;
         private static readonly string[] SlotHex = { "00E5FF", "FF3DCB", "FFD23F", "7CFF4F", "FF8A3D", "A57BFF" };
 
         [MenuItem("LoopLand/Build Game In Scene", priority = 0)]
@@ -148,7 +157,8 @@ namespace LoopLand.EditorTools
             fxMat = AddMat("FX_Particle", new Color(0.5f, 0.5f, 0.5f, 0.5f));
             Material dark = Std("Table", Hex("15131F"), 0.35f, 0.88f, Color.black);
 
-            roundSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            LoopLandArt.Build(Gen + "/UI");
+            roundSprite = LoopLandArt.Round;
             Color cCyan = new Color(0f, 0.55f, 0.68f, 1f);
             Color cPink = new Color(0.72f, 0.1f, 0.55f, 1f);
             Color cGold = new Color(0.72f, 0.53f, 0.06f, 1f);
@@ -171,40 +181,64 @@ namespace LoopLand.EditorTools
             var store = UdonSharpUndo.AddComponent<LoopLandStore>(storeGo);
             made.Add(store);
 
-            // table
-            Prim(PrimitiveType.Cylinder, "Table Top", rt, new Vector3(0f, TopY - 0.025f, 0f), new Vector3(5.6f, 0.025f, 5.6f), dark, true);
-            Prim(PrimitiveType.Cylinder, "Table Rim Glow", rt, new Vector3(0f, TopY - 0.03f, 0f), new Vector3(5.68f, 0.012f, 5.68f), Std("Rim", Hex("00B8D4"), 0f, 0.5f, Hex("00E5FF") * 1.5f));
-            Prim(PrimitiveType.Cylinder, "Table Pedestal", rt, new Vector3(0f, 0.42f, 0f), new Vector3(1.3f, 0.42f, 1.3f), dark, true);
-            Prim(PrimitiveType.Cylinder, "Center Disc", rt, new Vector3(0f, TopY + 0.002f, 0f), new Vector3(3.4f, 0.002f, 3.4f), Std("CenterDisc", Hex("120F26"), 0.3f, 0.95f, Hex("1A0F3A")));
+            // table: two joined round tables shaped like an infinity sign
+            Material rimMat = Std("Rim", Hex("00B8D4"), 0f, 0.5f, Hex("00E5FF") * 1.5f);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Prim(PrimitiveType.Cylinder, "Table Top", rt, new Vector3(side * LobeC, TopY - 0.025f, 0f), new Vector3(4.1f, 0.025f, 4.1f), dark, true);
+                Prim(PrimitiveType.Cylinder, "Table Rim Glow", rt, new Vector3(side * LobeC, TopY - 0.03f, 0f), new Vector3(4.18f, 0.012f, 4.18f), rimMat);
+                Prim(PrimitiveType.Cylinder, "Table Pedestal", rt, new Vector3(side * LobeC, 0.42f, 0f), new Vector3(1.0f, 0.42f, 1.0f), dark, true);
+            }
 
-            // board: one flat UI canvas with 40 cards (no overlap, one draw batch, easy custom art)
+            // board: 40 UI cards along an infinity loop, over a glowing gradient ribbon
+            BuildPath();
+            float pathL = pathLen[pathLen.Count - 1];
+            float spacing = (pathL / 4f - CrossGap) / 10f;
             var board = new GameObject("Board").transform;
             board.SetParent(rt, false);
-            RectTransform boardUi = UCanvas(board, "Board UI", new Vector3(0f, TopY + 0.002f, 0f), Quaternion.Euler(90f, 0f, 0f), new Vector2(5000f, 5000f), false);
-            const float cardW = 280f, cardH = 500f;
+            Mesh ribbon = RibbonMesh(0.64f);
+            var ribbonGo = new GameObject("Infinity Ribbon");
+            ribbonGo.transform.SetParent(board, false);
+            ribbonGo.transform.localPosition = new Vector3(0f, TopY + 0.0015f, 0f);
+            ribbonGo.AddComponent<MeshFilter>().sharedMesh = ribbon;
+            ribbonGo.AddComponent<MeshRenderer>().sharedMaterial = RibbonMaterial();
+            ParticleSystem sparkle = Fx("Ribbon Sparkles", ribbonGo.transform, Vector3.zero, Quaternion.identity, 2.2f, 0.03f, 0.03f, 90f, 0f, true, false, ParticleSystemShapeType.Sphere, 0.1f, -0.01f, 400, Color.white, Color.white, 0f);
+            var ssh = sparkle.shape;
+            ssh.shapeType = ParticleSystemShapeType.Mesh;
+            ssh.meshShapeType = ParticleSystemMeshShapeType.Triangle;
+            ssh.mesh = ribbon;
+            ssh.useMeshColors = true;
+            RectTransform boardUi = UCanvas(board, "Board UI", new Vector3(0f, TopY + 0.004f, 0f), Quaternion.Euler(90f, 0f, 0f), new Vector2(7800f, 4400f), false);
+            const float cardW = 300f, cardH = 500f;
             float tileW = cardW / 1000f;
             var anchors = new Transform[40];
             var ownerBars = new Image[40];
-            var markers = new GameObject[200];
+            var markers = new Image[200];
             Color[] groupCol = new Color[game.groupHex.Length];
             for (int g = 0; g < groupCol.Length; g++) groupCol[g] = Hex(game.groupHex[g]);
             Dir(Root + "/Space Art");
+            UImg(boardUi, "Dice Tray", new Vector2(LobeC * 1000f, 0f), new Vector2(760f, 560f), LoopLandArt.Round, new Color(0.05f, 0.05f, 0.12f, 0.85f));
+            TextMeshProUGUI boardLogo = UText(boardUi, "Board Logo", "<b>LOOPLAND</b>", new Vector2(-LobeC * 1000f, 0f), new Vector2(1600f, 360f), 280f, Color.white);
+            boardLogo.enableVertexGradient = true;
+            boardLogo.colorGradient = new VertexGradient(Hex("FFE14D"), Hex("00E5FF"), Hex("FF3DCB"), Hex("B07CFF"));
             for (int i = 0; i < 40; i++)
             {
-                float deg = -90f - 9f * i;
-                float a = deg * Mathf.Deg2Rad;
-                Vector3 p = new Vector3(Mathf.Cos(a) * R, TopY + 0.004f, Mathf.Sin(a) * R);
+                int lobe = i / 20;
+                PathAt(lobe * pathL * 0.5f + CrossGap + (i % 20) * spacing, out Vector2 p2, out Vector2 t2);
+                Vector2 n2 = new Vector2(-t2.y, t2.x);
+                if (Vector2.Dot(new Vector2(lobe == 0 ? LobeC : -LobeC, 0f) - p2, n2) < 0f) n2 = -n2;
+                Vector3 p = new Vector3(p2.x, TopY + 0.006f, p2.y);
                 var anchor = new GameObject("Space " + i.ToString("00") + " " + game.spaceName[i]).transform;
                 anchor.SetParent(board, false);
                 anchor.localPosition = p;
-                anchor.localRotation = Quaternion.LookRotation(new Vector3(-p.x, 0f, -p.z).normalized, Vector3.up);
+                anchor.localRotation = Quaternion.LookRotation(new Vector3(n2.x, 0f, n2.y), Vector3.up);
                 anchors[i] = anchor;
 
                 int type = game.spaceType[i];
                 int grp = game.spaceGroup[i];
                 bool corner = type == 0 || type == 7 || type == 8 || type == 9;
-                RectTransform card = URect(boardUi, "Card " + i.ToString("00") + " " + game.spaceName[i], new Vector2(p.x, p.z) * 1000f, new Vector2(cardW, cardH));
-                card.localRotation = Quaternion.Euler(0f, 0f, deg + 90f);
+                RectTransform card = URect(boardUi, "Card " + i.ToString("00") + " " + game.spaceName[i], p2 * 1000f, new Vector2(cardW, cardH));
+                card.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(-n2.x, n2.y) * Mathf.Rad2Deg);
                 Image bg = card.gameObject.AddComponent<Image>();
                 bg.raycastTarget = false;
                 Sprite art = SpaceArt(i, game.spaceName[i]);
@@ -213,7 +247,7 @@ namespace LoopLand.EditorTools
                 {
                     bg.sprite = roundSprite;
                     bg.type = Image.Type.Sliced;
-                    bg.pixelsPerUnitMultiplier = 0.35f;
+                    bg.pixelsPerUnitMultiplier = 1f;
                     bg.color = CardColor(type);
                 }
                 if (grp >= 0) UImage(card, "Band", new Vector2(0f, 200f), new Vector2(cardW - 16f, 84f), groupCol[grp]);
@@ -229,11 +263,11 @@ namespace LoopLand.EditorTools
                 {
                     for (int k = 0; k < 4; k++)
                     {
-                        markers[i * 5 + k] = UImage(card, "Loop " + (k + 1), new Vector2(-90f + k * 60f, 200f), new Vector2(42f, 42f), Hex("3DFF8A")).gameObject;
-                        markers[i * 5 + k].SetActive(false);
+                        markers[i * 5 + k] = UImg(card, "Loop " + (k + 1), new Vector2(-96f + k * 64f, 200f), new Vector2(50f, 50f), LoopLandArt.House, Color.white, false);
+                        markers[i * 5 + k].gameObject.SetActive(false);
                     }
-                    markers[i * 5 + 4] = UImage(card, "Tower", new Vector2(0f, 200f), new Vector2(150f, 56f), Hex("FFD54A")).gameObject;
-                    markers[i * 5 + 4].SetActive(false);
+                    markers[i * 5 + 4] = UImg(card, "Tower", new Vector2(0f, 205f), new Vector2(70f, 70f), LoopLandArt.Tower, Color.white, false);
+                    markers[i * 5 + 4].gameObject.SetActive(false);
                 }
             }
             GameObject sel = Prim(PrimitiveType.Cube, "Selection", rt, Vector3.zero, Vector3.one, AddMat("Glow_Select", Hex("FFE14D")));
@@ -244,7 +278,6 @@ namespace LoopLand.EditorTools
             Prim(PrimitiveType.Cube, "Frame", selChild, new Vector3(0f, 0.001f, 0f), new Vector3(tileW + 0.03f, 0.004f, 0.53f), AddMat("Glow_Select", Hex("FFE14D")));
 
             // center hologram
-            Fx("Loop Ring", rt, new Vector3(0f, TopY + 0.03f, 0f), Quaternion.Euler(-90f, 0f, 0f), 2.6f, 0f, 0.035f, 70f, 0f, true, false, ParticleSystemShapeType.Circle, 1.6f, 0f, 400, Hex("00E5FF"), Hex("FF3DCB"), 0.35f);
             Texture liveTex = LiveCamera(rt);
             var holo = new GameObject("Hologram").transform;
             holo.SetParent(rt, false);
@@ -254,17 +287,19 @@ namespace LoopLand.EditorTools
             var cards = new TMP_Text[4];
             for (int d = 0; d < 4; d++)
             {
-                Vector3 dir = Quaternion.Euler(0f, d * 90f, 0f) * Vector3.back;
+                Vector3 dir = Quaternion.Euler(0f, 45f + d * 90f, 0f) * Vector3.back;
                 RectTransform c = UCanvas(holo, "Screen " + d, dir * 0.8f, Quaternion.LookRotation(-dir, Vector3.up), new Vector2(1500f, 1100f));
-                UImage(c, "Glow", Vector2.zero, new Vector2(1530f, 1130f), new Color(0f, 0.9f, 1f, 0.55f));
-                UImage(c, "Panel", Vector2.zero, new Vector2(1500f, 1100f), new Color(0.035f, 0.03f, 0.07f, 0.94f));
-                UImage(c, "Live Frame", new Vector2(-290f, 70f), new Vector2(878f, 878f), new Color(1f, 0.24f, 0.8f, 0.85f));
-                URaw(c, "Live View", new Vector2(-290f, 70f), new Vector2(860f, 860f), liveTex);
-                UText(c, "Header", "<b>LIVE BOARD</b>", new Vector2(445f, 470f), new Vector2(540f, 70f), 40f, Hex("00E5FF"));
-                status[d] = UText(c, "Status", "LOOPLAND", new Vector2(445f, 260f), new Vector2(540f, 330f), 42f, Color.white);
-                players[d] = UText(c, "Players", "", new Vector2(445f, -150f), new Vector2(540f, 420f), 34f, Color.white, TextAlignmentOptions.TopLeft);
-                UImage(c, "Card Strip", new Vector2(0f, -455f), new Vector2(1440f, 150f), new Color(1f, 0.85f, 0.25f, 0.12f));
-                cards[d] = UText(c, "Card", "", new Vector2(0f, -455f), new Vector2(1400f, 140f), 40f, Hex("FFE14D"));
+                UImg(c, "Glow", Vector2.zero, new Vector2(1560f, 1160f), LoopLandArt.Glow, new Color(0f, 0.9f, 1f, 0.9f));
+                UImg(c, "Panel", Vector2.zero, new Vector2(1500f, 1100f), LoopLandArt.Panel, Color.white);
+                UImg(c, "Live Frame", new Vector2(0f, 175f), new Vector2(1462f, 742f), LoopLandArt.Round, new Color(1f, 0.24f, 0.8f, 0.9f));
+                URaw(c, "Live View", new Vector2(0f, 175f), new Vector2(1440f, 720f), liveTex);
+                UImg(c, "Live Tag", new Vector2(-590f, 500f), new Vector2(200f, 56f), LoopLandArt.Pill, new Color(0.9f, 0.1f, 0.3f, 0.95f));
+                UText(c, "Live Tag Text", "<b>LIVE</b>", new Vector2(-590f, 500f), new Vector2(180f, 50f), 34f, Color.white);
+                cards[d] = UText(c, "Card", "", new Vector2(0f, -248f), new Vector2(1420f, 86f), 40f, Hex("FFE14D"));
+                UImg(c, "Status Back", new Vector2(-365f, -420f), new Vector2(710f, 230f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
+                status[d] = UText(c, "Status", "LOOPLAND", new Vector2(-365f, -420f), new Vector2(680f, 215f), 40f, Color.white);
+                UImg(c, "Players Back", new Vector2(365f, -420f), new Vector2(710f, 230f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
+                players[d] = UText(c, "Players", "", new Vector2(365f, -420f), new Vector2(680f, 215f), 32f, Color.white, TextAlignmentOptions.Left);
             }
             var spinner = new GameObject("Logo Spinner").transform;
             spinner.SetParent(rt, false);
@@ -292,10 +327,10 @@ namespace LoopLand.EditorTools
             {
                 var rest = new GameObject("Rest " + d).transform;
                 rest.SetParent(diceRoot, false);
-                rest.localPosition = new Vector3(d == 0 ? -0.12f : 0.12f, TopY + 0.058f, d == 0 ? 0.06f : -0.06f);
+                rest.localPosition = new Vector3(LobeC + (d == 0 ? -0.12f : 0.12f), TopY + 0.062f, d == 0 ? 0.06f : -0.06f);
                 var thr = new GameObject("Throw " + d).transform;
                 thr.SetParent(diceRoot, false);
-                thr.localPosition = new Vector3(d == 0 ? -0.55f : 0.45f, TopY + 0.6f, -1.0f);
+                thr.localPosition = new Vector3(LobeC + (d == 0 ? -0.55f : 0.45f), TopY + 0.6f, -1.0f);
                 var die = new GameObject("Die " + d);
                 die.transform.SetParent(diceRoot, false);
                 die.transform.localPosition = rest.localPosition;
@@ -357,10 +392,12 @@ namespace LoopLand.EditorTools
             var rounds = new TMP_Text[4];
             for (int d = 0; d < 4; d++)
             {
-                Vector3 dir = Quaternion.Euler(0f, d * 90f, 0f) * Vector3.back;
+                int side = d < 2 ? 1 : -1;
+                float ang = (d % 2 == 0 ? -50f : 50f) * Mathf.Deg2Rad;
+                Vector3 dir = new Vector3(side * Mathf.Cos(ang), 0f, Mathf.Sin(ang));
                 var c = new GameObject("Console " + d).transform;
                 c.SetParent(consoles, false);
-                c.localPosition = dir * 2.62f + Vector3.up * (TopY + 0.02f);
+                c.localPosition = new Vector3(side * LobeC, 0f, 0f) + dir * 1.88f + Vector3.up * (TopY + 0.02f);
                 c.localRotation = Quaternion.LookRotation(-dir, Vector3.up);
                 RectTransform ui = UCanvas(c, "Panel", new Vector3(0f, 0.26f, 0f), Quaternion.Euler(35f, 0f, 0f), new Vector2(1100f, 640f));
                 UImage(ui, "Glow", Vector2.zero, new Vector2(1124f, 664f), new Color(0f, 0.9f, 1f, 0.5f));
@@ -379,102 +416,196 @@ namespace LoopLand.EditorTools
                 UButton(ui, "Reset", "RESET", new Vector2(397f, -200f), new Vector2(245f, 95f), cRed, game, "_OnReset", 30f);
             }
 
-            // store kiosk: clean UI panel, live mini view and a 3D preview pedestal
+            // store kiosk: premium store UI + live board panel
             Transform st = storeGo.transform;
             AudioSource storeAudio = Audio(storeGo);
-            Prim(PrimitiveType.Cube, "Stage", st, new Vector3(0f, 0.03f, -0.25f), new Vector3(5.8f, 0.06f, 1.5f), dark, true);
-            RectTransform sui = UCanvas(st, "Store UI", new Vector3(0f, 1.45f, 0f), Quaternion.identity, new Vector2(2700f, 1800f));
-            UImage(sui, "Glow", Vector2.zero, new Vector2(2730f, 1830f), new Color(1f, 0.83f, 0.29f, 0.55f));
-            UImage(sui, "Back", Vector2.zero, new Vector2(2700f, 1800f), new Color(0.035f, 0.03f, 0.07f, 0.96f));
-            UText(sui, "Title", "<b>LOOPLAND <color=#FFE14D>STORE</color></b>", new Vector2(0f, 790f), new Vector2(2500f, 120f), 96f, Color.white);
-            store.coinsText = UText(sui, "Coins", "", new Vector2(0f, 680f), new Vector2(2500f, 80f), 56f, Hex("FFE14D"));
-            var tabs = new TMP_Text[4];
-            string[] tabNames = { "DICE", "TOKENS", "TRAILS", "PREMIUM" };
-            for (int i = 0; i < 4; i++)
-                tabs[i] = UButton(sui, "Tab " + tabNames[i], tabNames[i], new Vector2(-930f + i * 620f, 560f), new Vector2(580f, 100f), i == 3 ? cGold : cDark, store, "_OnTab" + i, 40f);
+            Dir(Root + "/Store Art");
+            Prim(PrimitiveType.Cube, "Stage", st, new Vector3(0f, 0.03f, -0.25f), new Vector3(6.6f, 0.06f, 1.5f), dark, true);
+            RectTransform sui = UCanvas(st, "Store UI", new Vector3(0f, 1.5f, 0f), Quaternion.identity, new Vector2(2700f, 1800f));
+            UImg(sui, "Glow", Vector2.zero, new Vector2(2790f, 1890f), LoopLandArt.Glow, new Color(0.35f, 0.6f, 1f, 1f));
+            UImg(sui, "Back", Vector2.zero, new Vector2(2700f, 1800f), LoopLandArt.Panel, Color.white);
+            Sprite bgArt = FindArt(Root + "/Store Art", "Background");
+            if (bgArt != null) UImg(sui, "Background Art", Vector2.zero, new Vector2(2660f, 1760f), bgArt, new Color(1f, 1f, 1f, 0.6f), false);
+            TextMeshProUGUI logo = UText(sui, "Logo", "<b>LOOPLAND</b>", new Vector2(-760f, 800f), new Vector2(1100f, 170f), 150f, Color.white, TextAlignmentOptions.Left);
+            logo.enableVertexGradient = true;
+            logo.colorGradient = new VertexGradient(Hex("FFE14D"), Hex("00E5FF"), Hex("FF3DCB"), Hex("B07CFF"));
+            UText(sui, "Store Word", "<b>STORE</b>", new Vector2(-760f, 685f), new Vector2(1100f, 110f), 96f, Color.white, TextAlignmentOptions.Left);
+            UImg(sui, "Coin Badge Glow", new Vector2(110f, 750f), new Vector2(620f, 240f), LoopLandArt.Glow, new Color(1f, 0.8f, 0.3f, 0.8f));
+            UImg(sui, "Coin Badge", new Vector2(110f, 750f), new Vector2(560f, 190f), LoopLandArt.Round, new Color(0.08f, 0.07f, 0.2f, 0.95f));
+            UImg(sui, "Coin", new Vector2(-75f, 750f), new Vector2(150f, 150f), LoopLandArt.Coin, Color.white, false);
+            store.coinsText = UText(sui, "Coins", "0", new Vector2(180f, 778f), new Vector2(330f, 90f), 80f, Color.white, TextAlignmentOptions.Left);
+            UText(sui, "Coins Label", "<b>LOOP COINS</b>", new Vector2(180f, 705f), new Vector2(330f, 50f), 36f, Hex("FFD54A"), TextAlignmentOptions.Left);
+            store.vipText = UText(sui, "VIP", "", new Vector2(1000f, 750f), new Vector2(500f, 100f), 70f, Hex("FFD54A"));
+
+            string[] tabNames = { "DICE", "TOKENS", "BUILDINGS", "TRAILS", "PREMIUM" };
+            Sprite[] tabIcons = { LoopLandArt.IconDice, LoopLandArt.IconPawn, LoopLandArt.IconBuilding, LoopLandArt.IconSparkle, LoopLandArt.IconCrown };
+            var tabs = new TMP_Text[5];
+            var tabSel = new GameObject[5];
+            for (int i = 0; i < 5; i++)
+            {
+                var pos = new Vector2(-1040f + i * 520f, 560f);
+                tabSel[i] = UImg(sui, "Tab Glow " + i, pos, new Vector2(540f, 150f), LoopLandArt.Glow, new Color(1f, 0.8f, 0.25f, 1f)).gameObject;
+                TextMeshProUGUI lab = UButton(sui, "Tab " + tabNames[i], tabNames[i], pos, new Vector2(480f, 105f), new Color(0.13f, 0.14f, 0.34f, 1f), store, "_OnTab" + i, 38f);
+                lab.rectTransform.anchoredPosition = new Vector2(40f, 0f);
+                lab.rectTransform.sizeDelta = new Vector2(340f, 90f);
+                UImg(lab.transform.parent, "Icon", new Vector2(-170f, 0f), new Vector2(66f, 66f), tabIcons[i], i == 4 ? Hex("FFD54A") : Hex("CFE3FF"), false);
+                tabs[i] = lab;
+            }
             store.tabLabels = tabs;
+            store.tabSelected = tabSel;
+
             var itemRoots = new GameObject[8];
-            var itemLabels = new TMP_Text[8];
-            var swatches = new Image[8];
+            var itemSel = new GameObject[8];
+            var itemIcons = new Image[8];
+            var itemNames = new TMP_Text[8];
+            var itemPills = new Image[8];
+            var itemStatus = new TMP_Text[8];
             for (int i = 0; i < 8; i++)
             {
-                var p = new Vector2(-950f + (i % 4) * 633f, i < 4 ? 330f : 50f);
-                TextMeshProUGUI label = UButton(sui, "Item " + i, "", p, new Vector2(600f, 250f), new Color(0.12f, 0.11f, 0.22f, 1f), store, "_OnItem" + i, 38f);
-                label.rectTransform.anchoredPosition = new Vector2(40f, 0f);
-                label.rectTransform.sizeDelta = new Vector2(500f, 230f);
-                itemLabels[i] = label;
-                itemRoots[i] = label.transform.parent.gameObject;
-                swatches[i] = UImage(itemRoots[i].transform, "Swatch", new Vector2(-245f, 0f), new Vector2(70f, 70f), Color.white);
+                var pos = new Vector2(-1110f + (i % 4) * 380f, i < 4 ? 280f : -140f);
+                itemSel[i] = UImg(sui, "Item Glow " + i, pos, new Vector2(400f, 440f), LoopLandArt.Glow, new Color(1f, 0.8f, 0.25f, 1f)).gameObject;
+                TextMeshProUGUI lab = UButton(sui, "Item " + i, "", pos, new Vector2(360f, 400f), new Color(0.1f, 0.1f, 0.26f, 1f), store, "_OnItem" + i, 36f);
+                Transform btn = lab.transform.parent;
+                itemRoots[i] = btn.gameObject;
+                itemIcons[i] = UImg(btn, "Art", new Vector2(0f, 60f), new Vector2(300f, 240f), null, Color.white, false);
+                itemIcons[i].preserveAspect = true;
+                lab.rectTransform.anchoredPosition = new Vector2(0f, -95f);
+                lab.rectTransform.sizeDelta = new Vector2(330f, 60f);
+                itemNames[i] = lab;
+                itemPills[i] = UImg(btn, "Pill", new Vector2(0f, -160f), new Vector2(270f, 58f), LoopLandArt.Pill, Color.gray);
+                itemStatus[i] = UText(itemPills[i].transform, "Status", "", Vector2.zero, new Vector2(250f, 50f), 30f, Color.white);
+                itemStatus[i].fontStyle = FontStyles.Bold;
             }
             store.itemButtons = itemRoots;
-            store.itemLabels = itemLabels;
-            store.itemSwatches = swatches;
-            store.detailText = UText(sui, "Detail", "", new Vector2(-330f, -270f), new Vector2(1900f, 330f), 44f, Color.white, TextAlignmentOptions.Left);
-            store.actionLabel = UButton(sui, "Action", "SELECT AN ITEM", new Vector2(950f, -270f), new Vector2(620f, 180f), cGold, store, "_OnAction", 48f);
-            UButton(sui, "Daily", "DAILY BONUS", new Vector2(-640f, -640f), new Vector2(760f, 130f), cCyan, store, "_OnDaily", 46f);
-            UButton(sui, "World Store", "WORLD STORE", new Vector2(640f, -640f), new Vector2(760f, 130f), cGold, store, "_OnWorldStore", 46f);
-            RectTransform lui = UCanvas(st, "Live Board UI", new Vector3(-2.2f, 1.45f, -0.25f), Quaternion.Euler(0f, -20f, 0f), new Vector2(1000f, 1150f));
-            UImage(lui, "Glow", Vector2.zero, new Vector2(1030f, 1180f), new Color(0f, 0.9f, 1f, 0.55f));
-            UImage(lui, "Back", Vector2.zero, new Vector2(1000f, 1150f), new Color(0.035f, 0.03f, 0.07f, 0.96f));
-            UText(lui, "Header", "<b>LIVE <color=#FF3DCB>BOARD</color></b>", new Vector2(0f, 510f), new Vector2(900f, 90f), 56f, Hex("00E5FF"));
-            URaw(lui, "Live View", new Vector2(0f, -40f), new Vector2(920f, 920f), liveTex);
-            Prim(PrimitiveType.Cylinder, "Preview Pedestal", st, new Vector3(2.15f, 0.45f, -0.45f), new Vector3(0.45f, 0.45f, 0.45f), Std("Pedestal", Hex("2A2208"), 0.9f, 0.9f, Hex("FFD54A") * 0.2f), true);
-            var spin = new GameObject("Preview Spinner").transform;
-            spin.SetParent(st, false);
-            spin.localPosition = new Vector3(2.15f, 1.12f, -0.45f);
-            var pdie = new GameObject("Preview Die");
-            pdie.transform.SetParent(spin, false);
-            pdie.transform.localPosition = new Vector3(-0.12f, 0.06f, 0f);
-            pdie.transform.localScale = Vector3.one * 0.16f;
-            pdie.transform.localRotation = Quaternion.Euler(20f, 35f, 10f);
-            pdie.AddComponent<MeshFilter>().sharedMesh = dieMesh;
-            store.previewDie = pdie.AddComponent<MeshRenderer>();
-            store.previewDie.sharedMaterial = diceMats[0];
-            var ptok = new GameObject("Preview Token").transform;
-            ptok.SetParent(spin, false);
-            ptok.localPosition = new Vector3(0.14f, -0.12f, 0f);
-            ptok.localScale = Vector3.one * 2.4f;
-            TokenBody(ptok, tokenBody, tokenGlow, 1f, out Renderer[] pbr, out Renderer[] pgr);
-            var previewR = new Renderer[pbr.Length + pgr.Length];
-            pbr.CopyTo(previewR, 0);
-            pgr.CopyTo(previewR, pbr.Length);
-            store.previewToken = previewR;
-            store.previewTrail = Fx("Preview FX", spin, Vector3.zero, Quaternion.identity, 1.2f, 0.4f, 0.04f, 0f, 0f, false, true, ParticleSystemShapeType.Sphere, 0.18f, -0.1f, 200, Color.white, Color.white, 0f);
-            store.previewSpinner = spin;
+            store.itemSelected = itemSel;
+            store.itemIcons = itemIcons;
+            store.itemNames = itemNames;
+            store.itemPills = itemPills;
+            store.itemStatus = itemStatus;
+
+            UImg(sui, "Detail Panel", new Vector2(780f, 5f), new Vector2(1020f, 970f), LoopLandArt.Round, new Color(0.07f, 0.08f, 0.22f, 0.92f));
+            store.detailName = UText(sui, "Detail Name", "", new Vector2(640f, 420f), new Vector2(700f, 90f), 58f, Color.white, TextAlignmentOptions.Left);
+            store.detailRarityPill = UImg(sui, "Rarity", new Vector2(1130f, 420f), new Vector2(240f, 60f), LoopLandArt.Pill, Hex("1E6FD9"));
+            store.detailRarity = UText(store.detailRarityPill.transform, "Rarity Text", "", Vector2.zero, new Vector2(220f, 50f), 28f, Color.white);
+            store.detailDesc = UText(sui, "Detail Desc", "", new Vector2(780f, 300f), new Vector2(940f, 150f), 36f, Hex("D6DCFF"), TextAlignmentOptions.TopLeft);
+            store.detailPreview = UImg(sui, "Detail Preview", new Vector2(780f, -40f), new Vector2(620f, 480f), null, Color.white, false);
+            store.detailPreview.preserveAspect = true;
+            store.actionLabel = UButton(sui, "Action", "SELECT ITEM", new Vector2(780f, -385f), new Vector2(940f, 150f), Hex("F5B800"), store, "_OnAction", 56f);
+            store.actionLabel.color = new Color(0.12f, 0.08f, 0f, 1f);
+
+            UImg(sui, "Banner", new Vector2(-530f, -430f), new Vector2(1520f, 150f), LoopLandArt.Round, new Color(0.1f, 0.12f, 0.34f, 0.95f));
+            UImg(sui, "Banner Coins", new Vector2(-1205f, -430f), new Vector2(120f, 120f), LoopLandArt.Coin, Color.white, false);
+            store.bannerText = UText(sui, "Banner Text", "", new Vector2(-470f, -430f), new Vector2(1300f, 130f), 36f, Color.white, TextAlignmentOptions.Left);
+
+            TextMeshProUGUI daily = UButton(sui, "Daily", "DAILY BONUS", new Vector2(-665f, -735f), new Vector2(1250f, 190f), Hex("1E78FF"), store, "_OnDaily", 70f);
+            daily.rectTransform.anchoredPosition = new Vector2(20f, 0f);
+            daily.rectTransform.sizeDelta = new Vector2(800f, 150f);
+            UImg(daily.transform.parent, "Icon", new Vector2(-480f, 0f), new Vector2(120f, 120f), LoopLandArt.IconGift, Color.white, false);
+            UText(daily.transform.parent, "Arrow", "<b>></b>", new Vector2(560f, 0f), new Vector2(60f, 120f), 80f, Color.white);
+            TextMeshProUGUI world = UButton(sui, "World Store", "WORLD STORE", new Vector2(665f, -735f), new Vector2(1250f, 190f), Hex("8A2BE2"), store, "_OnWorldStore", 64f);
+            world.rectTransform.anchoredPosition = new Vector2(20f, 22f);
+            world.rectTransform.sizeDelta = new Vector2(800f, 90f);
+            UText(world.transform.parent, "Sub", "MORE ITEMS & EXCLUSIVE BUILDS", new Vector2(20f, -45f), new Vector2(800f, 50f), 32f, Hex("E8D5FF"));
+            UImg(world.transform.parent, "Icon", new Vector2(-480f, 0f), new Vector2(120f, 120f), LoopLandArt.IconGlobe, Color.white, false);
+            UText(world.transform.parent, "Arrow", "<b>></b>", new Vector2(560f, 0f), new Vector2(60f, 120f), 80f, Color.white);
+
+            RectTransform lui = UCanvas(st, "Live Board UI", new Vector3(-2.4f, 1.5f, -0.3f), Quaternion.Euler(0f, -20f, 0f), new Vector2(1400f, 860f));
+            UImg(lui, "Glow", Vector2.zero, new Vector2(1460f, 920f), LoopLandArt.Glow, new Color(0f, 0.9f, 1f, 0.9f));
+            UImg(lui, "Back", Vector2.zero, new Vector2(1400f, 860f), LoopLandArt.Panel, Color.white);
+            UText(lui, "Header", "<b>LIVE <color=#FF3DCB>BOARD</color></b>", new Vector2(0f, 360f), new Vector2(1300f, 100f), 64f, Hex("00E5FF"));
+            URaw(lui, "Live View", new Vector2(0f, -50f), new Vector2(1320f, 660f), liveTex);
             store.sfx = storeAudio;
             store.clickClip = Wav("click", 0.06f, t => Sin(1800f, t) * Env(t, 0.001f, 0.015f) * 0.5f);
             store.buyClip = Wav("coin", 0.5f, t => Notes(t, new[] { 988f, 1319f }, 0.08f, 0.25f));
             store.errorClip = Wav("error", 0.25f, t => Notes(t, new[] { 220f, 196f }, 0.1f, 0.06f));
 
-            // store catalogue
+            // store catalogue (thumbnails are generated; drop your own into Assets/LoopLand/Store Art to replace them)
             store.game = game;
             store.diceNames = diceNames;
             store.dicePrices = new[] { 0, 150, 300, 450, 600, 0, 0, 0 };
             store.diceProduct = new[] { -1, -1, -1, -1, -1, 0, 0, 2 };
             store.diceMaterials = diceMats;
             store.diceGlow = diceGlow;
+            store.diceDesc = new[]
+            {
+                "Clean ivory dice with crisp black pips. A timeless classic.",
+                "Glossy black dice with silver pips for a stealthy roll.",
+                "Electric neon pips that glow with every throw.",
+                "Deep red dice with a warm ember glow.",
+                "Icy dice that shine like fresh frost.",
+                "Solid gold dice for true LoopLand royalty.",
+                "Cosmic purple dice sprinkled with stars.",
+                "Blazing plasma dice that leave a fiery glow."
+            };
+            store.diceArt = new Sprite[8];
+            for (int i = 0; i < 8; i++) store.diceArt[i] = StoreArt("dice", i) ?? LoopLandArt.DiceThumb("Thumb_Dice_" + i, Hex(DiceBodyHex[i]), Hex(DicePipHex[i]), i == 6);
+
             store.tokenNames = new[] { "Classic Glow", "Chrome", "Toxic", "Lava", "Diamond", "Prism" };
             store.tokenPrices = new[] { 0, 200, 350, 500, 0, 0 };
             store.tokenProduct = new[] { -1, -1, -1, -1, 1, 1 };
-            store.tokenColors = new[] { Color.white, Hex("D8DEE9"), Hex("7CFF4F"), Hex("FF5A1F"), Hex("BFF6FF"), Hex("FF3DCB") };
+            store.tokenColors = new[] { Hex("00E5FF"), Hex("D8DEE9"), Hex("7CFF4F"), Hex("FF5A1F"), Hex("BFF6FF"), Hex("FF3DCB") };
             store.rainbowToken = 5;
+            store.tokenDesc = new[]
+            {
+                "Your seat color with a soft glow ring.",
+                "Polished chrome that reflects the whole board.",
+                "Radioactive green with a toxic aura.",
+                "A molten lava core that smolders as you move.",
+                "Crystal-clear diamond with a brilliant shine.",
+                "An animated rainbow prism that shifts colors."
+            };
+            store.tokenArt = new Sprite[6];
+            for (int i = 0; i < 6; i++) store.tokenArt[i] = StoreArt("token", i) ?? LoopLandArt.TokenThumb("Thumb_Token_" + i, store.tokenColors[i], i == 5);
+
+            store.buildingNames = new[] { "Classic Skyline", "Neon Pulse", "Coastal Resort", "Rooftop Gardens", "Ruby Ember", "Royal Gold", "Galaxy Holo", "Inferno Plasma" };
+            store.buildingPrices = new[] { 0, 200, 300, 400, 450, 0, 0, 0 };
+            store.buildingProduct = new[] { -1, -1, -1, -1, -1, 5, 5, 2 };
+            store.buildingColors = new[] { Hex("6FA8FF"), Hex("00F0FF"), Hex("3DE0C0"), Hex("5BE36B"), Hex("FF4060"), Hex("FFD54A"), Hex("B07CFF"), Hex("FF7A00") };
+            store.buildingDesc = new[]
+            {
+                "A clean and modern skyline to get your city started.",
+                "Neon towers that light up every property you build on.",
+                "Sunny beachfront resorts with ocean views.",
+                "Eco towers topped with lush rooftop gardens.",
+                "Crimson towers glowing with ember light.",
+                "Gilded skyscrapers for the ultimate landlord.",
+                "Holographic towers from a distant galaxy.",
+                "Fiery plasma towers that burn bright."
+            };
+            store.buildingArt = new Sprite[8];
+            for (int i = 0; i < 8; i++) store.buildingArt[i] = StoreArt("building", i) ?? LoopLandArt.BuildingThumb("Thumb_Building_" + i, store.buildingColors[i], i);
+
             store.trailNames = new[] { "Stardust", "Comet", "Ember", "Golden", "Rainbow" };
             store.trailPrices = new[] { 0, 250, 400, 0, 0 };
             store.trailProduct = new[] { -1, -1, -1, 2, 2 };
             store.trailColors = new[] { Color.white, Hex("4DB8FF"), Hex("FF7A2E"), Hex("FFD54A"), Hex("FF3DCB") };
             store.rainbowTrail = 4;
-            store.productNames = new[] { "Premium Dice Pack", "Holo Token Pack", "LoopLand VIP", "Coin Pouch", "Coin Vault" };
+            store.trailDesc = new[]
+            {
+                "A gentle sparkle that follows every hop.",
+                "A blue comet tail streaking across the board.",
+                "Glowing embers drifting behind you.",
+                "Golden sparks for VIP players.",
+                "A full rainbow trail that cycles colors."
+            };
+            store.trailArt = new Sprite[5];
+            for (int i = 0; i < 5; i++) store.trailArt[i] = StoreArt("trail", i) ?? LoopLandArt.TrailThumb("Thumb_Trail_" + i, store.trailColors[i], i == 4);
+
+            store.productNames = new[] { "Premium Dice Pack", "Holo Token Pack", "LoopLand VIP", "Coin Pouch", "Coin Vault", "Skyline Pack" };
             store.productDescriptions = new[]
             {
                 "Unlocks Royal Gold and Galaxy Holo dice forever.",
                 "Unlocks the Diamond and animated Prism tokens forever.",
-                "2x Loop Coins from games and daily bonus, Inferno Plasma dice, Golden and Rainbow trails.",
+                "2x Loop Coins from games and the daily bonus, plus Inferno Plasma dice and buildings and the Golden and Rainbow trails.",
                 "+500 Loop Coins instantly. Buy as many as you like.",
-                "+3000 Loop Coins instantly. Best value!"
+                "+3000 Loop Coins instantly. Best value!",
+                "Unlocks the Royal Gold and Galaxy Holo building styles forever."
             };
-            store.productListingIds = new[] { "", "", "", "", "" };
-            store.productPriceLabels = new[] { "Credits", "Credits", "Credits", "Credits", "Credits" };
-            store.productCoins = new[] { 0, 0, 0, 500, 3000 };
+            store.productListingIds = new[] { "", "", "", "", "", "" };
+            store.productPriceLabels = new[] { "Credits", "Credits", "Credits", "Credits", "Credits", "Credits" };
+            store.productCoins = new[] { 0, 0, 0, 500, 3000, 0 };
+            store.productArt = new Sprite[6];
+            for (int i = 0; i < 6; i++) store.productArt[i] = StoreArt("premium", i) ?? LoopLandArt.ProductThumb("Thumb_Premium_" + i, i);
             store.vipProduct = 2;
 
             // game wiring
@@ -618,6 +749,162 @@ namespace LoopLand.EditorTools
             return null;
         }
 
+        private static Image UImg(Transform parent, string name, Vector2 pos, Vector2 size, Sprite sprite, Color color, bool sliced = true, bool raycast = false)
+        {
+            var img = URect(parent, name, pos, size).gameObject.AddComponent<Image>();
+            img.sprite = sprite;
+            img.type = sliced && sprite != null && sprite.border.sqrMagnitude > 0f ? Image.Type.Sliced : Image.Type.Simple;
+            img.pixelsPerUnitMultiplier = 1f;
+            img.color = color;
+            img.raycastTarget = raycast;
+            return img;
+        }
+
+        private static Sprite StoreArt(string prefix, int index) => FindArt(Root + "/Store Art", prefix + "_" + index);
+
+        /// <summary>Finds an image by exact file name (no extension) in a folder and makes sure it imports as a Sprite.</summary>
+        private static Sprite FindArt(string folderPath, string fileName)
+        {
+            if (!AssetDatabase.IsValidFolder(folderPath)) return null;
+            foreach (string g in AssetDatabase.FindAssets("t:Texture2D", new[] { folderPath }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(g);
+                if (!string.Equals(Path.GetFileNameWithoutExtension(path), fileName, StringComparison.OrdinalIgnoreCase)) continue;
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer != null && importer.textureType != TextureImporterType.Sprite)
+                {
+                    importer.textureType = TextureImporterType.Sprite;
+                    importer.spriteImportMode = SpriteImportMode.Single;
+                    importer.SaveAndReimport();
+                }
+                return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            }
+            return null;
+        }
+
+        // ------------------------------------------------------------------ infinity path
+
+        /// <summary>Figure-8: two round lobes (centers at +-LobeC) joined by straight lanes that cross at the origin.</summary>
+        private static void BuildPath()
+        {
+            pathPts = new List<Vector2>();
+            float a = Mathf.Acos(LobeR / LobeC);
+            var lowR = new Vector2(LobeC + LobeR * Mathf.Cos(Mathf.PI + a), LobeR * Mathf.Sin(Mathf.PI + a));
+            var upR = new Vector2(LobeC + LobeR * Mathf.Cos(Mathf.PI - a), LobeR * Mathf.Sin(Mathf.PI - a));
+            var lowL = new Vector2(-LobeC + LobeR * Mathf.Cos(-a), LobeR * Mathf.Sin(-a));
+            var upL = new Vector2(-LobeC + LobeR * Mathf.Cos(a), LobeR * Mathf.Sin(a));
+            AddLine(Vector2.zero, lowR, 60);
+            AddArc(LobeC, Mathf.PI + a, 3f * Mathf.PI - a, 480);
+            AddLine(upR, lowL, 120);
+            AddArc(-LobeC, -a, -(2f * Mathf.PI - a), 480);
+            AddLine(upL, Vector2.zero, 60);
+            pathPts.Add(Vector2.zero);
+            pathLen = new List<float> { 0f };
+            for (int i = 1; i < pathPts.Count; i++) pathLen.Add(pathLen[i - 1] + Vector2.Distance(pathPts[i], pathPts[i - 1]));
+        }
+
+        private static void AddLine(Vector2 a, Vector2 b, int steps)
+        {
+            for (int i = 0; i < steps; i++) pathPts.Add(Vector2.Lerp(a, b, i / (float)steps));
+        }
+
+        private static void AddArc(float cx, float a0, float a1, int steps)
+        {
+            for (int i = 0; i < steps; i++)
+            {
+                float t = Mathf.Lerp(a0, a1, i / (float)steps);
+                pathPts.Add(new Vector2(cx + LobeR * Mathf.Cos(t), LobeR * Mathf.Sin(t)));
+            }
+        }
+
+        private static void PathAt(float s, out Vector2 p, out Vector2 tangent)
+        {
+            float total = pathLen[pathLen.Count - 1];
+            s = Mathf.Repeat(s, total);
+            int lo = 0, hi = pathLen.Count - 1;
+            while (hi - lo > 1)
+            {
+                int m = (lo + hi) / 2;
+                if (pathLen[m] <= s) lo = m; else hi = m;
+            }
+            float seg = Mathf.Max(1e-6f, pathLen[lo + 1] - pathLen[lo]);
+            p = Vector2.Lerp(pathPts[lo], pathPts[lo + 1], (s - pathLen[lo]) / seg);
+            tangent = (pathPts[lo + 1] - pathPts[lo]).normalized;
+        }
+
+        private static Color RibbonColor(float v)
+        {
+            float f = Mathf.Clamp01(v) * (RibbonHex.Length - 1);
+            int i = Mathf.Min((int)f, RibbonHex.Length - 2);
+            return Color.Lerp(Hex(RibbonHex[i]), Hex(RibbonHex[i + 1]), f - i);
+        }
+
+        private static Mesh RibbonMesh(float width)
+        {
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var cols = new List<Color>();
+            var tris = new List<int>();
+            float total = pathLen[pathLen.Count - 1];
+            for (int i = 0; i < pathPts.Count; i++)
+            {
+                Vector2 t = (pathPts[Mathf.Min(i + 1, pathPts.Count - 1)] - pathPts[Mathf.Max(i - 1, 0)]).normalized;
+                Vector2 n = new Vector2(-t.y, t.x) * (width * 0.5f);
+                Vector2 p = pathPts[i];
+                verts.Add(new Vector3(p.x + n.x, 0f, p.y + n.y));
+                verts.Add(new Vector3(p.x - n.x, 0f, p.y - n.y));
+                float v = pathLen[i] / total;
+                uvs.Add(new Vector2(0f, v * 40f));
+                uvs.Add(new Vector2(1f, v * 40f));
+                Color c = RibbonColor(v);
+                cols.Add(c);
+                cols.Add(c);
+                if (i == 0) continue;
+                int b = verts.Count - 4;
+                tris.Add(b); tris.Add(b + 2); tris.Add(b + 1);
+                tris.Add(b + 1); tris.Add(b + 2); tris.Add(b + 3);
+            }
+            var mesh = new Mesh { name = "LoopLand Infinity Ribbon" };
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetColors(cols);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            Dir(Gen + "/Meshes");
+            string path = Gen + "/Meshes/LoopLand_Ribbon.asset";
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(mesh, path);
+            return mesh;
+        }
+
+        private static Material RibbonMaterial()
+        {
+            const int w = 64;
+            var tex = new Texture2D(w, 4, TextureFormat.RGBA32, false);
+            for (int x = 0; x < w; x++)
+            {
+                float u = (x + 0.5f) / w;
+                float edge = Mathf.Exp(-Mathf.Pow((u - 0.07f) / 0.045f, 2f)) + Mathf.Exp(-Mathf.Pow((u - 0.93f) / 0.045f, 2f));
+                float a = Mathf.Clamp01(0.22f + edge);
+                for (int y = 0; y < 4; y++) tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+            tex.Apply();
+            Texture2D ribbonTex = SavePng("Ribbon", tex);
+            string path = Gen + "/Materials/Ribbon.mat";
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                Dir(Gen + "/Materials");
+                m = new Material(Shader.Find("Legacy Shaders/Particles/Additive"));
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.mainTexture = ribbonTex;
+            m.SetColor("_TintColor", new Color(0.5f, 0.5f, 0.5f, 0.5f));
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         private static RectTransform URect(Transform parent, string name, Vector2 pos, Vector2 size)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -633,7 +920,7 @@ namespace LoopLand.EditorTools
             var img = URect(parent, name, pos, size).gameObject.AddComponent<Image>();
             img.sprite = roundSprite;
             img.type = Image.Type.Sliced;
-            img.pixelsPerUnitMultiplier = 0.35f;
+            img.pixelsPerUnitMultiplier = 1f;
             img.color = color;
             img.raycastTarget = raycast;
             return img;
@@ -690,11 +977,11 @@ namespace LoopLand.EditorTools
         private static Texture LiveCamera(Transform root)
         {
             Dir(Gen + "/Textures");
-            string rtPath = Gen + "/Textures/LiveBoard.renderTexture";
+            string rtPath = Gen + "/Textures/LiveBoardWide.renderTexture";
             var liveTex = AssetDatabase.LoadAssetAtPath<RenderTexture>(rtPath);
             if (liveTex == null)
             {
-                liveTex = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGB32) { name = "LiveBoard", antiAliasing = 2 };
+                liveTex = new RenderTexture(1536, 768, 24, RenderTextureFormat.ARGB32) { name = "LiveBoardWide", antiAliasing = 2 };
                 AssetDatabase.CreateAsset(liveTex, rtPath);
             }
             var camGo = new GameObject("Live Board Camera");
@@ -703,7 +990,7 @@ namespace LoopLand.EditorTools
             camGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             var cam = camGo.AddComponent<Camera>();
             cam.orthographic = true;
-            cam.orthographicSize = 2.6f;
+            cam.orthographicSize = 2.1f;
             cam.nearClipPlane = 0.01f;
             cam.farClipPlane = 1.2f;
             cam.clearFlags = CameraClearFlags.SolidColor;
@@ -795,7 +1082,7 @@ namespace LoopLand.EditorTools
 
         // ------------------------------------------------------------------ helpers: assets
 
-        private static void Dir(string path)
+        internal static void Dir(string path)
         {
             if (AssetDatabase.IsValidFolder(path)) return;
             string parent = Path.GetDirectoryName(path).Replace('\\', '/');
@@ -869,9 +1156,7 @@ namespace LoopLand.EditorTools
         private static Material[] BuildDiceMaterials(out string[] names, out Color[] glow)
         {
             names = new[] { "Classic Ivory", "Midnight Onyx", "Neon Pulse", "Ruby Ember", "Frost Crystal", "Royal Gold", "Galaxy Holo", "Inferno Plasma" };
-            string[] body = { "F2EEE4", "15151C", "0B0F1E", "B0102A", "BFE9FF", "E8B730", "2A0E5E", "FF5A00" };
-            string[] pip = { "1A1A22", "E8E8F0", "00F0FF", "FFE3E8", "1B4E8C", "3A2500", "FFFFFF", "FFF3B0" };
-            string[] glowHex = { "FFFFFF", "8A8AFF", "00F0FF", "FF4060", "9AF2FF", "FFD54A", "B07CFF", "FF7A00" };
+            string[] body = DiceBodyHex, pip = DicePipHex, glowHex = DiceGlowHex;
             float[] metal = { 0f, 0.3f, 0.1f, 0.2f, 0.1f, 1f, 0.3f, 0.1f };
             float[] emit = { 0f, 0f, 1.2f, 0.15f, 0.2f, 0.1f, 0.8f, 1.3f };
             var mats = new Material[names.Length];

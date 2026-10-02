@@ -9,9 +9,10 @@ using VRC.SDKBase;
 namespace LoopLand
 {
     /// <summary>
-    /// LoopLand Store: persistent Loop Coins (PlayerData), cosmetic dice / tokens / trails bought with coins,
+    /// LoopLand Store: persistent Loop Coins (PlayerData), cosmetic dice / tokens / buildings / trails bought with coins,
     /// and VRChat Creator Economy products (premium packs, VIP, coin packs) bought with VRChat Credits.
     /// Equipped cosmetics live in PlayerData, so every player sees everyone else's skins.
+    /// Categories: 0 dice, 1 tokens, 2 buildings, 3 trails. Tab 4 is the premium (Credits) tab.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class LoopLandStore : UdonSharpBehaviour
@@ -24,19 +25,33 @@ namespace LoopLand
         public int[] diceProduct;
         public Material[] diceMaterials;
         public Color[] diceGlow;
+        public string[] diceDesc;
+        public Sprite[] diceArt;
 
         [Header("Token skins")]
         public string[] tokenNames;
         public int[] tokenPrices;
         public int[] tokenProduct;
         public Color[] tokenColors;
+        public string[] tokenDesc;
+        public Sprite[] tokenArt;
         public int rainbowToken = -1;
+
+        [Header("Building styles (the Loops and Towers on your properties)")]
+        public string[] buildingNames;
+        public int[] buildingPrices;
+        public int[] buildingProduct;
+        public Color[] buildingColors;
+        public string[] buildingDesc;
+        public Sprite[] buildingArt;
 
         [Header("Particle trails")]
         public string[] trailNames;
         public int[] trailPrices;
         public int[] trailProduct;
         public Color[] trailColors;
+        public string[] trailDesc;
+        public Sprite[] trailArt;
         public int rainbowTrail = -1;
 
         [Header("Creator Economy: assign UdonProduct assets and listing IDs (prod_...)")]
@@ -47,6 +62,7 @@ namespace LoopLand
         public string[] productPriceLabels;
         [Tooltip("Loop Coins granted per purchase (instant listings with quantity). 0 for unlock products.")]
         public int[] productCoins;
+        public Sprite[] productArt;
         public int vipProduct = 2;
         public int vipMultiplier = 2;
 
@@ -56,16 +72,22 @@ namespace LoopLand
 
         [Header("UI (auto-wired by the builder)")]
         public TMP_Text coinsText;
-        public TMP_Text detailText;
-        public TMP_Text actionLabel;
+        public TMP_Text vipText;
         public TMP_Text[] tabLabels;
+        public GameObject[] tabSelected;
         public GameObject[] itemButtons;
-        public TMP_Text[] itemLabels;
-        public Image[] itemSwatches;
-        public Renderer previewDie;
-        public Renderer[] previewToken;
-        public ParticleSystem previewTrail;
-        public Transform previewSpinner;
+        public GameObject[] itemSelected;
+        public Image[] itemIcons;
+        public TMP_Text[] itemNames;
+        public Image[] itemPills;
+        public TMP_Text[] itemStatus;
+        public TMP_Text detailName;
+        public TMP_Text detailRarity;
+        public Image detailRarityPill;
+        public TMP_Text detailDesc;
+        public Image detailPreview;
+        public TMP_Text actionLabel;
+        public TMP_Text bannerText;
         public AudioSource sfx;
         public AudioClip buyClip;
         public AudioClip errorClip;
@@ -73,13 +95,13 @@ namespace LoopLand
 
         [HideInInspector] public int pressedArg;
 
+        private const int PREMIUM_TAB = 4;
         private const string K_COINS = "ll_coins";
         private const string K_MATCH = "ll_match";
         private const string K_MATCH_GOT = "ll_match_got";
         private const string K_DAILY = "ll_daily";
-        private string[] kOwn = { "ll_own_dice", "ll_own_token", "ll_own_trail" };
-        private string[] kEq = { "ll_eq_dice", "ll_eq_token", "ll_eq_trail" };
-        private string[] tabNames = { "DICE", "TOKENS", "TRAILS", "PREMIUM" };
+        private string[] kOwn = { "ll_own_dice", "ll_own_token", "ll_own_building", "ll_own_trail" };
+        private string[] kEq = { "ll_eq_dice", "ll_eq_token", "ll_eq_building", "ll_eq_trail" };
 
         private bool restored;
         private bool[] owned = new bool[0];
@@ -87,18 +109,13 @@ namespace LoopLand
         private int pendingMatch;
         private int pendingEarned;
         private int tab;
-        private int sel = -1;
+        private int sel;
         private string message = "";
 
         private void Start()
         {
             owned = new bool[products == null ? 0 : products.Length];
             _RefreshUI();
-        }
-
-        private void Update()
-        {
-            if (previewSpinner != null) previewSpinner.Rotate(0f, 35f * Time.deltaTime, 0f);
         }
 
         // ------------------------------------------------------------ persistence & CE events
@@ -111,6 +128,7 @@ namespace LoopLand
             if (pendingCoins > 0) { int c = pendingCoins; pendingCoins = 0; _AddCoins(c); }
             if (pendingMatch != 0) _ApplyMatchReward(pendingMatch, pendingEarned);
             _RefreshOwned();
+            sel = _DefaultSel(tab);
             _RefreshUI();
             if (game != null) game._OnCosmeticsChanged();
         }
@@ -137,7 +155,7 @@ namespace LoopLand
                 {
                     int grant = productCoins != null && idx < productCoins.Length ? productCoins[idx] : 0;
                     if (grant > 0) _AddCoins(grant * Mathf.Max(1, quantity));
-                    message = "<color=#FFE14D>Thank you for supporting LoopLand!</color>\n" + _ProductName(idx) + (grant > 0 ? " (+" + (grant * Mathf.Max(1, quantity)) + " coins)" : " unlocked!");
+                    message = "<color=#FFE14D>Thank you for supporting LoopLand!</color> " + _ProductName(idx) + (grant > 0 ? " (+" + (grant * Mathf.Max(1, quantity)) + " coins)" : " unlocked!");
                     _Sfx(buyClip);
                 }
                 _RefreshUI();
@@ -170,7 +188,7 @@ namespace LoopLand
         {
             if (!restored) return;
             VRCPlayerApi lp = Networking.LocalPlayer;
-            for (int cat = 0; cat < 3; cat++)
+            for (int cat = 0; cat < 4; cat++)
             {
                 int eq = PlayerData.GetInt(lp, kEq[cat]);
                 if (eq != 0 && !_Owns(cat, eq)) PlayerData.SetInt(kEq[cat], 0);
@@ -233,11 +251,11 @@ namespace LoopLand
             Store.OpenWorldStorePage();
         }
 
-        // ------------------------------------------------------------ catalogue (used by the game too)
+        // ------------------------------------------------------------ catalogue (also used by the game)
 
         public int _GetEquipped(VRCPlayerApi p, int cat)
         {
-            if (!Utilities.IsValid(p)) return 0;
+            if (!Utilities.IsValid(p) || cat < 0 || cat > 3) return 0;
             int v = PlayerData.GetInt(p, kEq[cat]);
             if (v <= 0 || v >= _Count(cat)) return 0;
             int prod = _ItemProduct(cat, v);
@@ -250,42 +268,45 @@ namespace LoopLand
         public Color _TokenColor(int i) { return tokenColors != null && i >= 0 && i < tokenColors.Length ? tokenColors[i] : Color.white; }
         public Color _TokenGlow(int i, Color fallback) { return i <= 0 ? fallback : _TokenColor(i); }
         public Color _TrailColor(int i) { return trailColors != null && i >= 0 && i < trailColors.Length ? trailColors[i] : Color.white; }
+        public Color _BuildingColor(int i) { return buildingColors != null && i >= 0 && i < buildingColors.Length ? buildingColors[i] : Color.white; }
         public bool _IsRainbowToken(int i) { return i > 0 && i == rainbowToken; }
         public bool _IsRainbowTrail(int i) { return i > 0 && i == rainbowTrail; }
 
         private int _Count(int cat)
         {
-            string[] a = cat == 0 ? diceNames : (cat == 1 ? tokenNames : (cat == 2 ? trailNames : productNames));
+            string[] a = cat == 0 ? diceNames : (cat == 1 ? tokenNames : (cat == 2 ? buildingNames : (cat == 3 ? trailNames : productNames)));
             return a == null ? 0 : a.Length;
         }
 
         private string _ItemName(int cat, int i)
         {
-            if (cat == 0) return diceNames[i];
-            if (cat == 1) return tokenNames[i];
-            if (cat == 2) return trailNames[i];
-            return _ProductName(i);
+            string[] a = cat == 0 ? diceNames : (cat == 1 ? tokenNames : (cat == 2 ? buildingNames : (cat == 3 ? trailNames : productNames)));
+            return a != null && i >= 0 && i < a.Length ? a[i] : "";
+        }
+
+        private string _ItemDesc(int cat, int i)
+        {
+            string[] a = cat == 0 ? diceDesc : (cat == 1 ? tokenDesc : (cat == 2 ? buildingDesc : (cat == 3 ? trailDesc : productDescriptions)));
+            return a != null && i >= 0 && i < a.Length ? a[i] : "";
+        }
+
+        private Sprite _ItemArt(int cat, int i)
+        {
+            Sprite[] a = cat == 0 ? diceArt : (cat == 1 ? tokenArt : (cat == 2 ? buildingArt : (cat == 3 ? trailArt : productArt)));
+            return a != null && i >= 0 && i < a.Length ? a[i] : null;
         }
 
         private int _ItemPrice(int cat, int i)
         {
-            int[] a = cat == 0 ? dicePrices : (cat == 1 ? tokenPrices : trailPrices);
-            return a != null && i < a.Length ? a[i] : 0;
+            int[] a = cat == 0 ? dicePrices : (cat == 1 ? tokenPrices : (cat == 2 ? buildingPrices : trailPrices));
+            return a != null && i >= 0 && i < a.Length ? a[i] : 0;
         }
 
         private int _ItemProduct(int cat, int i)
         {
-            if (cat == 3) return i;
-            int[] a = cat == 0 ? diceProduct : (cat == 1 ? tokenProduct : trailProduct);
-            return a != null && i < a.Length ? a[i] : -1;
-        }
-
-        private Color _ItemColor(int cat, int i)
-        {
-            if (cat == 0) return _DiceGlow(i);
-            if (cat == 1) return i == 0 ? new Color(0f, 0.9f, 1f) : _TokenColor(i);
-            if (cat == 2) return _TrailColor(i);
-            return new Color(1f, 0.85f, 0.25f);
+            if (cat == PREMIUM_TAB) return i;
+            int[] a = cat == 0 ? diceProduct : (cat == 1 ? tokenProduct : (cat == 2 ? buildingProduct : trailProduct));
+            return a != null && i >= 0 && i < a.Length ? a[i] : -1;
         }
 
         private string _ProductName(int i)
@@ -293,9 +314,14 @@ namespace LoopLand
             return productNames != null && i >= 0 && i < productNames.Length ? productNames[i] : "Premium item";
         }
 
+        private bool _IsCoinPack(int prod)
+        {
+            return productCoins != null && prod >= 0 && prod < productCoins.Length && productCoins[prod] > 0;
+        }
+
         private bool _Owns(int cat, int i)
         {
-            if (cat == 3) return i < owned.Length && owned[i];
+            if (cat == PREMIUM_TAB) return i < owned.Length && owned[i];
             if (i == 0) return true;
             int prod = _ItemProduct(cat, i);
             if (prod >= 0) return prod < owned.Length && owned[prod];
@@ -303,12 +329,37 @@ namespace LoopLand
             return ((PlayerData.GetInt(Networking.LocalPlayer, kOwn[cat]) >> i) & 1) == 1;
         }
 
-        // ------------------------------------------------------------ UI events
+        private int _Equipped(int cat)
+        {
+            if (cat >= PREMIUM_TAB || !restored) return 0;
+            return Mathf.Max(0, PlayerData.GetInt(Networking.LocalPlayer, kEq[cat]));
+        }
+
+        private int _DefaultSel(int t)
+        {
+            return Mathf.Clamp(_Equipped(t), 0, Mathf.Max(0, _Count(t) - 1));
+        }
+
+        // ------------------------------------------------------------ UI events (UI buttons call these)
+
+        public void _OnTab0() { pressedArg = 0; _OnTab(); }
+        public void _OnTab1() { pressedArg = 1; _OnTab(); }
+        public void _OnTab2() { pressedArg = 2; _OnTab(); }
+        public void _OnTab3() { pressedArg = 3; _OnTab(); }
+        public void _OnTab4() { pressedArg = 4; _OnTab(); }
+        public void _OnItem0() { pressedArg = 0; _OnItem(); }
+        public void _OnItem1() { pressedArg = 1; _OnItem(); }
+        public void _OnItem2() { pressedArg = 2; _OnItem(); }
+        public void _OnItem3() { pressedArg = 3; _OnItem(); }
+        public void _OnItem4() { pressedArg = 4; _OnItem(); }
+        public void _OnItem5() { pressedArg = 5; _OnItem(); }
+        public void _OnItem6() { pressedArg = 6; _OnItem(); }
+        public void _OnItem7() { pressedArg = 7; _OnItem(); }
 
         public void _OnTab()
         {
-            tab = Mathf.Clamp(pressedArg, 0, 3);
-            sel = -1;
+            tab = Mathf.Clamp(pressedArg, 0, PREMIUM_TAB);
+            sel = _DefaultSel(tab);
             message = "";
             _Sfx(clickClip);
             _RefreshUI();
@@ -320,32 +371,17 @@ namespace LoopLand
             sel = pressedArg;
             message = "";
             _Sfx(clickClip);
-            _Preview();
             _RefreshUI();
         }
 
-        public void _OnTab0() { pressedArg = 0; _OnTab(); }
-        public void _OnTab1() { pressedArg = 1; _OnTab(); }
-        public void _OnTab2() { pressedArg = 2; _OnTab(); }
-        public void _OnTab3() { pressedArg = 3; _OnTab(); }
-        public void _OnItem0() { pressedArg = 0; _OnItem(); }
-        public void _OnItem1() { pressedArg = 1; _OnItem(); }
-        public void _OnItem2() { pressedArg = 2; _OnItem(); }
-        public void _OnItem3() { pressedArg = 3; _OnItem(); }
-        public void _OnItem4() { pressedArg = 4; _OnItem(); }
-        public void _OnItem5() { pressedArg = 5; _OnItem(); }
-        public void _OnItem6() { pressedArg = 6; _OnItem(); }
-        public void _OnItem7() { pressedArg = 7; _OnItem(); }
-
         public void _OnAction()
         {
-            if (sel < 0) { _Fail("Pick an item first."); return; }
+            if (sel < 0 || sel >= _Count(tab)) { _Fail("Pick an item first."); return; }
             int prod = _ItemProduct(tab, sel);
-            if (tab == 3 || (prod >= 0 && !_Owns(tab, sel)))
+            if (tab == PREMIUM_TAB || (prod >= 0 && !_Owns(tab, sel)))
             {
-                bool coinPack = productCoins != null && prod < productCoins.Length && productCoins[prod] > 0;
                 if (products == null || prod >= products.Length || products[prod] == null) { _Fail("This premium item isn't set up yet (see README)."); return; }
-                if (tab == 3 && _Owns(3, prod) && !coinPack) { _Fail("You already own this. Enjoy!"); return; }
+                if (tab == PREMIUM_TAB && _Owns(PREMIUM_TAB, prod) && !_IsCoinPack(prod)) { _Fail("You already own this. Enjoy!"); return; }
                 string id = productListingIds != null && prod < productListingIds.Length ? productListingIds[prod] : "";
                 _Sfx(clickClip);
                 if (id != null && id.Length > 0) Store.OpenListing(id);
@@ -363,7 +399,7 @@ namespace LoopLand
             }
             int price = _ItemPrice(tab, sel);
             int coins = _Coins();
-            if (coins < price) { _Fail("Need " + (price - coins) + " more Loop Coins. Play games, claim the daily bonus, or grab a coin pack!"); return; }
+            if (coins < price) { _Fail("You need " + (price - coins) + " more Loop Coins. Play games, claim the daily bonus or grab a coin pack!"); return; }
             int mask = PlayerData.GetInt(Networking.LocalPlayer, kOwn[tab]);
             PlayerData.SetInt(K_COINS, coins - price);
             PlayerData.SetInt(kOwn[tab], mask | (1 << sel));
@@ -385,88 +421,116 @@ namespace LoopLand
             if (sfx != null && c != null) sfx.PlayOneShot(c, 0.8f);
         }
 
-        private void _Preview()
-        {
-            if (sel < 0) return;
-            if (tab == 0 && previewDie != null && _DiceMaterial(sel) != null) previewDie.sharedMaterial = _DiceMaterial(sel);
-            Color c = _ItemColor(tab, sel);
-            if (tab == 1 && previewToken != null)
-            {
-                for (int i = 0; i < previewToken.Length; i++)
-                {
-                    if (previewToken[i] == null) continue;
-                    previewToken[i].material.SetColor("_Color", c);
-                    previewToken[i].material.SetColor("_EmissionColor", c * 0.6f);
-                }
-            }
-            if (tab == 2 && previewTrail != null)
-            {
-                Renderer r = previewTrail.GetComponent<Renderer>();
-                if (r != null) r.material.SetColor("_TintColor", c * 0.6f);
-                previewTrail.Emit(60);
-            }
-        }
+        // ------------------------------------------------------------ UI refresh
 
         private void _RefreshUI()
         {
-            if (coinsText != null)
-                coinsText.text = restored ? "<b>" + _Coins() + "</b> <size=70%>LOOP COINS</size>" + (_IsVip() ? "  <color=#FFE14D>VIP x" + vipMultiplier + "</color>" : "") : "<size=70%>Loading save...</size>";
-            if (tabLabels != null)
-                for (int i = 0; i < tabLabels.Length && i < 4; i++)
-                    if (tabLabels[i] != null) tabLabels[i].text = i == tab ? "<color=#FFE14D>" + tabNames[i] + "</color>" : tabNames[i];
+            int coins = _Coins();
+            if (coinsText != null) coinsText.text = restored ? coins.ToString() : "...";
+            if (vipText != null) vipText.text = _IsVip() ? "VIP x" + vipMultiplier : "";
+            for (int t = 0; t <= PREMIUM_TAB; t++)
+            {
+                if (tabLabels != null && t < tabLabels.Length && tabLabels[t] != null) tabLabels[t].color = t == tab ? new Color(1f, 0.84f, 0.3f, 1f) : Color.white;
+                if (tabSelected != null && t < tabSelected.Length && tabSelected[t] != null) tabSelected[t].SetActive(t == tab);
+            }
 
             int count = _Count(tab);
-            int eq = tab < 3 && restored ? PlayerData.GetInt(Networking.LocalPlayer, kEq[tab]) : -1;
-            if (itemLabels != null)
+            int eq = _Equipped(tab);
+            if (itemButtons != null)
             {
-                for (int i = 0; i < itemLabels.Length; i++)
+                for (int i = 0; i < itemButtons.Length; i++)
                 {
                     bool on = i < count;
-                    if (itemButtons != null && i < itemButtons.Length && itemButtons[i] != null) itemButtons[i].SetActive(on);
-                    if (!on || itemLabels[i] == null) continue;
-                    itemLabels[i].text = (i == sel ? "<color=#FFE14D>" : "") + "<b>" + _ItemName(tab, i) + "</b>" + (i == sel ? "</color>" : "") + "\n<size=75%>" + _StatusLine(tab, i, eq) + "</size>";
-                    if (itemSwatches != null && i < itemSwatches.Length && itemSwatches[i] != null)
+                    if (itemButtons[i] != null) itemButtons[i].SetActive(on);
+                    if (itemSelected != null && i < itemSelected.Length && itemSelected[i] != null) itemSelected[i].SetActive(on && i == sel);
+                    if (!on) continue;
+                    if (itemIcons != null && i < itemIcons.Length && itemIcons[i] != null)
                     {
-                        itemSwatches[i].color = _ItemColor(tab, i);
+                        Sprite s = _ItemArt(tab, i);
+                        itemIcons[i].sprite = s;
+                        itemIcons[i].enabled = s != null;
                     }
+                    if (itemNames != null && i < itemNames.Length && itemNames[i] != null) itemNames[i].text = _ItemName(tab, i);
+                    int kind = _StatusKind(tab, i, eq);
+                    if (itemPills != null && i < itemPills.Length && itemPills[i] != null) itemPills[i].color = _KindColor(kind);
+                    if (itemStatus != null && i < itemStatus.Length && itemStatus[i] != null) itemStatus[i].text = _KindText(tab, i, kind);
                 }
             }
 
-            string detail = "";
-            string action = "SELECT AN ITEM";
+            string action = "SELECT ITEM";
             if (sel >= 0 && sel < count)
             {
-                int prod = _ItemProduct(tab, sel);
-                detail = "<b>" + _ItemName(tab, sel) + "</b>\n";
-                if (tab == 3)
+                if (detailName != null) detailName.text = _ItemName(tab, sel);
+                string rarity = _Rarity(tab, sel);
+                if (detailRarity != null) detailRarity.text = rarity;
+                if (detailRarityPill != null) detailRarityPill.color = _RarityColor(rarity);
+                if (detailDesc != null) detailDesc.text = _ItemDesc(tab, sel);
+                if (detailPreview != null)
                 {
-                    detail += productDescriptions != null && sel < productDescriptions.Length ? productDescriptions[sel] : "";
-                    bool coinPack = productCoins != null && sel < productCoins.Length && productCoins[sel] > 0;
-                    action = _Owns(3, sel) && !coinPack ? "OWNED" : "GET  " + _PriceLabel(sel);
+                    Sprite s = _ItemArt(tab, sel);
+                    detailPreview.sprite = s;
+                    detailPreview.enabled = s != null;
                 }
+                int prod = _ItemProduct(tab, sel);
+                if (tab == PREMIUM_TAB) action = _Owns(PREMIUM_TAB, sel) && !_IsCoinPack(sel) ? "OWNED" : "GET  " + _PriceLabel(sel);
                 else if (_Owns(tab, sel)) action = sel == eq ? "EQUIPPED" : "EQUIP";
-                else if (prod >= 0) { detail += "Premium item - included with " + _ProductName(prod) + "."; action = "GET  " + _PriceLabel(prod); }
-                else { detail += "Unlock with Loop Coins earned by playing."; action = "BUY  " + _ItemPrice(tab, sel) + " COINS"; }
+                else if (prod >= 0) action = "UNLOCK  " + _PriceLabel(prod);
+                else action = "BUY  " + _ItemPrice(tab, sel) + " COINS";
             }
-            else detail = "Earn <color=#FFE14D>Loop Coins</color> by playing LoopLand, then spend them on dice, tokens and particle trails.\nPremium packs support the creator.";
-            if (message.Length > 0) detail += "\n" + message;
-            if (detailText != null) detailText.text = detail;
             if (actionLabel != null) actionLabel.text = action;
+
+            if (bannerText != null)
+            {
+                string first = message.Length > 0 ? message : "Earn <color=#FFE14D>Loop Coins</color> by playing LoopLand, then spend them on dice, tokens, buildings, trails and more!";
+                bannerText.text = first + "\n<color=#FFE14D>" + (restored ? coins + " Loop Coins saved." : "Loading your save...") + "</color>";
+            }
         }
 
-        private string _StatusLine(int cat, int i, int eq)
+        /// <summary>0 price in coins, 1 owned, 2 equipped, 3 premium (locked), 4 Credits price, 5 owned premium.</summary>
+        private int _StatusKind(int cat, int i, int eq)
         {
-            if (cat == 3)
-            {
-                bool coinPack = productCoins != null && i < productCoins.Length && productCoins[i] > 0;
-                if (_Owns(3, i) && !coinPack) return "<color=#7CFF4F>OWNED</color>";
-                return "<color=#FFE14D>" + _PriceLabel(i) + "</color>";
-            }
-            if (i == eq || (eq <= 0 && i == 0)) return "<color=#7CFF4F>EQUIPPED</color>";
-            if (_Owns(cat, i)) return "OWNED";
-            int prod = _ItemProduct(cat, i);
-            if (prod >= 0) return "<color=#FFE14D>PREMIUM</color>";
-            return _ItemPrice(cat, i) + " coins";
+            if (cat == PREMIUM_TAB) return _Owns(PREMIUM_TAB, i) && !_IsCoinPack(i) ? 5 : 4;
+            if (i == eq) return 2;
+            if (_Owns(cat, i)) return 1;
+            if (_ItemProduct(cat, i) >= 0) return 3;
+            return 0;
+        }
+
+        private Color _KindColor(int kind)
+        {
+            if (kind == 1 || kind == 5) return new Color(0.13f, 0.42f, 0.86f, 1f);
+            if (kind == 2) return new Color(0.1f, 0.62f, 0.36f, 1f);
+            if (kind == 3 || kind == 4) return new Color(0.72f, 0.53f, 0.06f, 1f);
+            return new Color(0.2f, 0.18f, 0.38f, 1f);
+        }
+
+        private string _KindText(int cat, int i, int kind)
+        {
+            if (kind == 1 || kind == 5) return "OWNED";
+            if (kind == 2) return "EQUIPPED";
+            if (kind == 3) return "PREMIUM";
+            if (kind == 4) return _PriceLabel(i);
+            return _ItemPrice(cat, i) + " COINS";
+        }
+
+        private string _Rarity(int cat, int i)
+        {
+            if (cat == PREMIUM_TAB) return _IsCoinPack(i) ? "COIN PACK" : "PREMIUM";
+            if (_ItemProduct(cat, i) >= 0) return "PREMIUM";
+            int p = _ItemPrice(cat, i);
+            if (p <= 0) return "STARTER";
+            if (p <= 250) return "COMMON";
+            if (p <= 450) return "RARE";
+            return "EPIC";
+        }
+
+        private Color _RarityColor(string r)
+        {
+            if (r == "STARTER") return new Color(0.3f, 0.36f, 0.55f, 1f);
+            if (r == "COMMON") return new Color(0.1f, 0.55f, 0.75f, 1f);
+            if (r == "RARE") return new Color(0.48f, 0.28f, 0.85f, 1f);
+            if (r == "EPIC") return new Color(0.9f, 0.4f, 0.1f, 1f);
+            return new Color(0.75f, 0.55f, 0.05f, 1f);
         }
 
         private string _PriceLabel(int prod)

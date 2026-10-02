@@ -89,7 +89,7 @@ namespace LoopLand
         public LoopLandDice[] dice;
         public Transform[] spaceAnchors;
         public Image[] ownerBars;
-        public GameObject[] buildMarkers;
+        public Image[] buildMarkers;
         public Transform selectionMarker;
         public Transform spinner;
         public TMP_Text[] statusTexts;
@@ -955,6 +955,7 @@ namespace LoopLand
         public void _OnCosmeticsChanged()
         {
             _RefreshTokens(false);
+            _RefreshBoard();
         }
 
         private void _RefreshAll()
@@ -1019,7 +1020,7 @@ namespace LoopLand
                 if (store != null && Utilities.IsValid(p))
                 {
                     int skin = store._GetEquipped(p, 1);
-                    int trail = store._GetEquipped(p, 2);
+                    int trail = store._GetEquipped(p, 3);
                     Color body = skin == 0 ? baseCol : store._TokenColor(skin);
                     tk._Skin(body, store._TokenGlow(skin, baseCol), store._TrailColor(trail), store._IsRainbowToken(skin), store._IsRainbowTrail(trail), label);
                 }
@@ -1046,12 +1047,19 @@ namespace LoopLand
                 }
                 if (buildMarkers == null || buildMarkers.Length < SPACES * 5) continue;
                 int b = (level[i] & 8) != 0 ? 0 : level[i] & 7;
+                Color style = Color.white;
+                if (b > 0 && store != null)
+                {
+                    VRCPlayerApi op = _SlotPlayer(o - 1);
+                    style = store._BuildingColor(Utilities.IsValid(op) ? store._GetEquipped(op, 2) : 0);
+                }
                 for (int k = 0; k < 5; k++)
                 {
-                    GameObject m = buildMarkers[i * 5 + k];
+                    Image m = buildMarkers[i * 5 + k];
                     if (m == null) continue;
                     bool on = b == 5 ? k == 4 : k < b;
-                    if (m.activeSelf != on) m.SetActive(on);
+                    if (m.gameObject.activeSelf != on) m.gameObject.SetActive(on);
+                    if (on) m.color = style;
                 }
             }
         }
