@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.12.0
+- Scratch cards now work like real scratch cards:
+  - **Match 3 to win.** Each card has 9 silver spots, and finding 3 the same wins that prize. Some cards don't win
+    (about half), and nothing else ever shows up 3 times.
+  - **You scratch every spot yourself.** The foil tears away wherever your pointer goes, with no REVEAL ALL and no
+    auto-clear. The result appears once all 9 spots are scratched, and the 3 matching spots light up.
+  - **New card design:** night-city art per rarity, the LOOPLAND logo, a price badge, a TOP PRIZE starburst, and
+    the rule "MATCH 3 THE SAME TO WIN THAT PRIZE!".
+  - **Prizes:** Loop Coins at 0.5x, 1x, 2x, 5x or 25x the card price (25x is the jackpot), or a dice, token,
+    building style or trail you don't own yet.
+  - **Screen:** "BUY SCRATCH CARDS" with a BUY CARD button under each card.
+  - **Desk:** shows HOW IT WORKS.
+  - **Results:** "WINNER!" with confetti, or "NOT A WIN THIS TIME" with a try-again sound.
+- Rebuild the scene (**LoopLand > Build Game In Scene > Replace**) to get the new cards.
+
 ## 1.11.0
 - Real scratching: the scratch card is covered in silver foil that tears away wherever you rub it with your pointer
   (VR laser or desktop cursor). No more sliding coins.

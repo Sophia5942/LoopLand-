@@ -14,7 +14,7 @@ namespace LoopLand.EditorTools
     {
         public static Sprite Round, Glow, Pill, Panel, Coin, House, Tower;
         public static Sprite IconDice, IconPawn, IconBuilding, IconSparkle, IconCrown, IconGift, IconGlobe;
-        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen, LogoInfinity, ScratchCell;
+        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen, LogoInfinity, ScratchCell, Burst, NoPrize;
 
         private static string folder;
         private static float aa;
@@ -132,6 +132,21 @@ namespace LoopLand.EditorTools
                 if (Hash(Mathf.Floor(x * 10f) + 3f, Mathf.Floor(y * 10f)) > 0.95f && Circle(Mathf.Repeat(x * 10f, 1f), Mathf.Repeat(y * 10f, 1f), 0.5f, 0.5f, 0.13f) < 0f) c = Color.white;
                 return A(c, Mathf.Clamp01((rim - Mathf.Sqrt(dx * dx + dy * dy)) / 0.012f + 0.5f));
             });
+            Burst = Paint("Burst", 128, 0, (x, y) =>
+            {
+                // 18-point starburst badge (tinted in the UI)
+                float dx = x - 0.5f, dy = y - 0.5f;
+                float tooth = Mathf.Abs(Mathf.Repeat(Mathf.Atan2(dy, dx) / (2f * Mathf.PI) * 18f, 1f) - 0.5f) * 2f;
+                return A(Color.white, Cov(Mathf.Sqrt(dx * dx + dy * dy) - (0.38f + 0.1f * (1f - tooth))));
+            });
+            NoPrize = Paint("No_Prize", 128, 0, (x, y) =>
+            {
+                float u = x - 0.5f, v = y - 0.5f;
+                float ring = Mathf.Abs(Circle(x, y, 0.5f, 0.5f, 0.36f)) - 0.035f;
+                float bar1 = Mathf.Max(Mathf.Abs(u - v) * 0.7071f - 0.045f, Mathf.Abs(u + v) * 0.7071f - 0.24f);
+                float bar2 = Mathf.Max(Mathf.Abs(u + v) * 0.7071f - 0.045f, Mathf.Abs(u - v) * 0.7071f - 0.24f);
+                return A(new Color(0.3f, 0.32f, 0.42f, 1f), Cov(Mathf.Min(ring, Mathf.Min(bar1, bar2))));
+            });
             IconScreen = Paint("Icon_Screen", 128, 0, (x, y) =>
             {
                 float frame = Mathf.Abs(Box(x, y, 0.5f, 0.58f, 0.38f, 0.27f, 0.05f)) - 0.04f;
@@ -181,29 +196,33 @@ namespace LoopLand.EditorTools
             return Paint(name, 256, 0, (x, y) => DrawSkyline(Color.clear, x, y, col, variant, bx, bw, bh));
         }
 
-        /// <summary>Scratch card pack: crimped foil pouch in the rarity colour with a skyline and the infinity logo.</summary>
-        public static Sprite PackArt(string name, Color col)
+        /// <summary>Scratch card background in the rarity colour: night-city skyline, colour glows, sparkles and a white inner border.</summary>
+        public static Sprite CardArt(string name, Color col)
         {
             return Paint(name, 256, 0, (x, y) =>
             {
-                float zig = Mathf.Abs(Mathf.Repeat(x * 16f, 1f) - 0.5f) * 0.04f;
-                float shape = Mathf.Max(Mathf.Abs(x - 0.5f) - 0.31f, Mathf.Max(y - (0.95f - zig), 0.05f + zig - y));
-                Color dark = new Color(col.r * 0.3f, col.g * 0.3f, col.b * 0.35f, 1f);
-                Color c = Color.Lerp(dark, col, y);
-                if (y > 0.88f || y < 0.12f) c = Color.Lerp(c, new Color(0.85f, 0.88f, 0.95f, 1f), 0.35f);
-                c = Color.Lerp(c, Color.white, Mathf.Exp(-Mathf.Pow((x + y * 0.6f - 0.75f) / 0.06f, 2f)) * 0.4f);
-                float sky = Box(x, y, 0.36f, 0.42f, 0.05f, 0.16f, 0.005f);
-                sky = Mathf.Min(sky, Box(x, y, 0.47f, 0.48f, 0.045f, 0.22f, 0.005f));
-                sky = Mathf.Min(sky, Box(x, y, 0.57f, 0.4f, 0.05f, 0.14f, 0.005f));
-                sky = Mathf.Min(sky, Box(x, y, 0.66f, 0.36f, 0.04f, 0.1f, 0.005f));
-                sky = Mathf.Min(sky, Box(x, y, 0.28f, 0.34f, 0.035f, 0.08f, 0.005f));
-                c = Mix(c, A(Color.Lerp(col, Color.white, 0.55f), 0.85f), Cov(sky));
-                if (sky < -0.006f && Hash(Mathf.Floor(x * 60f), Mathf.Floor(y * 60f)) > 0.72f) c = Color.Lerp(c, Color.white, 0.6f);
-                float inf = Mathf.Min(Mathf.Abs(Ellipse(x, y, 0.42f, 0.18f, 0.085f, 0.055f)), Mathf.Abs(Ellipse(x, y, 0.58f, 0.18f, 0.085f, 0.055f))) - 0.016f;
-                c = Mix(c, A(Color.white, 0.4f), Soft(inf - 0.01f, 0.04f) * 0.6f);
-                c = Mix(c, A(Color.white, 0.95f), Cov(inf));
+                Color dark = new Color(col.r * 0.18f + 0.06f, col.g * 0.15f + 0.03f, col.b * 0.3f + 0.16f, 1f);
+                Color c = Color.Lerp(dark, Color.Lerp(col, Color.white, 0.15f), Mathf.Pow(y, 1.4f));
+                c = Color.Lerp(c, new Color(1f, 0.24f, 0.8f, 1f), 0.35f * Mathf.Exp(-((x - 0.15f) * (x - 0.15f) + (y - 0.78f) * (y - 0.78f)) / 0.03f));
+                c = Color.Lerp(c, new Color(0f, 0.9f, 1f, 1f), 0.3f * Mathf.Exp(-((x - 0.85f) * (x - 0.85f) + (y - 0.62f) * (y - 0.62f)) / 0.03f));
+                float sky = 1f, low = 1f;
+                for (int b = 0; b < 10; b++)
+                {
+                    float bh = 0.06f + Hash(b, 3f) * 0.13f;
+                    sky = Mathf.Min(sky, Box(x, y, 0.05f + b * 0.1f, 0.6f + bh * 0.5f, 0.038f, bh * 0.5f, 0.004f));
+                }
+                for (int b = 0; b < 12; b++)
+                {
+                    float bh = 0.03f + Hash(b, 9f) * 0.07f;
+                    low = Mathf.Min(low, Box(x, y, 0.04f + b * 0.085f, bh * 0.5f, 0.035f, bh * 0.5f, 0.003f));
+                }
+                c = Color.Lerp(c, Color.Lerp(col, Color.white, 0.35f), Cov(sky) * 0.55f);
+                if (sky < -0.006f && Hash(Mathf.Floor(x * 90f), Mathf.Floor(y * 90f)) > 0.7f) c = Color.Lerp(c, new Color(1f, 0.95f, 0.7f, 1f), 0.6f);
+                c = Color.Lerp(c, new Color(0.04f, 0.03f, 0.12f, 1f), Cov(low) * 0.8f);
+                c = Color.Lerp(c, Color.white, Cov(Mathf.Abs(Box(x, y, 0.5f, 0.5f, 0.465f, 0.465f, 0.04f)) - 0.004f) * 0.8f);
+                if (Hash(Mathf.Floor(x * 40f) + 5f, Mathf.Floor(y * 40f)) > 0.985f && Circle(Mathf.Repeat(x * 40f, 1f), Mathf.Repeat(y * 40f, 1f), 0.5f, 0.5f, 0.2f) < 0f) c = Color.white;
                 c.a = 1f;
-                return A(c, Cov(shape));
+                return A(c, Cov(Box(x, y, 0.5f, 0.5f, 0.49f, 0.49f, 0.05f)));
             });
         }
 

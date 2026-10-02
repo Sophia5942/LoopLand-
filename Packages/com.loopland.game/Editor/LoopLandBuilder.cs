@@ -758,7 +758,7 @@ namespace LoopLand.EditorTools
 
         // ------------------------------------------------------------------ scratch cards
 
-        /// <summary>LoopLand Scratch Cards: an arcade machine beside the store. Pick a pack on the screen, buy it at the desk, then drag the coins to scratch.</summary>
+        /// <summary>LoopLand Scratch Cards: an arcade machine beside the store. Buy a card on the screen, rub the silver off its 9 spots, match 3 to win.</summary>
         private static void ScratchMachine(Transform rt, LoopLandStore store, Material dark)
         {
             var go = new GameObject("Scratch Cards");
@@ -818,32 +818,46 @@ namespace LoopLand.EditorTools
             string[] packNames = { "COMMON", "RARE", "EPIC", "LEGENDARY" };
             int[] packPrices = { 50, 100, 200, 400 };
             Color[] packCols = { Hex("1E8FFF"), Hex("2BD96B"), Hex("B07CFF"), Hex("FFD23F") };
+            var cardArts = new Sprite[4];
+            for (int i = 0; i < 4; i++) cardArts[i] = LoopLandArt.CardArt("Scratch_Card_" + i, packCols[i]);
             RectTransform scr = UCanvas(m, "Screen UI", new Vector3(0f, 1.95f, 0.145f), Quaternion.identity, new Vector2(2100f, 1450f));
             UImg(scr, "Glow", Vector2.zero, new Vector2(2140f, 1490f), LoopLandArt.Glow, new Color(0.75f, 0.35f, 1f, 1f));
             UImg(scr, "Back", Vector2.zero, new Vector2(2100f, 1450f), LoopLandArt.Panel, Color.white);
 
-            // pack page: four packs and the collection strip
-            RectTransform pp = URect(scr, "Pack Page", Vector2.zero, new Vector2(2100f, 1450f));
-            UText(pp, "Title", "<b>CHOOSE YOUR PACK</b>", new Vector2(0f, 640f), new Vector2(1600f, 110f), 84f, Color.white);
-            var glows = new GameObject[4];
+            // shop page: four cards to buy, then the collection
+            RectTransform pp = URect(scr, "Shop Page", Vector2.zero, new Vector2(2100f, 1450f));
+            UText(pp, "Title", "<b>BUY SCRATCH CARDS</b>", new Vector2(-450f, 645f), new Vector2(1100f, 100f), 80f, Color.white, TextAlignmentOptions.Left);
+            Image tag = UImg(pp, "Tag", new Vector2(345f, 645f), new Vector2(380f, 70f), LoopLandArt.Pill, Hex("D61F8C"));
+            UText(tag.transform, "Text", "<b>SOME WIN, SOME DON'T!</b>", Vector2.zero, new Vector2(350f, 56f), 34f, Color.white);
+            UImg(pp, "Coin", new Vector2(640f, 645f), new Vector2(90f, 90f), LoopLandArt.Coin, Color.white, false);
+            sc.coinsText = UText(pp, "Coins", "0", new Vector2(820f, 645f), new Vector2(260f, 90f), 66f, Color.white, TextAlignmentOptions.Left);
             for (int i = 0; i < 4; i++)
             {
                 var pos = new Vector2(-780f + i * 520f, 170f);
-                glows[i] = UImg(pp, "Pack Glow " + i, pos, new Vector2(500f, 820f), LoopLandArt.Glow, Lighter(packCols[i])).gameObject;
-                TextMeshProUGUI lab = UButton(pp, "Pack " + packNames[i], packNames[i], pos, new Vector2(460f, 780f), new Color(0.09f, 0.09f, 0.24f, 1f), sc, "_OnPack" + i, 54f);
-                Transform b = lab.transform.parent;
-                UImg(b, "Shine", new Vector2(0f, 100f), new Vector2(400f, 520f), LoopLandArt.Glow, new Color(packCols[i].r, packCols[i].g, packCols[i].b, 0.35f));
-                Image art = UImg(b, "Art", new Vector2(0f, 100f), new Vector2(540f, 540f), LoopLandArt.PackArt("Scratch_Pack_" + i, packCols[i]), Color.white, false);
-                art.preserveAspect = true;
-                lab.rectTransform.anchoredPosition = new Vector2(0f, -215f);
-                lab.rectTransform.sizeDelta = new Vector2(430f, 80f);
-                lab.color = Color.Lerp(packCols[i], Color.white, 0.3f);
-                Image pill = UImg(b, "Price", new Vector2(0f, -310f), new Vector2(300f, 84f), LoopLandArt.Pill, new Color(0.04f, 0.04f, 0.14f, 1f));
-                UImg(pill.transform, "Coin", new Vector2(-100f, 0f), new Vector2(64f, 64f), LoopLandArt.Coin, Color.white, false);
-                UText(pill.transform, "Amount", "<b>" + packPrices[i] + "</b>", new Vector2(30f, 0f), new Vector2(180f, 64f), 50f, Color.white);
+                UImg(pp, "Card Glow " + i, pos, new Vector2(500f, 820f), LoopLandArt.Glow, Lighter(packCols[i]));
+                Transform b = UImg(pp, "Card " + packNames[i], pos, new Vector2(460f, 780f), LoopLandArt.Round, new Color(0.09f, 0.09f, 0.24f, 1f)).transform;
+                UImg(b, "Art", new Vector2(0f, 140f), new Vector2(330f, 470f), cardArts[i], Color.white, false);
+                UImg(b, "Logo", new Vector2(0f, 300f), new Vector2(170f, 170f), LoopLandArt.LogoInfinity, Color.white, false);
+                TextMeshProUGUI word = UText(b, "Brand", "<b>LOOPLAND</b>", new Vector2(0f, 236f), new Vector2(300f, 56f), 50f, Color.white);
+                word.enableVertexGradient = true;
+                word.colorGradient = brand.colorGradient;
+                for (int k = 0; k < 9; k++)
+                    UImg(b, "Mini Spot " + k, new Vector2(-90f + (k % 3) * 90f, 140f - (k / 3) * 68f), new Vector2(80f, 58f), LoopLandArt.Round, new Color(0.78f, 0.8f, 0.86f, 1f));
+                UText(b, "Rarity", "<b>" + packNames[i] + "</b>", new Vector2(0f, -55f), new Vector2(300f, 60f), 48f, Color.white);
+                RectTransform tileStars = URect(b, "Stars", new Vector2(0f, -135f), new Vector2(300f, 50f));
+                var tileRow = tileStars.gameObject.AddComponent<HorizontalLayoutGroup>();
+                tileRow.childAlignment = TextAnchor.MiddleCenter;
+                tileRow.spacing = 8f;
+                tileRow.childControlWidth = tileRow.childControlHeight = false;
+                tileRow.childForceExpandWidth = tileRow.childForceExpandHeight = false;
+                for (int k = 0; k <= i; k++) UImg(tileStars, "Star " + k, Vector2.zero, new Vector2(46f, 46f), LoopLandArt.IconSparkle, Hex("FFE14D"), false);
+                UImg(b, "Coin", new Vector2(-70f, -215f), new Vector2(64f, 64f), LoopLandArt.Coin, Color.white, false);
+                UText(b, "Price", "<b>" + packPrices[i] + "</b>", new Vector2(30f, -215f), new Vector2(170f, 64f), 56f, Color.white, TextAlignmentOptions.Left);
+                UButton(b, "Buy", "BUY CARD", new Vector2(0f, -315f), new Vector2(380f, 100f), Hex("12B76A"), sc, "_OnBuy" + i, 46f);
             }
-            UText(pp, "Info", "Every card wins <color=#FFE14D>Loop Coins</color> or a <color=#00E5FF>dice, token, building style or trail</color> you don't own yet. Rarer packs, rarer prizes!",
-                new Vector2(0f, -275f), new Vector2(1900f, 90f), 38f, Hex("D6DCFF"));
+            UText(pp, "Info", "Rub the silver off all 9 spots. <color=#FFE14D>Find 3 the same</color> to win that prize: <color=#00E5FF>Loop Coins, dice, tokens, building styles or trails</color>!",
+                new Vector2(0f, -252f), new Vector2(1950f, 50f), 34f, Hex("D6DCFF"));
+            sc.messageText = UText(pp, "Message", "", new Vector2(0f, -302f), new Vector2(1900f, 50f), 40f, Color.white);
             UImg(pp, "Collection Back", new Vector2(0f, -490f), new Vector2(1760f, 300f), LoopLandArt.Round, new Color(0.06f, 0.07f, 0.2f, 0.9f));
             sc.collectionText = UText(pp, "Collection Title", "YOUR COLLECTION", new Vector2(0f, -385f), new Vector2(1200f, 70f), 46f, Color.white);
             // one slot per coin-priced store item, in the same order the machine builds its prize pool
@@ -864,32 +878,56 @@ namespace LoopLand.EditorTools
             }
             sc.collectionIcons = icons;
 
-            // scratch page: the card on the left, instructions or the prize on the right
+            // scratch page: the card on the left, how to play or the result on the right
             RectTransform sp = URect(scr, "Scratch Page", Vector2.zero, new Vector2(2100f, 1450f));
             UImg(sp, "Card Glow", new Vector2(-480f, 0f), new Vector2(960f, 1360f), LoopLandArt.Glow, new Color(1f, 1f, 1f, 0.8f));
-            Image card = UImg(sp, "Card", new Vector2(-480f, 0f), new Vector2(900f, 1300f), LoopLandArt.Round, packCols[0]);
+            Image card = UImg(sp, "Card", new Vector2(-480f, 0f), new Vector2(900f, 1300f), cardArts[0], Color.white, false);
             Transform ct = card.transform;
-            Color inner = new Color(0.05f, 0.05f, 0.14f, 1f);
-            UImg(ct, "Inner", new Vector2(0f, -45f), new Vector2(840f, 1170f), LoopLandArt.Round, inner);
             sc.cardBack = card;
-            sc.cardRarity = UText(ct, "Rarity", "<b>COMMON CARD</b>", new Vector2(0f, 595f), new Vector2(820f, 90f), 68f, Color.white);
-            TextMeshProUGUI cardBrand = UText(ct, "Brand", "<b>LOOPLAND</b>", new Vector2(0f, 465f), new Vector2(700f, 100f), 80f, Color.white);
-            cardBrand.enableVertexGradient = true;
-            cardBrand.colorGradient = brand.colorGradient;
-            UImg(ct, "Prize Glow", new Vector2(0f, 90f), new Vector2(660f, 560f), LoopLandArt.Glow, new Color(1f, 0.85f, 0.3f, 0.45f));
-            sc.prizeArt = UImg(ct, "Prize Art", new Vector2(0f, 90f), new Vector2(600f, 520f), LoopLandArt.Coin, Color.white, false);
-            sc.prizeArt.preserveAspect = true;
-            sc.prizeName = UText(ct, "Prize Name", "", new Vector2(0f, -260f), new Vector2(800f, 90f), 64f, Hex("FFE14D"));
-            sc.prizeName.fontStyle = FontStyles.Bold;
-            // the foil: 15 x 13 overlapping flakes. Each is a Selectable whose Animator switches it off when the pointer rubs
-            // over it (hover or press), so scratching follows the VR laser or desktop cursor with no Udon work per flake.
+            UImg(ct, "Logo", new Vector2(0f, 580f), new Vector2(330f, 330f), LoopLandArt.LogoInfinity, Color.white, false);
+            TextMeshProUGUI title = UText(ct, "Brand", "<b>LOOPLAND</b>", new Vector2(0f, 465f), new Vector2(560f, 130f), 130f, Color.white);
+            title.enableVertexGradient = true;
+            title.colorGradient = brand.colorGradient;
+            Image ribbon = UImg(ct, "Ribbon", new Vector2(0f, 368f), new Vector2(480f, 70f), LoopLandArt.Pill, Hex("FFD23F"));
+            UText(ribbon.transform, "Text", "<b>SCRATCH CARDS</b>", Vector2.zero, new Vector2(440f, 58f), 48f, Hex("1A1240"));
+            Image badge = UImg(ct, "Price Badge", new Vector2(340f, 585f), new Vector2(180f, 100f), LoopLandArt.Round, Hex("FFE14D"));
+            badge.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -6f);
+            UImg(badge.transform, "Coin", new Vector2(-50f, 0f), new Vector2(64f, 64f), LoopLandArt.Coin, Color.white, false);
+            sc.cardPrice = UText(badge.transform, "Price", "50", new Vector2(30f, 0f), new Vector2(110f, 70f), 58f, Hex("1A1240"));
+            sc.cardPrice.fontStyle = FontStyles.Bold;
+            TextMeshProUGUI slogan = UText(ct, "Slogan", "<b>SCRATCH\n<color=#FFE14D>PLAY</color>\nBUILD\n<color=#FFE14D>WIN!</color></b>", new Vector2(-335f, 548f), new Vector2(190f, 190f), 40f, Color.white);
+            slogan.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 8f);
+            Image burst = UImg(ct, "Top Prize", new Vector2(360f, 420f), new Vector2(170f, 170f), LoopLandArt.Burst, Hex("FF3DCB"), false);
+            burst.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 10f);
+            sc.cardTopPrize = UText(burst.transform, "Text", "", Vector2.zero, new Vector2(120f, 110f), 26f, Color.white);
+            sc.cardTopPrize.fontStyle = FontStyles.Bold;
+            Image rule = UImg(ct, "Rule", new Vector2(0f, 290f), new Vector2(780f, 60f), LoopLandArt.Pill, new Color(0.06f, 0.05f, 0.2f, 0.92f));
+            UText(rule.transform, "Text", "<b>MATCH <color=#FFE14D>3</color> THE SAME TO WIN THAT PRIZE!</b>", Vector2.zero, new Vector2(740f, 50f), 36f, Color.white);
+
+            // 9 scratch spots. Each spot's foil is 20 overlapping flakes, clipped to the spot. A flake is a Selectable whose
+            // Animator switches it off when the pointer rubs over it (hover or press), so the foil comes off exactly where
+            // the VR laser or desktop cursor goes, with no Udon work per flake.
             RuntimeAnimatorController flakeCtrl = ScratchFlakeController();
-            RectTransform foil = URect(ct, "Foil", new Vector2(0f, 15f), new Vector2(780f, 676f));
-            var cells = new GameObject[15 * 13];
-            for (int r = 0; r < 13; r++)
-                for (int c = 0; c < 15; c++)
+            var cells = new GameObject[9 * 20];
+            var spotIcons = new Image[9];
+            var spotLabels = new TMP_Text[9];
+            var spotGlows = new GameObject[9];
+            for (int s = 0; s < 9; s++)
+            {
+                var at = new Vector2(-270f + (s % 3) * 270f, 150f - (s / 3) * 220f);
+                spotGlows[s] = UImg(ct, "Spot Glow " + s, at, new Vector2(300f, 250f), LoopLandArt.Glow, new Color(1f, 0.85f, 0.2f, 1f)).gameObject;
+                spotGlows[s].SetActive(false);
+                UImg(ct, "Spot Frame " + s, at, new Vector2(262f, 212f), LoopLandArt.Round, Hex("FFD23F"));
+                UImg(ct, "Spot " + s, at, new Vector2(250f, 200f), LoopLandArt.Round, new Color(0.95f, 0.96f, 1f, 1f));
+                spotIcons[s] = UImg(ct, "Spot Icon " + s, at + new Vector2(0f, 26f), new Vector2(140f, 112f), LoopLandArt.Coin, Color.white, false);
+                spotIcons[s].preserveAspect = true;
+                spotLabels[s] = UText(ct, "Spot Label " + s, "", at + new Vector2(0f, -60f), new Vector2(236f, 64f), 30f, Hex("1A1A3A"));
+                spotLabels[s].fontStyle = FontStyles.Bold;
+                RectTransform foil = URect(ct, "Spot Foil " + s, at, new Vector2(240f, 190f));
+                foil.gameObject.AddComponent<RectMask2D>();
+                for (int f = 0; f < 20; f++)
                 {
-                    Image flake = UImg(foil, "Flake " + (r * 15 + c), new Vector2(-364f + c * 52f, 312f - r * 52f), new Vector2(86f, 86f), LoopLandArt.ScratchCell, Color.white, false, true);
+                    Image flake = UImg(foil, "Flake " + f, new Vector2(-100f + (f % 5) * 50f, 75f - (f / 5) * 50f), new Vector2(82f, 82f), LoopLandArt.ScratchCell, Color.white, false, true);
                     flake.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 90f * rng.Next(4));
                     var sel = flake.gameObject.AddComponent<Selectable>();
                     sel.transition = Selectable.Transition.Animation;
@@ -898,47 +936,36 @@ namespace LoopLand.EditorTools
                     nav.mode = Navigation.Mode.None;
                     sel.navigation = nav;
                     flake.gameObject.AddComponent<Animator>().runtimeAnimatorController = flakeCtrl;
-                    cells[r * 15 + c] = flake.gameObject;
-                }
-            sc.cells = cells;
-            // a clean frame over the scalloped outer edge of the foil
-            for (int e = 0; e < 4; e++)
-            {
-                float dir = e % 2 == 0 ? 1f : -1f;
-                if (e < 2)
-                {
-                    UImg(ct, "Foil Edge " + e, new Vector2(0f, dir > 0f ? 367f : -337f), new Vector2(836f, 28f), null, inner);
-                    UImg(ct, "Foil Trim " + e, new Vector2(0f, dir > 0f ? 355f : -325f), new Vector2(788f, 4f), null, Hex("FFD23F"));
-                }
-                else
-                {
-                    UImg(ct, "Foil Edge " + e, new Vector2(dir * 404f, 15f), new Vector2(28f, 732f), null, inner);
-                    UImg(ct, "Foil Trim " + e, new Vector2(dir * 392f, 15f), new Vector2(4f, 684f), null, Hex("FFD23F"));
+                    cells[s * 20 + f] = flake.gameObject;
                 }
             }
-            UText(ct, "Hint", "<b>RUB THE SILVER TO SCRATCH!</b>", new Vector2(0f, -420f), new Vector2(780f, 70f), 46f, Hex("00E5FF"));
-            UText(ct, "Footer", "SCRATCH   -   WIN   -   BUILD", new Vector2(0f, -540f), new Vector2(780f, 60f), 36f, Hex("8C93C8"));
+            sc.cells = cells;
+            sc.spotIcons = spotIcons;
+            sc.spotLabels = spotLabels;
+            sc.spotGlows = spotGlows;
+            sc.cardRarity = UText(ct, "Rarity", "<b>COMMON CARD</b>", new Vector2(0f, -455f), new Vector2(700f, 70f), 56f, Color.white);
+            UText(ct, "Footer", "<b>MORE CITIES  <color=#FFE14D>BIGGER REWARDS</color>  BRIGHTER WORLDS</b>", new Vector2(0f, -540f), new Vector2(800f, 60f), 34f, Hex("E8ECFF"));
 
             RectTransform info = URect(sp, "Info Panel", new Vector2(520f, 0f), new Vector2(900f, 1150f));
             UImg(info, "Back", Vector2.zero, new Vector2(900f, 1150f), LoopLandArt.Round, new Color(0.06f, 0.07f, 0.2f, 0.92f));
             UText(info, "Title", "<b>SCRATCH YOUR CARD</b>", new Vector2(0f, 460f), new Vector2(820f, 110f), 72f, Hex("FFE14D"));
-            UText(info, "How", "Point at the silver and <b>rub it</b> to scratch it off, just like a real scratch card!\n\nScratch most of it away to reveal your prize.\n\nIt's already yours, so take your time!",
-                new Vector2(0f, 150f), new Vector2(780f, 420f), 46f, Color.white);
-            sc.progressText = UText(info, "Progress", "SCRATCHED <color=#FFE14D>0%</color>", new Vector2(0f, -190f), new Vector2(780f, 100f), 64f, Color.white);
+            UText(info, "How", "Point at the silver and <b>rub it off</b> all <b>9 spots</b>, just like a real scratch card!\n\nFind <color=#FFE14D>3 the same</color> and you win that prize.",
+                new Vector2(0f, 200f), new Vector2(780f, 360f), 46f, Color.white);
+            sc.progressText = UText(info, "Progress", "", new Vector2(0f, -110f), new Vector2(780f, 100f), 60f, Color.white);
             sc.progressText.fontStyle = FontStyles.Bold;
-            NeonButton(info, "Reveal All", "REVEAL ALL", new Vector2(0f, -410f), new Vector2(640f, 150f), Hex("8A2BE2"), LoopLandArt.IconSparkle, sc, "_OnRevealAll", 60f, false);
+            Image luck = UImg(info, "Luck", new Vector2(0f, -330f), new Vector2(640f, 90f), LoopLandArt.Pill, Hex("D61F8C"));
+            UText(luck.transform, "Text", "<b>SOME WIN, SOME DON'T. GOOD LUCK!</b>", Vector2.zero, new Vector2(600f, 70f), 40f, Color.white);
             sc.infoPanel = info.gameObject;
 
             RectTransform won = URect(sp, "Won Panel", new Vector2(520f, 0f), new Vector2(900f, 1150f));
             UImg(won, "Glow", Vector2.zero, new Vector2(940f, 1190f), LoopLandArt.Glow, new Color(1f, 0.8f, 0.25f, 1f));
             UImg(won, "Back", Vector2.zero, new Vector2(900f, 1150f), LoopLandArt.Round, new Color(0.06f, 0.07f, 0.2f, 0.95f));
-            TextMeshProUGUI you = UText(won, "You Won", "<b>YOU WON!</b>", new Vector2(0f, 455f), new Vector2(840f, 160f), 130f, Color.white);
-            you.enableVertexGradient = true;
-            you.colorGradient = new VertexGradient(Hex("FFF3B0"), Hex("FFF3B0"), Hex("FFB000"), Hex("FFB000"));
-            sc.wonName = UText(won, "Prize", "", new Vector2(0f, 310f), new Vector2(840f, 110f), 74f, Color.white);
+            sc.wonTitle = UText(won, "Title", "", new Vector2(0f, 445f), new Vector2(840f, 200f), 120f, Color.white);
+            sc.wonTitle.fontStyle = FontStyles.Bold;
+            sc.wonName = UText(won, "Prize", "", new Vector2(0f, 280f), new Vector2(840f, 100f), 70f, Color.white);
             sc.wonName.fontStyle = FontStyles.Bold;
-            sc.wonKind = UText(won, "Kind", "", new Vector2(0f, 215f), new Vector2(840f, 70f), 46f, Hex("00E5FF"));
-            RectTransform starRow = URect(won, "Stars", new Vector2(0f, 115f), new Vector2(500f, 100f));
+            sc.wonKind = UText(won, "Kind", "", new Vector2(0f, 195f), new Vector2(840f, 70f), 46f, Hex("00E5FF"));
+            RectTransform starRow = URect(won, "Stars", new Vector2(0f, 110f), new Vector2(500f, 100f));
             var row = starRow.gameObject.AddComponent<HorizontalLayoutGroup>();
             row.childAlignment = TextAnchor.MiddleCenter;
             row.spacing = 14f;
@@ -947,25 +974,34 @@ namespace LoopLand.EditorTools
             var stars = new GameObject[4];
             for (int s = 0; s < 4; s++) stars[s] = UImg(starRow, "Star " + s, Vector2.zero, new Vector2(96f, 96f), LoopLandArt.IconSparkle, Hex("FFE14D"), false).gameObject;
             sc.stars = stars;
-            sc.wonNote = UText(won, "Note", "", new Vector2(0f, -10f), new Vector2(800f, 130f), 42f, Hex("D6DCFF"));
+            sc.wonNote = UText(won, "Note", "", new Vector2(0f, -15f), new Vector2(800f, 140f), 42f, Hex("D6DCFF"));
             RectTransform equip = URect(won, "Equip Group", new Vector2(0f, -215f), new Vector2(640f, 160f));
             sc.equipLabel = NeonButton(equip, "Equip", "EQUIP", Vector2.zero, new Vector2(620f, 150f), Hex("12B76A"), LoopLandArt.IconPawn, sc, "_OnEquip", 60f, false);
             sc.equipButton = equip.gameObject;
-            NeonButton(won, "Again", "SCRATCH AGAIN", new Vector2(0f, -420f), new Vector2(620f, 150f), Hex("D61F8C"), LoopLandArt.IconRefresh, sc, "_OnAgain", 56f, false);
+            NeonButton(won, "Again", "PLAY AGAIN", new Vector2(0f, -420f), new Vector2(620f, 150f), Hex("D61F8C"), LoopLandArt.IconRefresh, sc, "_OnAgain", 56f, false);
             sc.wonPanel = won.gameObject;
             won.gameObject.SetActive(false);
             sp.gameObject.SetActive(false);
 
-            // desk: coins, the big BUY button and messages
-            RectTransform desk = UCanvas(m, "Desk UI", new Vector3(0f, 1.052f, -0.267f), Quaternion.Euler(72f, 0f, 0f), new Vector2(2100f, 560f));
+            // desk: how it works
+            RectTransform desk = UCanvas(m, "Desk UI", new Vector3(0f, 1.052f, -0.267f), Quaternion.Euler(72f, 0f, 0f), new Vector2(2100f, 560f), false);
             UImg(desk, "Back", Vector2.zero, new Vector2(2100f, 560f), LoopLandArt.Panel, Color.white);
-            UImg(desk, "Coin", new Vector2(-860f, 60f), new Vector2(150f, 150f), LoopLandArt.Coin, Color.white, false);
-            sc.coinsText = UText(desk, "Coins", "0", new Vector2(-620f, 85f), new Vector2(330f, 90f), 80f, Color.white, TextAlignmentOptions.Left);
-            UText(desk, "Coins Label", "<b>LOOP COINS</b>", new Vector2(-620f, 15f), new Vector2(330f, 50f), 36f, Hex("FFD54A"), TextAlignmentOptions.Left);
-            UText(desk, "Hint", "Pick a pack on the screen,\nthen press <b>BUY</b>!", new Vector2(-700f, -165f), new Vector2(560f, 120f), 36f, Hex("D6DCFF"));
-            sc.buyLabel = NeonButton(desk, "Buy", "BUY", new Vector2(330f, 40f), new Vector2(1150f, 300f), Hex("F5B800"), LoopLandArt.Coin, sc, "_OnBuy", 80f, false);
-            sc.buyLabel.color = new Color(0.12f, 0.08f, 0f, 1f);
-            sc.messageText = UText(desk, "Message", "", new Vector2(330f, -210f), new Vector2(1500f, 80f), 44f, Color.white);
+            UText(desk, "Title", "<b>HOW IT WORKS</b>", new Vector2(0f, 205f), new Vector2(1200f, 90f), 60f, Hex("FFE14D"));
+            string[] steps =
+            {
+                "<b>BUY</b>\n<size=62%>a card on the screen</size>",
+                "<b>SCRATCH</b>\n<size=62%>rub off all 9 spots</size>",
+                "<b>MATCH 3</b>\n<size=62%>of the same prize</size>",
+                "<b>WIN!</b>\n<size=62%>or try again</size>"
+            };
+            for (int i = 0; i < 4; i++)
+            {
+                float x = -795f + i * 530f;
+                UImg(desk, "Step " + (i + 1), new Vector2(x - 165f, -40f), new Vector2(120f, 120f), LoopLandArt.Round, Hex("8A2BE2"));
+                UText(desk, "Step Number " + (i + 1), "<b>" + (i + 1) + "</b>", new Vector2(x - 165f, -40f), new Vector2(110f, 110f), 70f, Color.white);
+                UText(desk, "Step Text " + (i + 1), steps[i], new Vector2(x + 60f, -40f), new Vector2(310f, 220f), 64f, Color.white, TextAlignmentOptions.Left);
+                if (i < 3) UText(desk, "Arrow " + (i + 1), "<b>></b>", new Vector2(x + 265f, -40f), new Vector2(60f, 120f), 80f, Hex("00E5FF"));
+            }
 
             SetLayer(scr.gameObject, 1);
             SetLayer(desk.gameObject, 1);
@@ -985,22 +1021,25 @@ namespace LoopLand.EditorTools
             sc.dust = Fx("Scratch Dust", m, new Vector3(-0.48f, 1.95f, 0.1f), Quaternion.Euler(0f, 180f, 0f), 0.9f, 0.6f, 0.016f, 0f, 0f, false, true,
                 ParticleSystemShapeType.Cone, 0.02f, 1.2f, 300, Hex("F2F5FF"), Hex("9AA3B5"), 0f);
 
-            // packs and prizes (odds per pack in percent: coins, common, rare, epic, legendary item)
+            // cards and prizes. Odds per card in percent: no win, coins, common, rare, epic, legendary item.
+            // Coin prizes are 0.5x, 1x, 2x, 5x and 25x the card price (the 25x one is the jackpot).
             sc.packNames = packNames;
             sc.packPrices = packPrices;
-            sc.packColors = packCols;
-            sc.packGlows = glows;
-            sc.odds = new[] { 60, 28, 10, 2, 0, 45, 22, 24, 8, 1, 35, 8, 27, 24, 6, 25, 0, 15, 40, 20 };
-            sc.coinMin = new[] { 10, 25, 50, 100 };
-            sc.coinMax = new[] { 60, 120, 240, 480 };
+            sc.cardArts = cardArts;
+            sc.odds = new[] { 55, 30, 11, 3, 1, 0, 52, 30, 8, 7, 2, 1, 50, 30, 3, 8, 7, 2, 46, 30, 0, 5, 11, 8 };
+            sc.coinMult = new[] { 50, 100, 200, 500, 2500 };
+            sc.coinWeights = new[] { 45, 30, 17, 7, 1 };
             sc.packPage = pp.gameObject;
             sc.scratchPage = sp.gameObject;
             sc.coinArt = LoopLandArt.Coin;
+            sc.noPrizeArt = LoopLandArt.NoPrize;
             sc.clickClip = store.clickClip;
             sc.buyClip = store.buyClip;
             sc.errorClip = store.errorClip;
             sc.scratchClip = Wav("scratch", 0.16f, t => Noise() * (0.55f + 0.45f * Sin(70f, t)) * Env(t, 0.004f, 0.05f) * 0.45f);
+            sc.spotClip = Wav("scratch_spot", 0.2f, t => Notes(t, new[] { 1319f, 1760f }, 0.06f, 0.08f) * 0.6f);
             sc.winClip = Wav("scratch_win", 1.3f, t => Notes(t, new[] { 523f, 659f, 784f, 1047f, 1319f, 1568f }, 0.085f, 0.45f));
+            sc.loseClip = Wav("scratch_lose", 0.9f, t => Notes(t, new[] { 523f, 466f, 392f, 330f }, 0.14f, 0.25f) * 0.7f);
         }
 
         /// <summary>Animator for one foil flake: a hover or press from the UI pointer switches the flake off until the next card.</summary>
