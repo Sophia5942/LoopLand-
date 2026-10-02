@@ -226,6 +226,31 @@ namespace LoopLand.EditorTools
             });
         }
 
+        /// <summary>Wide scratch card for the counter (2.4 : 1) in the rarity colour: skyline, colour glows, sparkles, white border.</summary>
+        public static Sprite CardArtWide(string name, Color col)
+        {
+            const float w = 512f / 213f;
+            return PaintRect(name, 512, 213, 0, (x, y) =>
+            {
+                Color dark = new Color(col.r * 0.18f + 0.06f, col.g * 0.15f + 0.03f, col.b * 0.3f + 0.16f, 1f);
+                Color c = Color.Lerp(dark, Color.Lerp(col, Color.white, 0.15f), Mathf.Pow(y, 1.2f));
+                c = Color.Lerp(c, new Color(1f, 0.24f, 0.8f, 1f), 0.35f * Mathf.Exp(-((x - 0.3f) * (x - 0.3f) + (y - 0.75f) * (y - 0.75f)) / 0.04f));
+                c = Color.Lerp(c, new Color(0f, 0.9f, 1f, 1f), 0.3f * Mathf.Exp(-((x - w + 0.4f) * (x - w + 0.4f) + (y - 0.4f) * (y - 0.4f)) / 0.05f));
+                float sky = 1f;
+                for (int b = 0; b < 24; b++)
+                {
+                    float bh = 0.08f + Hash(b, 3f) * 0.16f;
+                    sky = Mathf.Min(sky, Box(x, y, 0.05f + b * 0.1f, 0.03f + bh * 0.5f, 0.038f, bh * 0.5f, 0.004f));
+                }
+                c = Color.Lerp(c, new Color(0.04f, 0.03f, 0.12f, 1f), Cov(sky) * 0.75f);
+                if (sky < -0.006f && Hash(Mathf.Floor(x * 90f), Mathf.Floor(y * 90f)) > 0.75f) c = Color.Lerp(c, new Color(1f, 0.95f, 0.7f, 1f), 0.5f);
+                c = Color.Lerp(c, Color.white, Cov(Mathf.Abs(Box(x, y, w * 0.5f, 0.5f, w * 0.5f - 0.035f, 0.465f, 0.04f)) - 0.004f) * 0.8f);
+                if (Hash(Mathf.Floor(x * 40f) + 5f, Mathf.Floor(y * 40f)) > 0.985f && Circle(Mathf.Repeat(x * 40f, 1f), Mathf.Repeat(y * 40f, 1f), 0.5f, 0.5f, 0.2f) < 0f) c = Color.white;
+                c.a = 1f;
+                return A(c, Cov(Box(x, y, w * 0.5f, 0.5f, w * 0.5f - 0.01f, 0.49f, 0.05f)));
+            });
+        }
+
         /// <summary>0 dice pack, 1 token pack, 2 VIP crown, 3 coin pouch, 4 coin vault, 5 skyline pack.</summary>
         public static Sprite ProductThumb(string name, int kind)
         {
@@ -354,17 +379,20 @@ namespace LoopLand.EditorTools
 
         // ------------------------------------------------------------------ raster helpers
 
-        private static Sprite Paint(string name, int size, int border, Func<float, float, Color> f)
+        private static Sprite Paint(string name, int size, int border, Func<float, float, Color> f) => PaintRect(name, size, size, border, f);
+
+        /// <summary>Like Paint, for a w x h image. f gets x in 0..w/h and y in 0..1, so shapes keep their proportions.</summary>
+        private static Sprite PaintRect(string name, int w, int h, int border, Func<float, float, Color> f)
         {
             string path = folder + "/" + name + ".png";
             var existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
             if (existing != null) return existing;
-            aa = 1f / size;
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            var px = new Color[size * size];
-            for (int y = 0; y < size; y++)
-                for (int x = 0; x < size; x++)
-                    px[y * size + x] = f((x + 0.5f) / size, (y + 0.5f) / size);
+            aa = 1f / h;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            var px = new Color[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    px[y * w + x] = f((x + 0.5f) / h, (y + 0.5f) / h);
             tex.SetPixels(px);
             tex.Apply();
             File.WriteAllBytes(path, tex.EncodeToPNG());

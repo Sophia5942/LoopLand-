@@ -9,11 +9,12 @@ using VRC.Udon.Common;
 namespace LoopLand
 {
     /// <summary>
-    /// LoopLand Scratch Cards: real scratch cards. Buy a Common, Rare, Epic or Legendary card with Loop Coins, then rub the
-    /// silver off its 9 spots with your pointer. Find 3 the same and you win that prize (Loop Coins or a store item you
-    /// don't own yet); otherwise the card doesn't win. Coin prizes are worth less than the cards on average, so cards
-    /// can't be farmed for coins. The prize is saved the moment the card is bought, so leaving mid-scratch never loses it.
-    /// Everything is local to the player.
+    /// LoopLand Scratch Cards: real scratch cards. Buy a Common, Rare, Epic or Legendary card on the screen and it lands
+    /// on the counter. Scratch the silver off its 9 spots yourself: in VR rub it with your finger or hand, on desktop hold
+    /// left click and look across it. Find 3 the same and you win that prize (Loop Coins or a store item you don't own
+    /// yet); otherwise the card doesn't win. Scratching is tracked here in Udon (fingertip, hand or view ray against the
+    /// card), so it does not depend on UI hover events. Coin prizes are worth less than the cards on average, so cards
+    /// can't be farmed for coins. The prize is saved the moment the card is bought. Everything is local to the player.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class LoopLandScratch : UdonSharpBehaviour
@@ -33,8 +34,11 @@ namespace LoopLand
         public GameObject scratchPage;
         public GameObject infoPanel;
         public GameObject wonPanel;
+        public GameObject deskIdle;
+        public GameObject deskCard;
 
-        [Header("Card")]
+        [Header("Card on the counter")]
+        public Transform cardSpace;     // the card's RectTransform: 1 unit = 1 mm, +Z points into the counter
         public Image cardBack;
         public TMP_Text cardRarity;
         public TMP_Text cardPrice;
@@ -42,8 +46,9 @@ namespace LoopLand
         public Image[] spotIcons;
         public TMP_Text[] spotLabels;
         public GameObject[] spotGlows;
-        public GameObject[] cells;      // foil flakes, spot by spot: each hides itself (Selectable + Animator) when the pointer rubs over it
+        public GameObject[] cells;      // foil flakes, spot by spot
         [Range(0.3f, 1f)] public float spotRevealAt = 0.6f;
+        public float brush = 34f;       // scratch radius in mm
         public TMP_Text progressText;
         public ParticleSystem dust;
         public Sprite coinArt;
@@ -94,16 +99,32 @@ namespace LoopLand
         private bool allOwned;
         private bool jackpot;
         private int[] spotSym = new int[SPOTS];
-        private int[] spotLeft = new int[SPOTS];
         private bool[] spotDone = new bool[SPOTS];
+        private int[] spotGone = new int[SPOTS];
+        private float[] spotMinX = new float[SPOTS];
+        private float[] spotMaxX = new float[SPOTS];
+        private float[] spotMinY = new float[SPOTS];
+        private float[] spotMaxY = new float[SPOTS];
         private int spotsDone;
         private int perSpot = 1;
+        private int needPerSpot = 1;
         private int[] decoys = new int[16];
-        private int[] remain;
-        private int remainCount;
-        private float nextPoll;
+        private float[] flakeX;
+        private float[] flakeY;
+        private bool[] gone;
+
+        // scratching: 0 left hand, 1 right hand, 2 desktop view
+        private float[] lastX = new float[3];
+        private float[] lastY = new float[3];
+        private float[] lastT = new float[3];
+        private bool useHeld;
+        private int removedNow;
+        private int scratchHand;
+        private float dustX;
+        private float dustY;
+        private bool newSpot;
         private float nextScratch;
-        private bool leftHand;
+
         private int[] poolCat = new int[64];
         private int[] poolItem = new int[64];
         private int[] poolTier = new int[64];
@@ -113,6 +134,7 @@ namespace LoopLand
         private void Start()
         {
             _BuildPool();
+            _CacheFlakes();
             _ShowCard(false);
             _Refresh();
         }
@@ -130,7 +152,7 @@ namespace LoopLand
 
         public override void InputUse(bool value, UdonInputEventArgs args)
         {
-            if (value) leftHand = args.handType == HandType.LEFT; // the hand that last clicked is the one pointing
+            useHeld = value;
         }
 
         // ------------------------------------------------------------ buttons (UI calls these)
@@ -153,6 +175,7 @@ namespace LoopLand
             if (onCard && !revealed) return;
             onCard = false;
             revealed = false;
+            if (progressText != null) progressText.text = "";
             _ShowCard(false);
             _Sfx(clickClip);
             _Refresh();
@@ -160,46 +183,160 @@ namespace LoopLand
 
         // ------------------------------------------------------------ scratching
 
-        /// <summary>Watches the foil flakes: the UI hides each one the moment the pointer rubs over it.</summary>
+        /// <summary>Remembers where every foil flake sits on the card (in mm), so scratching is plain distance maths.</summary>
+        private void _CacheFlakes()
+        {
+            if (cells == null || cardSpace == null) return;
+            int n = cells.Length;
+            flakeX = new float[n];
+            flakeY = new float[n];
+            gone = new bool[n];
+            perSpot = Mathf.Max(1, n / SPOTS);
+            needPerSpot = Mathf.Max(1, Mathf.CeilToInt(perSpot * spotRevealAt));
+            for (int s = 0; s < SPOTS; s++)
+            {
+                spotMinX[s] = 100000f;
+                spotMaxX[s] = -100000f;
+                spotMinY[s] = 100000f;
+                spotMaxY[s] = -100000f;
+            }
+            for (int i = 0; i < n; i++)
+            {
+                if (cells[i] == null) continue;
+                Vector3 p = cardSpace.InverseTransformPoint(cells[i].transform.position);
+                flakeX[i] = p.x;
+                flakeY[i] = p.y;
+                int s = i / perSpot;
+                if (s >= SPOTS) continue;
+                spotMinX[s] = Mathf.Min(spotMinX[s], p.x);
+                spotMaxX[s] = Mathf.Max(spotMaxX[s], p.x);
+                spotMinY[s] = Mathf.Min(spotMinY[s], p.y);
+                spotMaxY[s] = Mathf.Max(spotMaxY[s], p.y);
+            }
+        }
+
         private void Update()
         {
-            if (!onCard || revealed || cells == null || remain == null || Time.time < nextPoll) return;
-            nextPoll = Time.time + 0.05f;
-            int fresh = 0;
-            bool newSpot = false;
-            int need = perSpot - Mathf.CeilToInt(perSpot * spotRevealAt);
-            for (int k = remainCount - 1; k >= 0; k--)
+            if (!onCard || cardSpace == null || flakeX == null) return;
+            VRCPlayerApi me = Networking.LocalPlayer;
+            if (!Utilities.IsValid(me)) return;
+            removedNow = 0;
+            if (me.IsUserInVR())
             {
-                int idx = remain[k];
-                GameObject cell = cells[idx];
-                if (cell != null && cell.activeSelf) continue;
-                if (fresh < 3 && cell != null && dust != null)
+                _Hand(me, 0);
+                _Hand(me, 1);
+            }
+            else if (useHeld) _View(me);
+            else lastT[2] = 0f;
+            if (removedNow > 0) _AfterScratch();
+        }
+
+        /// <summary>VR: the index fingertip (or the hand, if the avatar has no finger bones) scratches when it touches the card.</summary>
+        private void _Hand(VRCPlayerApi me, int h)
+        {
+            bool left = h == 0;
+            Vector3 p = me.GetBonePosition(left ? HumanBodyBones.LeftIndexDistal : HumanBodyBones.RightIndexDistal);
+            float reach = 70f;
+            if (p == Vector3.zero)
+            {
+                p = me.GetTrackingData(left ? VRCPlayerApi.TrackingDataType.LeftHand : VRCPlayerApi.TrackingDataType.RightHand).position;
+                reach = 130f;
+            }
+            Vector3 lp = cardSpace.InverseTransformPoint(p);
+            if (lp.z < -reach || lp.z > 80f)
+            {
+                lastT[h] = 0f;
+                return;
+            }
+            _StrokeTo(h, lp.x, lp.y);
+        }
+
+        /// <summary>Desktop: while left click is held, the spot in the middle of the view scratches.</summary>
+        private void _View(VRCPlayerApi me)
+        {
+            VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
+            Vector3 o = cardSpace.InverseTransformPoint(head.position);
+            Vector3 d = cardSpace.InverseTransformDirection(head.rotation * Vector3.forward);
+            if (d.z < 0.05f)
+            {
+                lastT[2] = 0f;
+                return;
+            }
+            float t = -o.z / d.z;
+            if (t < 0f || t > 3000f)
+            {
+                lastT[2] = 0f;
+                return;
+            }
+            _StrokeTo(2, o.x + d.x * t, o.y + d.y * t);
+        }
+
+        /// <summary>Scratches along the path since the last frame, so fast strokes leave no gaps.</summary>
+        private void _StrokeTo(int h, float x, float y)
+        {
+            if (lastT[h] > 0f && Time.time - lastT[h] < 0.2f)
+            {
+                float dx = x - lastX[h];
+                float dy = y - lastY[h];
+                int steps = Mathf.Clamp(Mathf.CeilToInt(Mathf.Sqrt(dx * dx + dy * dy) / (brush * 0.5f)), 1, 24);
+                for (int k = 1; k <= steps; k++) _ScratchAt(lastX[h] + dx * k / steps, lastY[h] + dy * k / steps, h);
+            }
+            else _ScratchAt(x, y, h);
+            lastX[h] = x;
+            lastY[h] = y;
+            lastT[h] = Time.time;
+        }
+
+        private void _ScratchAt(float x, float y, int h)
+        {
+            float r2 = brush * brush;
+            for (int s = 0; s < SPOTS; s++)
+            {
+                if (x < spotMinX[s] - brush || x > spotMaxX[s] + brush || y < spotMinY[s] - brush || y > spotMaxY[s] + brush) continue;
+                int end = Mathf.Min((s + 1) * perSpot, flakeX.Length);
+                for (int i = s * perSpot; i < end; i++)
                 {
-                    dust.transform.position = cell.transform.position;
-                    dust.Emit(5);
-                }
-                fresh++;
-                remainCount--;
-                remain[k] = remain[remainCount];
-                int s = idx / perSpot;
-                if (s >= SPOTS) continue;
-                spotLeft[s]--;
-                if (!spotDone[s] && spotLeft[s] <= need)
-                {
-                    spotDone[s] = true;
-                    spotsDone++;
-                    newSpot = true;
+                    if (gone[i]) continue;
+                    float ex = flakeX[i] - x;
+                    float ey = flakeY[i] - y;
+                    if (ex * ex + ey * ey > r2) continue;
+                    gone[i] = true;
+                    if (cells[i] != null) cells[i].SetActive(false);
+                    removedNow++;
+                    scratchHand = h;
+                    dustX = flakeX[i];
+                    dustY = flakeY[i];
+                    spotGone[s]++;
+                    if (!spotDone[s] && spotGone[s] >= needPerSpot)
+                    {
+                        spotDone[s] = true;
+                        spotsDone++;
+                        newSpot = true;
+                    }
                 }
             }
-            if (fresh == 0) return;
+        }
+
+        private void _AfterScratch()
+        {
+            if (dust != null)
+            {
+                dust.transform.position = cardSpace.TransformPoint(new Vector3(dustX, dustY, -8f));
+                dust.Emit(Mathf.Min(8, removedNow * 2));
+            }
             if (Time.time >= nextScratch)
             {
                 nextScratch = Time.time + 0.09f;
                 _Sfx(scratchClip);
-                _Buzz();
+                _Buzz(scratchHand);
             }
-            if (newSpot) _Sfx(spotClip);
-            if (progressText != null) progressText.text = "SPOTS SCRATCHED  <color=#FFE14D>" + spotsDone + " / " + SPOTS + "</color>";
+            if (newSpot)
+            {
+                newSpot = false;
+                _Sfx(spotClip);
+            }
+            if (revealed) return;
+            if (progressText != null) progressText.text = "SPOTS\n<size=140%><color=#FFE14D>" + spotsDone + " / " + SPOTS + "</color></size>";
             if (spotsDone >= SPOTS) _Reveal();
         }
 
@@ -211,6 +348,7 @@ namespace LoopLand
             if (onCard && !revealed) { _Fail("Finish scratching your card first!"); return; }
             if (!store._IsReady()) { _Fail("Your save is still loading..."); return; }
             if (poolCount == 0) _BuildPool();
+            if (flakeX == null) _CacheFlakes();
             int price = packPrices[p];
             if (!store._SpendCoins(price)) { _Fail("You need " + (price - store._Coins()) + " more Loop Coins for a " + packNames[p] + " card."); return; }
             pack = p;
@@ -404,24 +542,23 @@ namespace LoopLand
                 if (spotLabels != null && i < spotLabels.Length && spotLabels[i] != null) spotLabels[i].text = label;
                 if (spotGlows != null && i < spotGlows.Length && spotGlows[i] != null) spotGlows[i].SetActive(false);
                 spotDone[i] = false;
+                spotGone[i] = 0;
             }
-            perSpot = Mathf.Max(1, cells.Length / SPOTS);
-            for (int i = 0; i < SPOTS; i++) spotLeft[i] = perSpot;
             spotsDone = 0;
-            if (remain == null || remain.Length < cells.Length) remain = new int[cells.Length];
-            for (int i = 0; i < cells.Length; i++)
-            {
-                if (cells[i] != null) cells[i].SetActive(true);
-                remain[i] = i;
-            }
-            remainCount = cells.Length;
-            if (progressText != null) progressText.text = "SPOTS SCRATCHED  <color=#FFE14D>0 / " + SPOTS + "</color>";
+            if (cells != null)
+                for (int i = 0; i < cells.Length; i++)
+                {
+                    if (cells[i] != null) cells[i].SetActive(true);
+                    if (gone != null && i < gone.Length) gone[i] = false;
+                }
+            for (int h = 0; h < 3; h++) lastT[h] = 0f;
+            if (progressText != null) progressText.text = "SPOTS\n<size=140%><color=#FFE14D>0 / " + SPOTS + "</color></size>";
             if (infoPanel != null) infoPanel.SetActive(true);
             if (wonPanel != null) wonPanel.SetActive(false);
             _ShowCard(true);
         }
 
-        /// <summary>Every spot has been scratched: show the result. Any foil left on the card stays for the player to rub off.</summary>
+        /// <summary>Every spot has been scratched: show the result. Any foil left on the card can still be rubbed off.</summary>
         private void _Reveal()
         {
             revealed = true;
@@ -431,6 +568,7 @@ namespace LoopLand
                 for (int i = 0; i < SPOTS && i < spotGlows.Length; i++) if (spotGlows[i] != null) spotGlows[i].SetActive(win && spotSym[i] == winSym);
             if (infoPanel != null) infoPanel.SetActive(false);
             if (wonPanel != null) wonPanel.SetActive(true);
+            if (progressText != null) progressText.text = win ? "<color=#FFE14D>WINNER!</color>" : "<color=#9FB3FF>NO WIN</color>";
             if (wonTitle != null) wonTitle.text = win ? "<color=#FFE14D>WINNER!</color>" : "<color=#9FB3FF>NOT A WIN\nTHIS TIME</color>";
             if (wonName != null)
                 wonName.text = !win ? "NO PRIZE" : (prizeTier == 1 ? _Num(prizeCoins) + " LOOP COINS" : store._NameOf(prizeCat, prizeItem));
@@ -457,6 +595,8 @@ namespace LoopLand
         {
             if (packPage != null) packPage.SetActive(!card);
             if (scratchPage != null) scratchPage.SetActive(card);
+            if (deskIdle != null) deskIdle.SetActive(!card);
+            if (deskCard != null) deskCard.SetActive(card);
         }
 
         public void _Refresh()
@@ -503,12 +643,13 @@ namespace LoopLand
             if (sfx != null && c != null) sfx.PlayOneShot(c, 0.8f);
         }
 
-        /// <summary>A light buzz in the pointing hand while scratching (VR only).</summary>
-        private void _Buzz()
+        /// <summary>A light buzz in the hand that is scratching (VR only).</summary>
+        private void _Buzz(int h)
         {
+            if (h > 1) return;
             VRCPlayerApi me = Networking.LocalPlayer;
             if (!Utilities.IsValid(me) || !me.IsUserInVR()) return;
-            me.PlayHapticEventInHand(leftHand ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.05f, 0.2f, 160f);
+            me.PlayHapticEventInHand(h == 0 ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.05f, 0.25f, 160f);
         }
     }
 }

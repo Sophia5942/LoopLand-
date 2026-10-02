@@ -61,8 +61,9 @@ If your scene still has the LoopLand tower world from an earlier version, click
 - Press **STORE** to pop the store up above your dashboard (only you see it move); press it again or **X** to send it back.
 - **Scratch Cards** (the machine beside the store) work like real scratch cards:
   1. On the screen, press **BUY CARD** under a Common (50), Rare (100), Epic (200) or Legendary (400) card.
-  2. Point at the silver and rub it off all 9 spots. It tears away wherever your pointer goes (VR laser or
-     desktop cursor), and you scratch every spot yourself.
+     The card lands on the counter in front of you.
+  2. Scratch the silver off all 9 spots yourself. In VR, rub it with your finger or hand. On desktop, hold
+     **left click** and look across the silver.
   3. Find 3 the same to win that prize: Loop Coins (up to 25x the card price) or a dice, token, building style or
      trail you don't own yet. Some cards don't win.
 
@@ -127,7 +128,7 @@ Put them in `Assets/LoopLand/Store Art/` and run **Build Game In Scene** again:
 - **Board names / prices / rents**: `Board data` on `LoopLand/Game`, then rebuild.
 - **Catalogue** (names, prices, colors, which product unlocks an item): `LoopLand/Store` inspector.
   Product index `-1` means "buy with Loop Coins".
-- **Scratch cards** (card names, prices, odds, coin prizes, how much of a spot counts as scratched):
+- **Scratch cards** (card names, prices, odds, coin prizes, how much of a spot counts as scratched, scratch size):
   `LoopLand/Scratch Cards` inspector.
   - Odds are 6 numbers per card, in percent: no win, coins, common, rare, epic and legendary item.
   - Coin prizes (*Coin Mult*) are in percent of the card price, and *Coin Weights* says how often each comes up.
@@ -142,3 +143,7 @@ Put them in `Assets/LoopLand/Store Art/` and run **Build Game In Scene** again:
 - Persistent keys (PlayerData): `ll_coins`, `ll_own_*`, `ll_eq_*`, `ll_match`, `ll_match_got`, `ll_daily`.
   Match rewards are applied exactly once per match, even after a rejoin.
 - Everything is driven by synced state, so late joiners see the correct board, tokens and dice.
+- Scratch cards don't rely on UI hover events. `LoopLandScratch` tracks the player in Udon and hides the foil
+  flakes within the scratch radius of that point, along the path since the last frame:
+  - in VR, the index fingertip (or the hand, for avatars without finger bones) when it touches the card;
+  - on desktop, the view ray while left click is held.

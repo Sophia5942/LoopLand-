@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.13.0
+- Fixed scratching. The scratch card now lies on the **counter** in front of the machine, and the scratching is
+  tracked in Udon instead of relying on UI hover events:
+  - **VR:** rub the silver with your finger or hand; it comes off wherever you touch the card.
+  - **Desktop:** hold left click and look across the silver.
+  - Fast strokes leave no gaps. Silver dust pops off where you scratch, with a scratch sound and a buzz in the
+    scratching hand.
+- Spots are now 27 x 15 cm, so they're easy to rub.
+- The screen shows "SCRATCH YOUR CARD!" pointing down to the counter, then the result.
+- Rebuild the scene (**LoopLand > Build Game In Scene > Replace**) to get the counter card.
+
 ## 1.12.0
 - Scratch cards now work like real scratch cards:
   - **Match 3 to win.** Each card has 9 silver spots, and finding 3 the same wins that prize. Some cards don't win
