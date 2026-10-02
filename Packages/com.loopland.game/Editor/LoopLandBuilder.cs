@@ -456,7 +456,7 @@ namespace LoopLand.EditorTools
                 MenuButton(ui, "Mortgage", "MORTGAGE", new Vector2(mx, -46f), new Vector2(216f, 80f), cPurple, LoopLandArt.IconBank, game, "_OnMortgage");
                 rounds[d] = MenuButton(ui, "Rounds", "ROUNDS", new Vector2(mx, -140f), new Vector2(216f, 80f), cPurple, LoopLandArt.IconChart, game, "_OnRounds");
                 MenuButton(ui, "Store", "STORE", new Vector2(mx, -234f), new Vector2(216f, 80f), cOrange, LoopLandArt.IconStore, store, "_OpenStore" + d);
-                views[d] = MenuButton(ui, "View", "VIEW: TOP", new Vector2(mx, -328f), new Vector2(216f, 80f), Hex("0A9BE0"), LoopLandArt.IconScreen, game, "_OnView" + d);
+                views[d] = MenuButton(ui, "View", "VIEW: CENTER", new Vector2(mx, -328f), new Vector2(216f, 80f), Hex("0A9BE0"), LoopLandArt.IconScreen, game, "_OnView" + d);
                 SetLayer(ui.gameObject, 1); // TransparentFX: still clickable, but hidden from the live board camera
 
                 // top screen above the dashboard (VIEW: TOP), held by two posts that stay off the board
@@ -483,6 +483,7 @@ namespace LoopLand.EditorTools
                 UImg(sc, "Players Back", new Vector2(320f, -360f), new Vector2(620f, 180f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
                 playersL.Add(UText(sc, "Players", "", new Vector2(320f, -360f), new Vector2(590f, 165f), 28f, Color.white, TextAlignmentOptions.Left));
                 SetLayer(top.gameObject, 1);
+                top.gameObject.SetActive(false);
                 seatScreens[d] = top.gameObject;
 
                 // where the store pops up for this seat (same spot as the top screen, independent of the VIEW setting)
@@ -714,6 +715,7 @@ namespace LoopLand.EditorTools
             game.cardTexts = cardsL.ToArray();
             game.viewLabels = views;
             game.seatScreens = seatScreens;
+            game.centerScreens = holo.gameObject;
             game.propArt = propArt;
             game.propName = propName;
             game.propPrice = propPrice;

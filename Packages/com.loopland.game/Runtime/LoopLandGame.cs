@@ -101,6 +101,7 @@ namespace LoopLand
         public TMP_Text[] cardTexts;
         public TMP_Text[] viewLabels;
         public GameObject[] seatScreens;
+        public GameObject centerScreens;
         public Image[] propArt;
         public TMP_Text[] propName;
         public TMP_Text[] propPrice;
@@ -210,7 +211,8 @@ namespace LoopLand
         private float resetArmTime = -10f;
         private int rentMult = 1;
         private int selected = -1;
-        private int[] seatView = new int[4];
+        private bool topView;
+        private int viewSeat = -1;
         private int storeSeat = -1;
         private float toastUntil;
         private float captionUntil;
@@ -270,15 +272,20 @@ namespace LoopLand
 
         public void _OnTile() { _Select(pressedArg); }
 
-        // live view per seat (local only): 0 = top screen above the dashboard, 1 = center screens only
-        public void _OnView0() { _CycleView(0); }
-        public void _OnView1() { _CycleView(1); }
-        public void _OnView2() { _CycleView(2); }
-        public void _OnView3() { _CycleView(3); }
+        // VIEW (local only): either the center screens OR the screen in front of the console you pressed it on
+        public void _OnView0() { _ToggleView(0); }
+        public void _OnView1() { _ToggleView(1); }
+        public void _OnView2() { _ToggleView(2); }
+        public void _OnView3() { _ToggleView(3); }
 
-        private void _CycleView(int d)
+        private void _ToggleView(int d)
         {
-            seatView[d] = seatView[d] == 0 ? 1 : 0;
+            if (topView && viewSeat == d) topView = false;
+            else
+            {
+                topView = true;
+                viewSeat = d;
+            }
             _ApplyViews();
             _PlayFx(0);
         }
@@ -292,11 +299,12 @@ namespace LoopLand
 
         private void _ApplyViews()
         {
+            if (centerScreens != null) centerScreens.SetActive(!topView);
             for (int d = 0; d < 4; d++)
             {
-                if (seatScreens != null && d < seatScreens.Length && seatScreens[d] != null) seatScreens[d].SetActive(seatView[d] == 0 && storeSeat != d);
-                if (viewLabels != null && d < viewLabels.Length && viewLabels[d] != null)
-                    viewLabels[d].text = seatView[d] == 0 ? "VIEW: TOP" : "VIEW: CENTER";
+                bool mine = topView && viewSeat == d;
+                if (seatScreens != null && d < seatScreens.Length && seatScreens[d] != null) seatScreens[d].SetActive(mine && storeSeat != d);
+                if (viewLabels != null && d < viewLabels.Length && viewLabels[d] != null) viewLabels[d].text = mine ? "VIEW: TOP" : "VIEW: CENTER";
             }
         }
         public void _OnPrevSpace() { _Select((selected < 0 ? _MyPos() : selected) + SPACES - 1); }

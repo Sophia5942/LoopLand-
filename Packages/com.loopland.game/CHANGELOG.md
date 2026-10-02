@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.2
+- VIEW is a true swap: CENTER shows only the middle screens, TOP shows only the screen in front of the console
+  you pressed it on (the middle screens hide). Local to each player; starts on CENTER.
+
 ## 1.9.1
 - Much smoother camera: every shot change is an eased glide (smootherstep), the pan back to the overview takes
   3.2 s with a gentle crane lift, and the chase cam filters out hop bounce and direction snaps.
