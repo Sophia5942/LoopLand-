@@ -91,7 +91,6 @@ namespace LoopLand
         [Header("Store pop-up at each console (local to the player who opens it)")]
         public Transform storePanel;
         public Transform[] storeSpots;
-        public GameObject[] seatScreens;
         public AudioSource sfx;
         public AudioClip buyClip;
         public AudioClip errorClip;
@@ -291,9 +290,7 @@ namespace LoopLand
                 storePanel.localRotation = Quaternion.identity;
                 openSeat = seat;
             }
-            if (seatScreens != null)
-                for (int i = 0; i < seatScreens.Length; i++)
-                    if (seatScreens[i] != null) seatScreens[i].SetActive(i != openSeat);
+            if (game != null) game._StoreSeatChanged(openSeat);
             _Sfx(clickClip);
         }
 

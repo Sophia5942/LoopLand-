@@ -14,7 +14,7 @@ namespace LoopLand.EditorTools
     {
         public static Sprite Round, Glow, Pill, Panel, Coin, House, Tower;
         public static Sprite IconDice, IconPawn, IconBuilding, IconSparkle, IconCrown, IconGift, IconGlobe;
-        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore;
+        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen;
 
         private static string folder;
         private static float aa;
@@ -31,6 +31,7 @@ namespace LoopLand.EditorTools
         private static readonly Vector2[] HammerHandle = { new Vector2(0.2801f, 0.1237f), new Vector2(0.6301f, 0.5237f), new Vector2(0.5699f, 0.5763f), new Vector2(0.2199f, 0.1763f) };
         private static readonly Vector2[] HammerHead = { new Vector2(0.7244f, 0.3956f), new Vector2(0.8166f, 0.501f), new Vector2(0.5156f, 0.7644f), new Vector2(0.4234f, 0.659f) };
         private static readonly Vector2[] RefreshHead = { new Vector2(0.56f, 0.64f), new Vector2(0.8f, 0.78f), new Vector2(0.56f, 0.94f) };
+        private static readonly Vector2[] PlayTri = { new Vector2(0.44f, 0.48f), new Vector2(0.6f, 0.58f), new Vector2(0.44f, 0.68f) };
         private static readonly Vector2[] HouseShape = { new Vector2(0.18f, 0.12f), new Vector2(0.82f, 0.12f), new Vector2(0.82f, 0.55f), new Vector2(0.5f, 0.88f), new Vector2(0.18f, 0.55f) };
 
         public static void Build(string outFolder)
@@ -113,6 +114,12 @@ namespace LoopLand.EditorTools
                 float handle = Mathf.Max(Mathf.Abs(Circle(x, y, 0.5f, 0.64f, 0.15f)) - 0.035f, 0.6f - y);
                 float body = Box(x, y, 0.5f, 0.38f, 0.32f, 0.26f, 0.06f);
                 return A(Color.white, Cov(Mathf.Min(handle, body)));
+            });
+            IconScreen = Paint("Icon_Screen", 128, 0, (x, y) =>
+            {
+                float frame = Mathf.Abs(Box(x, y, 0.5f, 0.58f, 0.38f, 0.27f, 0.05f)) - 0.04f;
+                float stand = Mathf.Min(Box(x, y, 0.5f, 0.24f, 0.04f, 0.08f, 0.01f), Box(x, y, 0.5f, 0.15f, 0.18f, 0.03f, 0.02f));
+                return A(Color.white, Cov(Mathf.Min(frame, Mathf.Min(stand, Poly(x, y, PlayTri)))));
             });
             IconGlobe = Paint("Icon_Globe", 128, 0, (x, y) =>
             {

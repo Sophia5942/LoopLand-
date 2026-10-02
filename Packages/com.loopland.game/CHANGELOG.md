@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0
+- Seat dashboards in the style of a property app: card with picture, name, price, full rent table, owner line
+  and the big action button, plus an icon menu (browse, my space, build, sell, mortgage, rounds, store, view).
+- VIEW toggle per seat: live board beside the dashboard, on a top screen, or off. Center live screens are back,
+  raised to 2.3 m.
+- Every board card shows a picture (generated per color group / special space, or your Space Art).
+
 ## 1.6.1
 - Console polish: tighter neon outlines (no more overlapping glows), no accent bars over the top buttons,
   bigger STORE button, button gloss, solid back plate (no mirrored UI from across the table).

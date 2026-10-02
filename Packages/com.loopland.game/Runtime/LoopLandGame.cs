@@ -99,6 +99,15 @@ namespace LoopLand
         public TMP_Text[] secondaryLabels;
         public TMP_Text[] roundsLabels;
         public TMP_Text[] cardTexts;
+        public TMP_Text[] viewLabels;
+        public GameObject[] seatWings;
+        public GameObject[] seatScreens;
+        public Image[] propArt;
+        public TMP_Text[] propName;
+        public TMP_Text[] propPrice;
+        public TMP_Text[] propLabels;
+        public TMP_Text[] propValues;
+        public Sprite[] spaceArt;
         public ParticleSystem celebrateFx;
         public ParticleSystem moneyFx;
         public AudioSource sfx;
@@ -199,12 +208,16 @@ namespace LoopLand
         private float resetArmTime = -10f;
         private int rentMult = 1;
         private int selected = -1;
+        private int[] seatView = new int[4];
+        private int storeSeat = -1;
+        private float toastUntil;
 
         private void Start()
         {
             for (int i = 0; i < SPACES; i++) propIdx[i] = -1;
             for (int k = 0; k < propSpaces.Length; k++) propIdx[propSpaces[k]] = k;
             if (selectionMarker != null) selectionMarker.gameObject.SetActive(false);
+            _ApplyViews();
             _RefreshAll();
         }
 
@@ -248,6 +261,37 @@ namespace LoopLand
         }
 
         public void _OnTile() { _Select(pressedArg); }
+
+        // live view per seat (local only): 0 = beside the dashboard, 1 = top screen, 2 = off
+        public void _OnView0() { _CycleView(0); }
+        public void _OnView1() { _CycleView(1); }
+        public void _OnView2() { _CycleView(2); }
+        public void _OnView3() { _CycleView(3); }
+
+        private void _CycleView(int d)
+        {
+            seatView[d] = (seatView[d] + 1) % 3;
+            _ApplyViews();
+            _PlayFx(0);
+        }
+
+        /// <summary>Called by the store when it pops up at a seat (or -1 when it goes back to the kiosk).</summary>
+        public void _StoreSeatChanged(int seat)
+        {
+            storeSeat = seat;
+            _ApplyViews();
+        }
+
+        private void _ApplyViews()
+        {
+            for (int d = 0; d < 4; d++)
+            {
+                if (seatWings != null && d < seatWings.Length && seatWings[d] != null) seatWings[d].SetActive(seatView[d] == 0);
+                if (seatScreens != null && d < seatScreens.Length && seatScreens[d] != null) seatScreens[d].SetActive(seatView[d] == 1 && storeSeat != d);
+                if (viewLabels != null && d < viewLabels.Length && viewLabels[d] != null)
+                    viewLabels[d].text = seatView[d] == 0 ? "VIEW: DESK" : (seatView[d] == 1 ? "VIEW: TOP" : "VIEW: OFF");
+            }
+        }
         public void _OnPrevSpace() { _Select((selected < 0 ? _MyPos() : selected) + SPACES - 1); }
         public void _OnNextSpace() { _Select((selected < 0 ? _MyPos() : selected) + 1); }
         public void _OnMySpace() { _Select(_MyPos()); }
@@ -1100,7 +1144,7 @@ namespace LoopLand
             _SetTexts(statusTexts, status);
             _SetTexts(primaryLabels, prim);
             _SetTexts(secondaryLabels, sec);
-            _SetTexts(roundsLabels, "ROUNDS\n" + (maxRounds == 0 ? "INF" : maxRounds.ToString()));
+            _SetTexts(roundsLabels, "ROUNDS " + (maxRounds == 0 ? "INF" : maxRounds.ToString()));
 
             string players = "";
             for (int i = 0; i < MAXP; i++)
@@ -1140,31 +1184,57 @@ namespace LoopLand
 
         private void _RefreshInfo()
         {
-            if (selected < 0) { _SetTexts(infoTexts, "<color=#9AF2FF>Use < SPACE > to inspect a space</color>\nthen BUILD, SELL or MORTGAGE it."); return; }
-            int p = selected;
+            int p = selected >= 0 ? selected : _MyPos();
             int t = spaceType[p];
             int g = spaceGroup[p];
-            string s = "<b>" + spaceName[p] + "</b>";
-            if (g >= 0) s += "  <color=#" + groupHex[g] + ">" + groupNames[g] + "</color>";
+            string price;
+            string labels;
+            string values;
             if (t == T_PROP)
             {
                 int k = propIdx[p];
-                s += "\nPrice $" + spacePrice[p] + "   Loop $" + houseCost[g];
-                if (k >= 0) s += "\nRent " + propRents[k * 6] + " | " + propRents[k * 6 + 1] + " | " + propRents[k * 6 + 2] + " | " + propRents[k * 6 + 3] + " | " + propRents[k * 6 + 4] + " | T " + propRents[k * 6 + 5];
+                price = "$" + spacePrice[p];
+                labels = "Purchase Price\nRent (Base)\nRent (1 Loop)\nRent (2 Loops)\nRent (3 Loops)\nRent (4 Loops)\nRent (Tower)\nLoop Cost";
+                values = "$" + spacePrice[p];
+                for (int r = 0; r < 6; r++) values += "\n$" + (k >= 0 ? propRents[k * 6 + r] : 0);
+                values += "\n$" + (g >= 0 && g < houseCost.Length ? houseCost[g] : 0);
             }
-            else if (t == T_PORTAL) s += "\nPrice $" + spacePrice[p] + "\nRent 25 / 50 / 100 / 200";
-            else if (t == T_UTIL) s += "\nPrice $" + spacePrice[p] + "\nRent 4x dice (10x with both)";
-            else if (t == T_TAX) s += "\nPay $" + spacePrice[p];
-            else if (t == T_GO) s += "\nCollect $" + goSalary + " every loop";
-            else if (t == T_TWIST || t == T_CHEST) s += "\nDraw a card";
-            else if (t == T_GOJAIL) s += "\nStraight to the Glitch Zone!";
+            else if (t == T_PORTAL)
+            {
+                price = "$" + spacePrice[p];
+                labels = "Purchase Price\nRent (1 Portal)\nRent (2 Portals)\nRent (3 Portals)\nRent (4 Portals)";
+                values = "$" + spacePrice[p] + "\n$25\n$50\n$100\n$200";
+            }
+            else if (t == T_UTIL)
+            {
+                price = "$" + spacePrice[p];
+                labels = "Purchase Price\nRent (1 owned)\nRent (2 owned)";
+                values = "$" + spacePrice[p] + "\n4x dice\n10x dice";
+            }
+            else if (t == T_TAX) { price = "PAY $" + spacePrice[p]; labels = "Tax to the bank"; values = "$" + spacePrice[p]; }
+            else if (t == T_GO) { price = "+$" + goSalary; labels = "Salary every loop\nLoop Coins every loop"; values = "$" + goSalary + "\n+" + coinsPassGo; }
+            else if (t == T_TWIST || t == T_CHEST) { price = "DRAW A CARD"; labels = "Deck\nCards"; values = (t == T_TWIST ? "Twist" : "Loop Chest") + "\n12"; }
+            else if (t == T_JAIL) { price = "GLITCH ZONE"; labels = "Bail\nMax turns inside"; values = "$" + jailFine + "\n3"; }
+            else if (t == T_GOJAIL) { price = "GLITCHED!"; labels = "Go straight to the Glitch Zone"; values = ""; }
+            else { price = "FREE"; labels = "Relax, nothing happens here"; values = ""; }
+
+            string line;
             int o = owner[p];
             if (o != 0)
             {
                 int b = level[p] & 7;
-                s += "\nOwner " + _Name(o - 1) + ((level[p] & 8) != 0 ? "  <color=#FF4D5E>MORTGAGED</color>" : (b == 5 ? "  TOWER" : (b > 0 ? "  Loops " + b : "")));
+                line = "Owned by " + _Name(o - 1) + ((level[p] & 8) != 0 ? "  <color=#FF4D5E>MORTGAGED</color>" : (b == 5 ? "  TOWER" : (b > 0 ? "  Loops " + b : "")));
             }
-            _SetTexts(infoTexts, s);
+            else if (t == T_PROP || t == T_PORTAL || t == T_UTIL) line = "<color=#7CFF4F>For sale</color>" + (g >= 0 && g < groupNames.Length ? "  <color=#" + groupHex[g] + ">" + groupNames[g] + "</color>" : "");
+            else line = "<color=#9AF2FF>Use < and > to browse the board</color>";
+
+            _SetTexts(propName, spaceName[p]);
+            _SetTexts(propPrice, price);
+            _SetTexts(propLabels, labels);
+            _SetTexts(propValues, values);
+            if (propArt != null && spaceArt != null && p < spaceArt.Length)
+                for (int i = 0; i < propArt.Length; i++) if (propArt[i] != null) propArt[i].sprite = spaceArt[p];
+            if (Time.time >= toastUntil) _SetTexts(infoTexts, line);
         }
 
         private void _SetTexts(TMP_Text[] arr, string value)
@@ -1176,6 +1246,7 @@ namespace LoopLand
         private void _Toast(string msg)
         {
             _SetTexts(infoTexts, "<color=#FFE14D>" + msg + "</color>");
+            toastUntil = Time.time + 3f;
             _PlayFx(0);
         }
 
