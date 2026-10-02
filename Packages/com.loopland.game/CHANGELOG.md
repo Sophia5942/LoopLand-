@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.0
+- Neon "Game Controls" console: icon buttons in two columns, LOOPLAND header, big JOIN GAME button, glowing edges.
+- STORE button on every console: the store pops up on that seat screen for the local player (X or STORE again closes it).
+- New icons: bank, hammer, chart, refresh, people, store bag.
+
 ## 1.5.0
 - Seat screens: each console gets its own live board + status screen above eye level, replacing the far-away
   center hologram screens (the spinning logo stays).

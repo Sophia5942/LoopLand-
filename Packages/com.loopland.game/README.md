@@ -45,6 +45,7 @@ Generated assets go to `Assets/LoopLand/Generated`, and a reusable prefab is sav
 
 ## How to play
 - Walk to a console at the table edge and press **JOIN GAME**, then **START GAME**.
+- Press **STORE** on your console to pop the store up on your seat screen (only you see it move); press it again or **X** to send it back.
 - The big button is context-sensitive: ROLL DICE / BUY / END TURN / ROLL DOUBLES...
 - The second button does PASS, USE GLITCH PASS, PAY BAIL or LEAVE.
 - Pick a space with **< SPACE / SPACE >** (or **MY SPACE**), then use **BUILD / SELL / MORTGAGE** during your turn.

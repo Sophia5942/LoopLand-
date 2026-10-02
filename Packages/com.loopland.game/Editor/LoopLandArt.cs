@@ -14,6 +14,7 @@ namespace LoopLand.EditorTools
     {
         public static Sprite Round, Glow, Pill, Panel, Coin, House, Tower;
         public static Sprite IconDice, IconPawn, IconBuilding, IconSparkle, IconCrown, IconGift, IconGlobe;
+        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore;
 
         private static string folder;
         private static float aa;
@@ -26,6 +27,10 @@ namespace LoopLand.EditorTools
         private static readonly Vector2[] CrownL = { new Vector2(0.16f, 0.34f), new Vector2(0.4f, 0.34f), new Vector2(0.2f, 0.72f) };
         private static readonly Vector2[] CrownM = { new Vector2(0.36f, 0.34f), new Vector2(0.64f, 0.34f), new Vector2(0.5f, 0.82f) };
         private static readonly Vector2[] CrownR = { new Vector2(0.6f, 0.34f), new Vector2(0.84f, 0.34f), new Vector2(0.8f, 0.72f) };
+        private static readonly Vector2[] BankRoof = { new Vector2(0.1f, 0.64f), new Vector2(0.9f, 0.64f), new Vector2(0.5f, 0.9f) };
+        private static readonly Vector2[] HammerHandle = { new Vector2(0.2801f, 0.1237f), new Vector2(0.6301f, 0.5237f), new Vector2(0.5699f, 0.5763f), new Vector2(0.2199f, 0.1763f) };
+        private static readonly Vector2[] HammerHead = { new Vector2(0.7244f, 0.3956f), new Vector2(0.8166f, 0.501f), new Vector2(0.5156f, 0.7644f), new Vector2(0.4234f, 0.659f) };
+        private static readonly Vector2[] RefreshHead = { new Vector2(0.56f, 0.64f), new Vector2(0.8f, 0.78f), new Vector2(0.56f, 0.94f) };
         private static readonly Vector2[] HouseShape = { new Vector2(0.18f, 0.12f), new Vector2(0.82f, 0.12f), new Vector2(0.82f, 0.55f), new Vector2(0.5f, 0.88f), new Vector2(0.18f, 0.55f) };
 
         public static void Build(string outFolder)
@@ -75,6 +80,39 @@ namespace LoopLand.EditorTools
                 d = Mathf.Min(d, Mathf.Min(Circle(x, y, 0.4f, 0.79f, 0.08f), Circle(x, y, 0.6f, 0.79f, 0.08f)));
                 float gap = Mathf.Min(Box(x, y, 0.5f, 0.45f, 0.035f, 0.4f, 0f), Box(x, y, 0.5f, 0.57f, 0.4f, 0.012f, 0f));
                 return A(Color.white, Cov(d) * (1f - Cov(gap)));
+            });
+            IconBank = Paint("Icon_Bank", 128, 0, (x, y) =>
+            {
+                float d = Mathf.Min(Poly(x, y, BankRoof), Mathf.Min(Box(x, y, 0.5f, 0.14f, 0.4f, 0.045f, 0.01f), Box(x, y, 0.5f, 0.59f, 0.37f, 0.03f, 0.01f)));
+                for (int k = 0; k < 4; k++) d = Mathf.Min(d, Box(x, y, 0.23f + k * 0.18f, 0.37f, 0.045f, 0.19f, 0.01f));
+                return A(Color.white, Cov(d));
+            });
+            IconHammer = Paint("Icon_Hammer", 128, 0, (x, y) => A(Color.white, Cov(Mathf.Min(Poly(x, y, HammerHandle), Poly(x, y, HammerHead)))));
+            IconChart = Paint("Icon_Chart", 128, 0, (x, y) =>
+            {
+                float d = Mathf.Min(Box(x, y, 0.28f, 0.3f, 0.075f, 0.14f, 0.015f), Box(x, y, 0.5f, 0.4f, 0.075f, 0.24f, 0.015f));
+                d = Mathf.Min(d, Mathf.Min(Box(x, y, 0.72f, 0.5f, 0.075f, 0.34f, 0.015f), Box(x, y, 0.5f, 0.11f, 0.4f, 0.025f, 0.01f)));
+                return A(Color.white, Cov(d));
+            });
+            IconRefresh = Paint("Icon_Refresh", 128, 0, (x, y) =>
+            {
+                float ang = Mathf.Atan2(y - 0.5f, x - 0.5f) * Mathf.Rad2Deg;
+                float ring = Mathf.Abs(Circle(x, y, 0.5f, 0.5f, 0.3f)) - 0.055f;
+                if (ang > 15f && ang < 75f) ring = 1f;
+                return A(Color.white, Cov(Mathf.Min(ring, Poly(x, y, RefreshHead))));
+            });
+            IconPeople = Paint("Icon_People", 128, 0, (x, y) =>
+            {
+                float d = Mathf.Min(Circle(x, y, 0.33f, 0.64f, 0.11f), Circle(x, y, 0.66f, 0.68f, 0.12f));
+                d = Mathf.Min(d, Mathf.Max(Ellipse(x, y, 0.33f, 0.3f, 0.2f, 0.17f), 0.2f - y));
+                d = Mathf.Min(d, Mathf.Max(Ellipse(x, y, 0.66f, 0.34f, 0.22f, 0.19f), 0.24f - y));
+                return A(Color.white, Cov(d));
+            });
+            IconStore = Paint("Icon_Store", 128, 0, (x, y) =>
+            {
+                float handle = Mathf.Max(Mathf.Abs(Circle(x, y, 0.5f, 0.64f, 0.15f)) - 0.035f, 0.6f - y);
+                float body = Box(x, y, 0.5f, 0.38f, 0.32f, 0.26f, 0.06f);
+                return A(Color.white, Cov(Mathf.Min(handle, body)));
             });
             IconGlobe = Paint("Icon_Globe", 128, 0, (x, y) =>
             {

@@ -366,13 +366,16 @@ namespace LoopLand.EditorTools
                 tokens[s] = tk;
             }
 
-            // consoles: clean world-space UI panels at the table edge
+            // consoles: neon "game controls" panels with a seat screen above each one
             var consoles = new GameObject("Consoles").transform;
             consoles.SetParent(rt, false);
             var info = new TMP_Text[4];
             var prim = new TMP_Text[4];
             var sec = new TMP_Text[4];
             var rounds = new TMP_Text[4];
+            var storeSpots = new Transform[4];
+            var seatScreens = new GameObject[4];
+            Color cBlue = Hex("1F4FD8"), cPurple = Hex("6A2BD9"), cOrange = Hex("D98A00"), cTeal = Hex("0E9F7E"), cRedBtn = Hex("C21836"), cJoin = Hex("0A9BE0"), cSec = Hex("9B1FD1");
             for (int d = 0; d < 4; d++)
             {
                 int side = d < 2 ? 1 : -1;
@@ -382,24 +385,31 @@ namespace LoopLand.EditorTools
                 c.SetParent(consoles, false);
                 c.localPosition = new Vector3(side * LobeC, 0f, 0f) + dir * 1.88f + Vector3.up * (TopY + 0.02f);
                 c.localRotation = Quaternion.LookRotation(-dir, Vector3.up);
-                RectTransform ui = UCanvas(c, "Panel", new Vector3(0f, 0.26f, 0f), Quaternion.Euler(35f, 0f, 0f), new Vector2(1100f, 640f));
-                UImage(ui, "Glow", Vector2.zero, new Vector2(1124f, 664f), new Color(0f, 0.9f, 1f, 0.5f));
-                UImage(ui, "Back", Vector2.zero, new Vector2(1100f, 640f), new Color(0.035f, 0.03f, 0.07f, 0.95f));
-                UImage(ui, "Info Back", new Vector2(0f, 222f), new Vector2(1060f, 160f), new Color(1f, 1f, 1f, 0.05f));
-                info[d] = UText(ui, "Info", "", new Vector2(0f, 222f), new Vector2(1030f, 150f), 30f, Color.white);
-                prim[d] = UButton(ui, "Primary", "JOIN GAME", new Vector2(-265f, 62f), new Vector2(510f, 120f), cCyan, game, "_OnPrimary", 44f);
-                sec[d] = UButton(ui, "Secondary", "-", new Vector2(265f, 62f), new Vector2(510f, 120f), cPink, game, "_OnSecondary", 40f);
-                UButton(ui, "Prev Space", "< SPACE", new Vector2(-397f, -82f), new Vector2(245f, 95f), cDark, game, "_OnPrevSpace", 30f);
-                UButton(ui, "Next Space", "SPACE >", new Vector2(-132f, -82f), new Vector2(245f, 95f), cDark, game, "_OnNextSpace", 30f);
-                UButton(ui, "Build", "BUILD", new Vector2(132f, -82f), new Vector2(245f, 95f), cDark, game, "_OnBuild", 30f);
-                UButton(ui, "Sell", "SELL", new Vector2(397f, -82f), new Vector2(245f, 95f), cDark, game, "_OnSell", 30f);
-                UButton(ui, "Mortgage", "MORTGAGE", new Vector2(-397f, -200f), new Vector2(245f, 95f), cDark, game, "_OnMortgage", 30f);
-                UButton(ui, "My Space", "MY SPACE", new Vector2(-132f, -200f), new Vector2(245f, 95f), cDark, game, "_OnMySpace", 30f);
-                rounds[d] = UButton(ui, "Rounds", "ROUNDS", new Vector2(132f, -200f), new Vector2(245f, 95f), cDark, game, "_OnRounds", 28f);
-                UButton(ui, "Reset", "RESET", new Vector2(397f, -200f), new Vector2(245f, 95f), cRed, game, "_OnReset", 30f);
+                RectTransform ui = UCanvas(c, "Game Controls", new Vector3(0f, 0.28f, 0f), Quaternion.Euler(35f, 0f, 0f), new Vector2(1500f, 760f));
+                UImg(ui, "Glow", Vector2.zero, new Vector2(1570f, 830f), LoopLandArt.Glow, new Color(0.2f, 0.75f, 1f, 1f));
+                UImg(ui, "Back", Vector2.zero, new Vector2(1500f, 760f), LoopLandArt.Panel, Color.white);
+                UImg(ui, "Accent L", new Vector2(-560f, 372f), new Vector2(380f, 70f), LoopLandArt.Glow, new Color(1f, 0.75f, 0.2f, 1f));
+                UImg(ui, "Accent R", new Vector2(560f, 372f), new Vector2(380f, 70f), LoopLandArt.Glow, new Color(1f, 0.75f, 0.2f, 1f));
+                TextMeshProUGUI clogo = UText(ui, "Logo", "<b>LOOPLAND</b>", new Vector2(0f, 318f), new Vector2(700f, 95f), 84f, Color.white);
+                clogo.enableVertexGradient = true;
+                clogo.colorGradient = new VertexGradient(Hex("FFE14D"), Hex("00E5FF"), Hex("FF3DCB"), Hex("B07CFF"));
+                UText(ui, "Subtitle", "- GAME CONTROLS -", new Vector2(0f, 255f), new Vector2(700f, 44f), 30f, Hex("7DF9FF"));
+                UImg(ui, "Info Back", new Vector2(0f, 128f), new Vector2(720f, 190f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.35f));
+                info[d] = UText(ui, "Info", "", new Vector2(0f, 128f), new Vector2(690f, 175f), 30f, Color.white);
+                prim[d] = NeonButton(ui, "Primary", "JOIN GAME", new Vector2(0f, -62f), new Vector2(720f, 150f), cJoin, LoopLandArt.IconPeople, game, "_OnPrimary", 56f, true);
+                sec[d] = NeonButton(ui, "Secondary", "-", new Vector2(-115f, -250f), new Vector2(490f, 120f), cSec, LoopLandArt.IconDice, game, "_OnSecondary", 40f, false);
+                NeonButton(ui, "Store", "STORE", new Vector2(250f, -250f), new Vector2(220f, 120f), cOrange, LoopLandArt.IconStore, store, "_OpenStore" + d, 34f, false);
+                NeonButton(ui, "Prev Space", "< SPACE", new Vector2(-565f, 255f), new Vector2(320f, 130f), cBlue, LoopLandArt.IconBuilding, game, "_OnPrevSpace", 36f, false);
+                NeonButton(ui, "Next Space", "SPACE >", new Vector2(-565f, 85f), new Vector2(320f, 130f), cBlue, LoopLandArt.IconBuilding, game, "_OnNextSpace", 36f, false);
+                NeonButton(ui, "Mortgage", "MORTGAGE", new Vector2(-565f, -85f), new Vector2(320f, 130f), cPurple, LoopLandArt.IconBank, game, "_OnMortgage", 32f, false);
+                NeonButton(ui, "My Space", "MY SPACE", new Vector2(-565f, -255f), new Vector2(320f, 130f), cBlue, LoopLandArt.House, game, "_OnMySpace", 34f, false);
+                NeonButton(ui, "Build", "BUILD", new Vector2(565f, 255f), new Vector2(320f, 130f), cOrange, LoopLandArt.IconHammer, game, "_OnBuild", 36f, false);
+                NeonButton(ui, "Sell", "SELL", new Vector2(565f, 85f), new Vector2(320f, 130f), cTeal, LoopLandArt.Coin, game, "_OnSell", 36f, false);
+                rounds[d] = NeonButton(ui, "Rounds", "ROUNDS", new Vector2(565f, -85f), new Vector2(320f, 130f), cPurple, LoopLandArt.IconChart, game, "_OnRounds", 32f, false);
+                NeonButton(ui, "Reset", "RESET", new Vector2(565f, -255f), new Vector2(320f, 130f), cRedBtn, LoopLandArt.IconRefresh, game, "_OnReset", 36f, false);
                 SetLayer(ui.gameObject, 1); // TransparentFX: still clickable, but hidden from the live board camera
 
-                // seat screen: personal live board, card, status and players above each console (above eye level)
+                // seat screen above eye level: live board, card, status and players (the store pops up here too)
                 Prim(PrimitiveType.Cube, "Screen Stand", c, new Vector3(0f, 0.5f, 0.36f), new Vector3(0.05f, 1.0f, 0.05f), dark);
                 var screen = new GameObject("Seat Screen").transform;
                 screen.SetParent(c, false);
@@ -418,7 +428,15 @@ namespace LoopLand.EditorTools
                 status[d] = UText(sc, "Status", "LOOPLAND", new Vector2(-320f, -360f), new Vector2(590f, 165f), 34f, Color.white);
                 UImg(sc, "Players Back", new Vector2(320f, -360f), new Vector2(620f, 180f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
                 players[d] = UText(sc, "Players", "", new Vector2(320f, -360f), new Vector2(590f, 165f), 28f, Color.white, TextAlignmentOptions.Left);
+                var spot = new GameObject("Store Spot").transform;
+                spot.SetParent(screen, false);
+                spot.localPosition = new Vector3(0f, 0f, -0.01f);
+                spot.localScale = Vector3.one * 0.48f;
+                storeSpots[d] = spot;
+                seatScreens[d] = sc.gameObject;
             }
+            store.storeSpots = storeSpots;
+            store.seatScreens = seatScreens;
 
             // store kiosk: premium store UI + live board panel
             Transform st = storeGo.transform;
@@ -439,7 +457,9 @@ namespace LoopLand.EditorTools
             UImg(sui, "Coin", new Vector2(-75f, 750f), new Vector2(150f, 150f), LoopLandArt.Coin, Color.white, false);
             store.coinsText = UText(sui, "Coins", "0", new Vector2(180f, 778f), new Vector2(330f, 90f), 80f, Color.white, TextAlignmentOptions.Left);
             UText(sui, "Coins Label", "<b>LOOP COINS</b>", new Vector2(180f, 705f), new Vector2(330f, 50f), 36f, Hex("FFD54A"), TextAlignmentOptions.Left);
-            store.vipText = UText(sui, "VIP", "", new Vector2(1000f, 750f), new Vector2(500f, 100f), 70f, Hex("FFD54A"));
+            store.vipText = UText(sui, "VIP", "", new Vector2(880f, 750f), new Vector2(460f, 100f), 70f, Hex("FFD54A"));
+            store.storePanel = sui;
+            NeonButton(sui, "Close", "X", new Vector2(1250f, 820f), new Vector2(110f, 110f), Hex("C21836"), null, store, "_CloseStore", 56f, false);
 
             string[] tabNames = { "DICE", "TOKENS", "BUILDINGS", "TRAILS", "PREMIUM" };
             Sprite[] tabIcons = { LoopLandArt.IconDice, LoopLandArt.IconPawn, LoopLandArt.IconBuilding, LoopLandArt.IconSparkle, LoopLandArt.IconCrown };
@@ -907,6 +927,28 @@ namespace LoopLand.EditorTools
             m.SetColor("_TintColor", new Color(0.5f, 0.5f, 0.5f, 0.5f));
             EditorUtility.SetDirty(m);
             return m;
+        }
+
+        /// <summary>Glowing button with optional icon on the left and an optional ">" arrow on the right. Returns its label.</summary>
+        private static TextMeshProUGUI NeonButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Color color, Sprite icon,
+            UdonSharpBehaviour target, string evt, float fontSize, bool arrow)
+        {
+            UImg(parent, name + " Glow", pos, size + new Vector2(50f, 50f), LoopLandArt.Glow, new Color(Mathf.Lerp(color.r, 1f, 0.3f), Mathf.Lerp(color.g, 1f, 0.3f), Mathf.Lerp(color.b, 1f, 0.3f), 0.95f));
+            TextMeshProUGUI t = UButton(parent, name, label, pos, size, color, target, evt, fontSize);
+            if (icon != null)
+            {
+                float isz = Mathf.Min(size.y * 0.62f, 90f);
+                Color tint = icon == LoopLandArt.Coin ? Color.white : Color.Lerp(color, Color.white, 0.75f);
+                UImg(t.transform.parent, "Icon", new Vector2(-size.x * 0.5f + isz * 0.5f + 24f, 0f), new Vector2(isz, isz), icon, tint, false);
+                t.rectTransform.anchoredPosition = new Vector2(isz * 0.5f + 8f, 0f);
+                t.rectTransform.sizeDelta = new Vector2(size.x - isz - 70f, size.y - 12f);
+            }
+            if (arrow)
+            {
+                UText(t.transform.parent, "Arrow", "<b>></b>", new Vector2(size.x * 0.5f - 40f, 0f), new Vector2(50f, size.y), fontSize, Color.white);
+                t.rectTransform.sizeDelta -= new Vector2(60f, 0f);
+            }
+            return t;
         }
 
         private static void SetLayer(GameObject go, int layer)

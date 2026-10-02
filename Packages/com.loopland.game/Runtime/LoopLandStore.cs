@@ -88,6 +88,10 @@ namespace LoopLand
         public Image detailPreview;
         public TMP_Text actionLabel;
         public TMP_Text bannerText;
+        [Header("Store pop-up at each console (local to the player who opens it)")]
+        public Transform storePanel;
+        public Transform[] storeSpots;
+        public GameObject[] seatScreens;
         public AudioSource sfx;
         public AudioClip buyClip;
         public AudioClip errorClip;
@@ -111,10 +115,20 @@ namespace LoopLand
         private int tab;
         private int sel;
         private string message = "";
+        private Transform homeParent;
+        private Vector3 homePos;
+        private Quaternion homeRot;
+        private int openSeat = -1;
 
         private void Start()
         {
             owned = new bool[products == null ? 0 : products.Length];
+            if (storePanel != null)
+            {
+                homeParent = storePanel.parent;
+                homePos = storePanel.localPosition;
+                homeRot = storePanel.localRotation;
+            }
             _RefreshUI();
         }
 
@@ -249,6 +263,38 @@ namespace LoopLand
         {
             _Sfx(clickClip);
             Store.OpenWorldStorePage();
+        }
+
+        // ------------------------------------------------------------ store pop-up (only moves the local player's copy)
+
+        public void _OpenStore0() { _ToggleStoreAt(0); }
+        public void _OpenStore1() { _ToggleStoreAt(1); }
+        public void _OpenStore2() { _ToggleStoreAt(2); }
+        public void _OpenStore3() { _ToggleStoreAt(3); }
+        public void _CloseStore() { _ToggleStoreAt(-1); }
+
+        private void _ToggleStoreAt(int seat)
+        {
+            if (storePanel == null || homeParent == null) return;
+            bool valid = seat >= 0 && storeSpots != null && seat < storeSpots.Length && storeSpots[seat] != null;
+            if (!valid || seat == openSeat)
+            {
+                storePanel.SetParent(homeParent, false);
+                storePanel.localPosition = homePos;
+                storePanel.localRotation = homeRot;
+                openSeat = -1;
+            }
+            else
+            {
+                storePanel.SetParent(storeSpots[seat], false);
+                storePanel.localPosition = Vector3.zero;
+                storePanel.localRotation = Quaternion.identity;
+                openSeat = seat;
+            }
+            if (seatScreens != null)
+                for (int i = 0; i < seatScreens.Length; i++)
+                    if (seatScreens[i] != null) seatScreens[i].SetActive(i != openSeat);
+            _Sfx(clickClip);
         }
 
         // ------------------------------------------------------------ catalogue (also used by the game)
