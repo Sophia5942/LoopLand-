@@ -386,10 +386,8 @@ namespace LoopLand.EditorTools
                 c.localPosition = new Vector3(side * LobeC, 0f, 0f) + dir * 1.88f + Vector3.up * (TopY + 0.02f);
                 c.localRotation = Quaternion.LookRotation(-dir, Vector3.up);
                 RectTransform ui = UCanvas(c, "Game Controls", new Vector3(0f, 0.28f, 0f), Quaternion.Euler(35f, 0f, 0f), new Vector2(1500f, 760f));
-                UImg(ui, "Glow", Vector2.zero, new Vector2(1570f, 830f), LoopLandArt.Glow, new Color(0.2f, 0.75f, 1f, 1f));
+                UImg(ui, "Glow", Vector2.zero, new Vector2(1540f, 800f), LoopLandArt.Glow, new Color(0.2f, 0.75f, 1f, 1f));
                 UImg(ui, "Back", Vector2.zero, new Vector2(1500f, 760f), LoopLandArt.Panel, Color.white);
-                UImg(ui, "Accent L", new Vector2(-560f, 372f), new Vector2(380f, 70f), LoopLandArt.Glow, new Color(1f, 0.75f, 0.2f, 1f));
-                UImg(ui, "Accent R", new Vector2(560f, 372f), new Vector2(380f, 70f), LoopLandArt.Glow, new Color(1f, 0.75f, 0.2f, 1f));
                 TextMeshProUGUI clogo = UText(ui, "Logo", "<b>LOOPLAND</b>", new Vector2(0f, 318f), new Vector2(700f, 95f), 84f, Color.white);
                 clogo.enableVertexGradient = true;
                 clogo.colorGradient = new VertexGradient(Hex("FFE14D"), Hex("00E5FF"), Hex("FF3DCB"), Hex("B07CFF"));
@@ -397,8 +395,8 @@ namespace LoopLand.EditorTools
                 UImg(ui, "Info Back", new Vector2(0f, 128f), new Vector2(720f, 190f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.35f));
                 info[d] = UText(ui, "Info", "", new Vector2(0f, 128f), new Vector2(690f, 175f), 30f, Color.white);
                 prim[d] = NeonButton(ui, "Primary", "JOIN GAME", new Vector2(0f, -62f), new Vector2(720f, 150f), cJoin, LoopLandArt.IconPeople, game, "_OnPrimary", 56f, true);
-                sec[d] = NeonButton(ui, "Secondary", "-", new Vector2(-115f, -250f), new Vector2(490f, 120f), cSec, LoopLandArt.IconDice, game, "_OnSecondary", 40f, false);
-                NeonButton(ui, "Store", "STORE", new Vector2(250f, -250f), new Vector2(220f, 120f), cOrange, LoopLandArt.IconStore, store, "_OpenStore" + d, 34f, false);
+                sec[d] = NeonButton(ui, "Secondary", "-", new Vector2(-122f, -250f), new Vector2(456f, 120f), cSec, LoopLandArt.IconDice, game, "_OnSecondary", 40f, false);
+                NeonButton(ui, "Store", "STORE", new Vector2(240f, -250f), new Vector2(240f, 120f), cOrange, LoopLandArt.IconStore, store, "_OpenStore" + d, 38f, false);
                 NeonButton(ui, "Prev Space", "< SPACE", new Vector2(-565f, 255f), new Vector2(320f, 130f), cBlue, LoopLandArt.IconBuilding, game, "_OnPrevSpace", 36f, false);
                 NeonButton(ui, "Next Space", "SPACE >", new Vector2(-565f, 85f), new Vector2(320f, 130f), cBlue, LoopLandArt.IconBuilding, game, "_OnNextSpace", 36f, false);
                 NeonButton(ui, "Mortgage", "MORTGAGE", new Vector2(-565f, -85f), new Vector2(320f, 130f), cPurple, LoopLandArt.IconBank, game, "_OnMortgage", 32f, false);
@@ -407,17 +405,21 @@ namespace LoopLand.EditorTools
                 NeonButton(ui, "Sell", "SELL", new Vector2(565f, 85f), new Vector2(320f, 130f), cTeal, LoopLandArt.Coin, game, "_OnSell", 36f, false);
                 rounds[d] = NeonButton(ui, "Rounds", "ROUNDS", new Vector2(565f, -85f), new Vector2(320f, 130f), cPurple, LoopLandArt.IconChart, game, "_OnRounds", 32f, false);
                 NeonButton(ui, "Reset", "RESET", new Vector2(565f, -255f), new Vector2(320f, 130f), cRedBtn, LoopLandArt.IconRefresh, game, "_OnReset", 36f, false);
+                GameObject plate = Prim(PrimitiveType.Cube, "Back Plate", c, new Vector3(0f, 0.28f, 0f) + Quaternion.Euler(35f, 0f, 0f) * new Vector3(0f, 0f, 0.014f), new Vector3(1.52f, 0.78f, 0.016f), dark);
+                plate.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
+                SetLayer(plate, 1);
                 SetLayer(ui.gameObject, 1); // TransparentFX: still clickable, but hidden from the live board camera
 
                 // seat screen above eye level: live board, card, status and players (the store pops up here too)
-                Prim(PrimitiveType.Cube, "Screen Stand", c, new Vector3(0f, 0.5f, 0.36f), new Vector3(0.05f, 1.0f, 0.05f), dark);
+                for (int post = -1; post <= 1; post += 2)
+                    Prim(PrimitiveType.Cube, "Screen Post", c, new Vector3(post * 0.5f, 0.5f, 0.3f), new Vector3(0.04f, 1.0f, 0.04f), dark);
                 var screen = new GameObject("Seat Screen").transform;
                 screen.SetParent(c, false);
-                screen.localPosition = new Vector3(0f, 1.1f, 0.26f);
+                screen.localPosition = new Vector3(0f, 1.1f, 0.25f);
                 screen.localRotation = Quaternion.Euler(-20f, 0f, 0f);
                 Prim(PrimitiveType.Cube, "Back", screen, new Vector3(0f, 0f, 0.025f), new Vector3(1.34f, 0.99f, 0.03f), dark);
                 RectTransform sc = UCanvas(screen, "Seat Screen UI", Vector3.zero, Quaternion.identity, new Vector2(1300f, 950f), false);
-                UImg(sc, "Glow", Vector2.zero, new Vector2(1360f, 1010f), LoopLandArt.Glow, new Color(0f, 0.9f, 1f, 0.9f));
+                UImg(sc, "Glow", Vector2.zero, new Vector2(1340f, 990f), LoopLandArt.Glow, new Color(0f, 0.9f, 1f, 0.9f));
                 UImg(sc, "Panel", Vector2.zero, new Vector2(1300f, 950f), LoopLandArt.Panel, Color.white);
                 UImg(sc, "Live Frame", new Vector2(0f, 150f), new Vector2(1262f, 642f), LoopLandArt.Round, new Color(1f, 0.24f, 0.8f, 0.9f));
                 URaw(sc, "Live View", new Vector2(0f, 150f), new Vector2(1240f, 620f), liveTex);
@@ -444,7 +446,7 @@ namespace LoopLand.EditorTools
             Dir(Root + "/Store Art");
             Prim(PrimitiveType.Cube, "Stage", st, new Vector3(0f, 0.03f, -0.25f), new Vector3(6.6f, 0.06f, 1.5f), dark, true);
             RectTransform sui = UCanvas(st, "Store UI", new Vector3(0f, 1.5f, 0f), Quaternion.identity, new Vector2(2700f, 1800f));
-            UImg(sui, "Glow", Vector2.zero, new Vector2(2790f, 1890f), LoopLandArt.Glow, new Color(0.35f, 0.6f, 1f, 1f));
+            UImg(sui, "Glow", Vector2.zero, new Vector2(2740f, 1840f), LoopLandArt.Glow, new Color(0.35f, 0.6f, 1f, 1f));
             UImg(sui, "Back", Vector2.zero, new Vector2(2700f, 1800f), LoopLandArt.Panel, Color.white);
             Sprite bgArt = FindArt(Root + "/Store Art", "Background");
             if (bgArt != null) UImg(sui, "Background Art", Vector2.zero, new Vector2(2660f, 1760f), bgArt, new Color(1f, 1f, 1f, 0.6f), false);
@@ -468,7 +470,7 @@ namespace LoopLand.EditorTools
             for (int i = 0; i < 5; i++)
             {
                 var pos = new Vector2(-1040f + i * 520f, 560f);
-                tabSel[i] = UImg(sui, "Tab Glow " + i, pos, new Vector2(540f, 150f), LoopLandArt.Glow, new Color(1f, 0.8f, 0.25f, 1f)).gameObject;
+                tabSel[i] = UImg(sui, "Tab Glow " + i, pos, new Vector2(512f, 137f), LoopLandArt.Glow, new Color(1f, 0.8f, 0.25f, 1f)).gameObject;
                 TextMeshProUGUI lab = UButton(sui, "Tab " + tabNames[i], tabNames[i], pos, new Vector2(480f, 105f), new Color(0.13f, 0.14f, 0.34f, 1f), store, "_OnTab" + i, 38f);
                 lab.rectTransform.anchoredPosition = new Vector2(40f, 0f);
                 lab.rectTransform.sizeDelta = new Vector2(340f, 90f);
@@ -487,7 +489,7 @@ namespace LoopLand.EditorTools
             for (int i = 0; i < 8; i++)
             {
                 var pos = new Vector2(-1110f + (i % 4) * 380f, i < 4 ? 280f : -140f);
-                itemSel[i] = UImg(sui, "Item Glow " + i, pos, new Vector2(400f, 440f), LoopLandArt.Glow, new Color(1f, 0.8f, 0.25f, 1f)).gameObject;
+                itemSel[i] = UImg(sui, "Item Glow " + i, pos, new Vector2(390f, 430f), LoopLandArt.Glow, new Color(1f, 0.8f, 0.25f, 1f)).gameObject;
                 TextMeshProUGUI lab = UButton(sui, "Item " + i, "", pos, new Vector2(360f, 400f), new Color(0.1f, 0.1f, 0.26f, 1f), store, "_OnItem" + i, 36f);
                 Transform btn = lab.transform.parent;
                 itemRoots[i] = btn.gameObject;
@@ -534,7 +536,7 @@ namespace LoopLand.EditorTools
             UText(world.transform.parent, "Arrow", "<b>></b>", new Vector2(560f, 0f), new Vector2(60f, 120f), 80f, Color.white);
 
             RectTransform lui = UCanvas(st, "Live Board UI", new Vector3(-2.4f, 1.5f, -0.3f), Quaternion.Euler(0f, -20f, 0f), new Vector2(1400f, 860f));
-            UImg(lui, "Glow", Vector2.zero, new Vector2(1460f, 920f), LoopLandArt.Glow, new Color(0f, 0.9f, 1f, 0.9f));
+            UImg(lui, "Glow", Vector2.zero, new Vector2(1440f, 900f), LoopLandArt.Glow, new Color(0f, 0.9f, 1f, 0.9f));
             UImg(lui, "Back", Vector2.zero, new Vector2(1400f, 860f), LoopLandArt.Panel, Color.white);
             UText(lui, "Header", "<b>LIVE <color=#FF3DCB>BOARD</color></b>", new Vector2(0f, 360f), new Vector2(1300f, 100f), 64f, Hex("00E5FF"));
             URaw(lui, "Live View", new Vector2(0f, -50f), new Vector2(1320f, 660f), liveTex);
@@ -631,6 +633,14 @@ namespace LoopLand.EditorTools
             store.productArt = new Sprite[6];
             for (int i = 0; i < 6; i++) store.productArt[i] = StoreArt("premium", i) ?? LoopLandArt.ProductThumb("Thumb_Premium_" + i, i);
             store.vipProduct = 2;
+            for (int i = 0; i < 8; i++)
+            {
+                itemIcons[i].sprite = store.diceArt[i];
+                itemNames[i].text = store.diceNames[i];
+            }
+            store.detailPreview.sprite = store.diceArt[0];
+            store.detailName.text = store.diceNames[0];
+            store.detailDesc.text = store.diceDesc[0];
 
             // game wiring
             game.store = store;
@@ -933,8 +943,10 @@ namespace LoopLand.EditorTools
         private static TextMeshProUGUI NeonButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Color color, Sprite icon,
             UdonSharpBehaviour target, string evt, float fontSize, bool arrow)
         {
-            UImg(parent, name + " Glow", pos, size + new Vector2(50f, 50f), LoopLandArt.Glow, new Color(Mathf.Lerp(color.r, 1f, 0.3f), Mathf.Lerp(color.g, 1f, 0.3f), Mathf.Lerp(color.b, 1f, 0.3f), 0.95f));
+            UImg(parent, name + " Glow", pos, size + new Vector2(30f, 30f), LoopLandArt.Glow, new Color(Mathf.Lerp(color.r, 1f, 0.3f), Mathf.Lerp(color.g, 1f, 0.3f), Mathf.Lerp(color.b, 1f, 0.3f), 0.95f));
             TextMeshProUGUI t = UButton(parent, name, label, pos, size, color, target, evt, fontSize);
+            Image gloss = UImg(t.transform.parent, "Gloss", new Vector2(0f, size.y * 0.2f), new Vector2(size.x - 18f, size.y * 0.45f), LoopLandArt.Round, new Color(1f, 1f, 1f, 0.1f));
+            gloss.transform.SetSiblingIndex(0);
             if (icon != null)
             {
                 float isz = Mathf.Min(size.y * 0.62f, 90f);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.1
+- Console polish: tighter neon outlines (no more overlapping glows), no accent bars over the top buttons,
+  bigger STORE button, button gloss, solid back plate (no mirrored UI from across the table).
+- Seat screen stands on two posts that stay off the board cards.
+- Store shows item pictures in the editor before Play mode.
+
 ## 1.6.0
 - Neon "Game Controls" console: icon buttons in two columns, LOOPLAND header, big JOIN GAME button, glowing edges.
 - STORE button on every console: the store pops up on that seat screen for the local player (X or STORE again closes it).
