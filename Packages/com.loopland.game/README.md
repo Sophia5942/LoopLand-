@@ -13,6 +13,8 @@ LoopLand is a networked, Monopoly-style board game for VRChat worlds:
   cosmetics are visible to everyone.
 - **VRChat Creator Economy (CE) integration**: premium packs, VIP (2x coins), and Loop Coin packs bought
   with VRChat Credits through Udon Products.
+- **Live Board screens**: an overhead camera streams the board (tokens, trails, dice) to a big spectator
+  screen and a mini screen at the store, with the turn status and every player's cash next to it.
 - **One-click builder** that generates the whole game, including materials, dice, particles and sounds.
 
 ## Requirements

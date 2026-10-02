@@ -465,6 +465,44 @@ namespace LoopLand.EditorTools
             store.productCoins = new[] { 0, 0, 0, 500, 3000 };
             store.vipProduct = 2;
 
+            // live board view: overhead camera -> render texture -> spectator screens
+            Dir(Gen + "/Textures");
+            string rtPath = Gen + "/Textures/LiveBoard.renderTexture";
+            var liveTex = AssetDatabase.LoadAssetAtPath<RenderTexture>(rtPath);
+            if (liveTex == null)
+            {
+                liveTex = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGB32) { name = "LiveBoard", antiAliasing = 2 };
+                AssetDatabase.CreateAsset(liveTex, rtPath);
+            }
+            string liveMatPath = Gen + "/Materials/LiveBoard.mat";
+            var liveMat = AssetDatabase.LoadAssetAtPath<Material>(liveMatPath);
+            if (liveMat == null)
+            {
+                liveMat = new Material(Shader.Find("Unlit/Texture"));
+                AssetDatabase.CreateAsset(liveMat, liveMatPath);
+            }
+            liveMat.mainTexture = liveTex;
+            var camGo = new GameObject("Live Board Camera");
+            camGo.transform.SetParent(rt, false);
+            camGo.transform.localPosition = new Vector3(0f, 1.4f, 0f);
+            camGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            var cam = camGo.AddComponent<Camera>();
+            cam.orthographic = true;
+            cam.orthographicSize = 2.6f;
+            cam.nearClipPlane = 0.01f;
+            cam.farClipPlane = 1.2f;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = Hex("0A0914");
+            cam.cullingMask = 1;
+            cam.depth = -10f;
+            cam.allowHDR = false;
+            cam.useOcclusionCulling = false;
+            cam.targetTexture = liveTex;
+            var liveStatus = new List<TextMeshPro>(status);
+            var livePlayers = new List<TextMeshPro>(players);
+            LiveScreen(rt, "Live Board Screen", new Vector3(0f, 0f, 5.0f), 2.0f, liveMat, panel, frameCyan, liveStatus, livePlayers);
+            LiveScreen(st, "Live Board Mini Screen", new Vector3(-2.8f, 0f, 0.05f), 1.2f, liveMat, panel, frameGold, liveStatus, livePlayers);
+
             // game wiring
             game.store = store;
             game.tokens = tokens;
@@ -474,8 +512,8 @@ namespace LoopLand.EditorTools
             game.buildMarkers = markers;
             game.selectionMarker = selChild;
             game.spinner = spinner;
-            game.statusTexts = status;
-            game.playerTexts = players;
+            game.statusTexts = liveStatus.ToArray();
+            game.playerTexts = livePlayers.ToArray();
             game.cardTexts = cards;
             game.infoTexts = info;
             game.primaryLabels = prim;
@@ -564,6 +602,23 @@ namespace LoopLand.EditorTools
             b.pressVisual = vis;
             Done(b, interact, 3f);
             return tmp;
+        }
+
+        /// <summary>Standing screen showing the overhead live board feed, with turn status and the player list beside it.</summary>
+        private static void LiveScreen(Transform parent, string name, Vector3 lpos, float size, Material screenMat, Material panel, Material frame,
+            List<TextMeshPro> statusOut, List<TextMeshPro> playersOut)
+        {
+            var root = new GameObject(name).transform;
+            root.SetParent(parent, false);
+            root.localPosition = lpos;
+            float cy = 0.9f + size * 0.5f;
+            Prim(PrimitiveType.Cube, "Pole", root, new Vector3(0f, 0.45f, 0.06f), new Vector3(0.08f, 0.9f, 0.08f), panel);
+            Prim(PrimitiveType.Cube, "Back", root, new Vector3(0f, cy, 0.03f), new Vector3(size + 0.9f, size + 0.12f, 0.04f), panel);
+            Prim(PrimitiveType.Cube, "Frame", root, new Vector3(0f, cy, 0.055f), new Vector3(size + 0.96f, size + 0.18f, 0.01f), frame);
+            Prim(PrimitiveType.Quad, "Screen", root, new Vector3(-0.42f, cy, 0f), new Vector3(size, size, 1f), screenMat);
+            Text(root, "Title", "<b>LIVE <color=#FF3DCB>BOARD</color></b>", new Vector3(0f, cy + size * 0.5f + 0.14f, 0f), Quaternion.identity, new Vector2(size + 0.8f, 0.2f), 1.6f, Hex("00E5FF"));
+            statusOut.Add(Text(root, "Status", "", new Vector3(size * 0.5f + 0.02f, cy + size * 0.22f, -0.01f), Quaternion.identity, new Vector2(0.8f, size * 0.5f), 0.6f, Color.white));
+            playersOut.Add(Text(root, "Players", "", new Vector3(size * 0.5f + 0.02f, cy - size * 0.25f, -0.01f), Quaternion.identity, new Vector2(0.8f, size * 0.45f), 0.45f, Color.white, TextAlignmentOptions.Left));
         }
 
         private static void Done(UdonSharpBehaviour b, string interact, float proximity)
