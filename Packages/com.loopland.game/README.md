@@ -49,8 +49,9 @@ Generated assets go to `Assets/LoopLand/Generated`, and a reusable prefab is sav
   Browse with **<** / **>** or jump to **MY SPACE**.
 - **VIEW** swaps your live board between **TOP** (the screen above your dashboard) and **CENTER** (just the big
   screens above the middle of the table).
-- The live camera is a director: it zooms in on the dice when someone rolls, follows their token around the
-  loop, then eases back to the full board.
+- The live camera is a director: a dice close-up when someone rolls, a side chase-cam while their token hops,
+  a close-up of the card it lands on (turned so the card reads upright), then a pan back to the whole board.
+  Captions like "ItzSoph rolled 4 + 2" and "ItzSoph landed on Neon Row" appear on every live screen.
 - Press **STORE** to pop the store up above your dashboard (only you see it move); press it again or **X** to send it back.
 - The big button is context-sensitive: ROLL DICE / BUY / END TURN / ROLL DOUBLES...
 - The second button does PASS, USE GLITCH PASS, PAY BAIL or LEAVE.

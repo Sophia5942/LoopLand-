@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.9.0
+- Cinematic live camera: dice close-up, side chase-cam, upright close-up of the landing card, pan back to an
+  angled overview (perspective). UI panels, screens and the logo are hidden from the camera.
+- Captions on every live screen: "<player> rolled 4 + 2" (DOUBLES! too) and "<player> landed on <space>".
+
 ## 1.8.0
 - Live camera director: zooms in on the dice, follows the moving token, then returns to the overview.
 - VIEW swaps between the top screen and the center screens (the side live panel is removed).

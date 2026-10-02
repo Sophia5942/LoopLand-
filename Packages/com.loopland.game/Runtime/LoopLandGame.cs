@@ -109,6 +109,7 @@ namespace LoopLand
         public GameObject[] rowBacks;
         public Sprite[] spaceArt;
         public LoopLandCamera liveCam;
+        public TMP_Text[] captionTexts;
         public ParticleSystem celebrateFx;
         public ParticleSystem moneyFx;
         public AudioSource sfx;
@@ -212,6 +213,7 @@ namespace LoopLand
         private int[] seatView = new int[4];
         private int storeSeat = -1;
         private float toastUntil;
+        private float captionUntil;
         private int camSeenPos = -1;
         private int camSeenSlot = -1;
         private string[] rowL = new string[9];
@@ -440,6 +442,11 @@ namespace LoopLand
         private void Update()
         {
             if (spinner != null) spinner.Rotate(0f, 10f * Time.deltaTime, 0f);
+            if (captionUntil > 0f && Time.time > captionUntil)
+            {
+                captionUntil = 0f;
+                _SetTexts(captionTexts, "");
+            }
             if (cardHideTime > 0f && Time.time > cardHideTime)
             {
                 cardHideTime = 0f;
@@ -1049,17 +1056,30 @@ namespace LoopLand
             int tp = pos[turnSlot];
             if (phase == PH_PLAY)
             {
-                int steps = Mathf.Max(1, lastSteps);
-                float travel = 1.0f + steps * Mathf.Min(0.24f, 4f / steps) + 1.6f;
-                Transform tk = tokens[turnSlot].transform;
+                Transform land = spaceAnchors != null && tp < spaceAnchors.Length ? spaceAnchors[tp] : null;
                 if (rolled && dice != null && dice.Length >= 2 && dice[0] != null && dice[1] != null)
-                    liveCam._FollowSequence(dice[0].transform, dice[1].transform, 1.45f, tk, travel);
-                else if (camSeenSlot == turnSlot && tp != camSeenPos)
-                    liveCam._FollowSequence(null, null, 0f, tk, travel);
+                {
+                    liveCam._ShowRoll(dice[0].transform, dice[1].transform, tokens[turnSlot], land);
+                    _Caption(_Name(turnSlot) + " rolled <color=#FFE14D>" + die1 + " + " + die2 + "</color>" + (die1 == die2 ? "  <color=#FF5FBF>DOUBLES!</color>" : ""));
+                }
+                else if (camSeenSlot == turnSlot && tp != camSeenPos) liveCam._ShowMove(tokens[turnSlot], land);
             }
             else liveCam._Overview();
             camSeenPos = tp;
             camSeenSlot = turnSlot;
+        }
+
+        /// <summary>Called by the camera when it reaches the close-up of the landing space.</summary>
+        public void _OnCameraLanded()
+        {
+            if (phase != PH_PLAY) return;
+            _Caption(_Name(turnSlot) + " landed on <color=#FFE14D>" + spaceName[pos[turnSlot]] + "</color>");
+        }
+
+        private void _Caption(string msg)
+        {
+            _SetTexts(captionTexts, "<mark=#000000B0> " + msg + " </mark>");
+            captionUntil = Time.time + 4f;
         }
 
         /// <summary>Formats money with thousands separators, e.g. $1,500.</summary>

@@ -4,90 +4,118 @@ using UnityEngine;
 namespace LoopLand
 {
     /// <summary>
-    /// Live board camera director. Shows the whole board by default; when someone rolls it zooms in on the dice,
-    /// then follows that player's token around the loop, then eases back to the overview. Runs locally on every
-    /// client from the synced game events, so everyone sees the same camera moves.
+    /// Live board camera director (perspective). Shots:
+    /// overview (wide angled view of the whole loop) -> dice close-up when someone rolls -> chase cam from the side
+    /// while their token hops -> close-up of the card it landed on (rotated so the card reads upright) -> pan back.
+    /// Runs locally on every client from the synced game events, so everyone sees the same show.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class LoopLandCamera : UdonSharpBehaviour
     {
         public Camera cam;
-        public float overviewSize = 1.75f;
-        public float followSize = 0.95f;
-        public float moveSharpness = 3.5f;
-        public float zoomSharpness = 2.5f;
-        [Tooltip("How far the zoomed view may pan from the center (keeps it on the board).")]
-        public float limitX = 1.6f;
-        public float limitZ = 0.8f;
+        public LoopLandGame game;
+        public Transform overviewPose;
+        [Header("Shots")]
+        public float diceTime = 1.5f;
+        public float closeUpTime = 2.6f;
+        public float chaseDistance = 0.75f;
+        public float chaseSide = 0.45f;
+        public float chaseHeight = 0.5f;
+        public float closeUpHeight = 0.75f;
+        public float closeUpBack = 0.35f;
+        [Header("Smoothing")]
+        public float posSharpness = 3f;
+        public float rotSharpness = 3.5f;
 
-        private Vector3 home;
-        private Transform target;
-        private Transform target2;
-        private Transform nextTarget;
-        private float phaseEnd;
-        private float nextHold;
-        private bool following;
+        private const int SHOT_OVERVIEW = 0;
+        private const int SHOT_DICE = 1;
+        private const int SHOT_CHASE = 2;
+        private const int SHOT_CLOSE = 3;
 
-        private void Start()
+        private int shot;
+        private float shotEnd;
+        private Transform diceA;
+        private Transform diceB;
+        private LoopLandToken token;
+        private Transform landing;
+
+        /// <summary>Dice close-up, then chase the token, then close-up on the landing space.</summary>
+        public void _ShowRoll(Transform a, Transform b, LoopLandToken tk, Transform land)
         {
-            if (cam == null) cam = GetComponent<Camera>();
-            home = transform.localPosition;
+            diceA = a;
+            diceB = b;
+            token = tk;
+            landing = land;
+            shot = SHOT_DICE;
+            shotEnd = Time.time + diceTime;
         }
 
-        /// <summary>Follow a (or the midpoint of a and b) for firstTime seconds, then follow next for nextTime seconds.</summary>
-        public void _FollowSequence(Transform a, Transform b, float firstTime, Transform next, float nextTime)
+        /// <summary>Chase the token (for card moves / teleports), then close-up on the landing space.</summary>
+        public void _ShowMove(LoopLandToken tk, Transform land)
         {
-            if (firstTime > 0f && a != null)
-            {
-                target = a;
-                target2 = b;
-                phaseEnd = Time.time + firstTime;
-                nextTarget = next;
-                nextHold = nextTime;
-            }
-            else
-            {
-                target = next;
-                target2 = null;
-                phaseEnd = Time.time + nextTime;
-                nextTarget = null;
-            }
-            following = target != null;
+            token = tk;
+            landing = land;
+            shot = SHOT_CHASE;
+            shotEnd = Time.time + 1.0f;
         }
 
         public void _Overview()
         {
-            following = false;
+            shot = SHOT_OVERVIEW;
         }
 
         private void LateUpdate()
         {
-            if (cam == null) return;
-            if (following && Time.time > phaseEnd)
+            if (shot == SHOT_DICE && Time.time > shotEnd)
             {
-                if (nextTarget != null)
-                {
-                    target = nextTarget;
-                    target2 = null;
-                    nextTarget = null;
-                    phaseEnd = Time.time + nextHold;
-                }
-                else following = false;
+                shot = token != null ? SHOT_CHASE : SHOT_OVERVIEW;
+                shotEnd = Time.time + 1.0f;
             }
+            else if (shot == SHOT_CHASE && Time.time > shotEnd && (token == null || !token._IsMoving()))
+            {
+                shot = landing != null ? SHOT_CLOSE : SHOT_OVERVIEW;
+                shotEnd = Time.time + closeUpTime;
+                if (shot == SHOT_CLOSE && game != null) game._OnCameraLanded();
+            }
+            else if (shot == SHOT_CLOSE && Time.time > shotEnd) shot = SHOT_OVERVIEW;
 
-            Vector3 goal = home;
-            float size = overviewSize;
-            if (following && target != null)
+            Vector3 gp;
+            Quaternion gr;
+            if (shot == SHOT_DICE && diceA != null)
             {
-                Vector3 p = target.position;
-                if (target2 != null) p = (p + target2.position) * 0.5f;
-                if (transform.parent != null) p = transform.parent.InverseTransformPoint(p);
-                goal = new Vector3(Mathf.Clamp(p.x, -limitX, limitX), home.y, Mathf.Clamp(p.z, -limitZ, limitZ));
-                size = followSize;
+                Vector3 m = diceB != null ? (diceA.position + diceB.position) * 0.5f : diceA.position;
+                gp = m + new Vector3(-0.55f, 0.75f, -0.85f);
+                gr = Quaternion.LookRotation(m - gp, Vector3.up);
             }
+            else if (shot == SHOT_CHASE && token != null)
+            {
+                Transform t = token.transform;
+                Vector3 f = t.forward;
+                f.y = 0f;
+                if (f.sqrMagnitude < 0.001f) f = Vector3.forward;
+                f.Normalize();
+                Vector3 right = Vector3.Cross(Vector3.up, f);
+                gp = t.position - f * chaseDistance + right * chaseSide + Vector3.up * chaseHeight;
+                gr = Quaternion.LookRotation(t.position + f * 0.35f + Vector3.up * 0.05f - gp, Vector3.up);
+            }
+            else if (shot == SHOT_CLOSE && landing != null)
+            {
+                // the card's text runs "up" toward the inside of the loop (the anchor's forward), so use that as screen-up
+                Vector3 inward = landing.forward;
+                Vector3 c = landing.position;
+                gp = c - inward * closeUpBack + Vector3.up * closeUpHeight;
+                gr = Quaternion.LookRotation(c + inward * 0.03f - gp, inward);
+            }
+            else if (overviewPose != null)
+            {
+                gp = overviewPose.position;
+                gr = overviewPose.rotation;
+            }
+            else return;
+
             float dt = Time.deltaTime;
-            transform.localPosition = Vector3.Lerp(transform.localPosition, goal, 1f - Mathf.Exp(-moveSharpness * dt));
-            cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, size, 1f - Mathf.Exp(-zoomSharpness * dt));
+            transform.position = Vector3.Lerp(transform.position, gp, 1f - Mathf.Exp(-posSharpness * dt));
+            transform.rotation = Quaternion.Slerp(transform.rotation, gr, 1f - Mathf.Exp(-rotSharpness * dt));
         }
     }
 }

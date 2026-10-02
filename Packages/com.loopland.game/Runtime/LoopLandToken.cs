@@ -39,6 +39,11 @@ namespace LoopLand
         private bool rainbowTrail;
         private Color glowCol = Color.white;
 
+        public bool _IsMoving()
+        {
+            return moving;
+        }
+
         public void _MoveTo(int p, int m, float d)
         {
             if (spaces == null || spaces.Length == 0) return;

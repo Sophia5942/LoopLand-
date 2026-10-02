@@ -287,6 +287,7 @@ namespace LoopLand.EditorTools
             var statusL = new List<TMP_Text>();
             var playersL = new List<TMP_Text>();
             var cardsL = new List<TMP_Text>();
+            var captionsL = new List<TMP_Text>();
             var holo = new GameObject("Center Screens").transform;
             holo.SetParent(rt, false);
             holo.localPosition = new Vector3(0f, 2.3f, 0f);
@@ -301,18 +302,21 @@ namespace LoopLand.EditorTools
                 URaw(c, "Live View", new Vector2(0f, 175f), new Vector2(1440f, 720f), liveTex);
                 UImg(c, "Live Tag", new Vector2(-590f, 500f), new Vector2(200f, 56f), LoopLandArt.Pill, new Color(0.9f, 0.1f, 0.3f, 0.95f));
                 UText(c, "Live Tag Text", "<b>LIVE</b>", new Vector2(-590f, 500f), new Vector2(180f, 50f), 34f, Color.white);
+                captionsL.Add(UText(c, "Caption", "", new Vector2(40f, 480f), new Vector2(980f, 70f), 46f, Color.white));
                 cardsL.Add(UText(c, "Card", "", new Vector2(0f, -248f), new Vector2(1420f, 86f), 40f, Hex("FFE14D")));
                 UImg(c, "Status Back", new Vector2(-365f, -420f), new Vector2(710f, 230f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
                 statusL.Add(UText(c, "Status", "LOOPLAND", new Vector2(-365f, -420f), new Vector2(680f, 215f), 40f, Color.white));
                 UImg(c, "Players Back", new Vector2(365f, -420f), new Vector2(710f, 230f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
                 playersL.Add(UText(c, "Players", "", new Vector2(365f, -420f), new Vector2(680f, 215f), 32f, Color.white, TextAlignmentOptions.Left));
             }
+            SetLayer(holo.gameObject, 1);
             var spinner = new GameObject("Logo Spinner").transform;
             spinner.SetParent(rt, false);
             spinner.localPosition = new Vector3(0f, 2.7f, 0f);
             for (int s = 0; s < 2; s++)
                 Text(spinner, "Logo", "<b>LOOP<color=#FF3DCB>LAND</color></b>", Vector3.zero, Quaternion.Euler(0f, s * 180f, 0f), new Vector2(1.8f, 0.4f), 2.4f, Hex("00E5FF"));
             Fx("Logo Ring", spinner, Vector3.zero, Quaternion.Euler(-90f, 0f, 0f), 1.8f, 0f, 0.03f, 30f, 0f, true, false, ParticleSystemShapeType.Circle, 0.95f, 0f, 200, Hex("FFE14D"), Hex("00E5FF"), 0.5f);
+            SetLayer(spinner.gameObject, 1);
             ParticleSystem confetti = Fx("Celebrate", rt, new Vector3(0f, 1.6f, 0f), Quaternion.identity, 2.8f, 3f, 0.05f, 0f, 0f, false, true, ParticleSystemShapeType.Sphere, 0.3f, 0.5f, 600, Color.white, Color.white, 0f);
             var cem = confetti.emission;
             cem.SetBursts(new[] { new ParticleSystem.Burst(0f, 250), new ParticleSystem.Burst(0.4f, 200) });
@@ -472,11 +476,13 @@ namespace LoopLand.EditorTools
                 URaw(sc, "Live View", new Vector2(0f, 150f), new Vector2(1240f, 620f), liveTex);
                 UImg(sc, "Live Tag", new Vector2(-520f, 425f), new Vector2(170f, 50f), LoopLandArt.Pill, new Color(0.9f, 0.1f, 0.3f, 0.95f));
                 UText(sc, "Live Tag Text", "<b>LIVE</b>", new Vector2(-520f, 425f), new Vector2(150f, 44f), 30f, Color.white);
+                captionsL.Add(UText(sc, "Caption", "", new Vector2(40f, 418f), new Vector2(860f, 64f), 40f, Color.white));
                 cardsL.Add(UText(sc, "Card", "", new Vector2(0f, -205f), new Vector2(1240f, 70f), 36f, Hex("FFE14D")));
                 UImg(sc, "Status Back", new Vector2(-320f, -360f), new Vector2(620f, 180f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
                 statusL.Add(UText(sc, "Status", "", new Vector2(-320f, -360f), new Vector2(590f, 165f), 34f, Color.white));
                 UImg(sc, "Players Back", new Vector2(320f, -360f), new Vector2(620f, 180f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
                 playersL.Add(UText(sc, "Players", "", new Vector2(320f, -360f), new Vector2(590f, 165f), 28f, Color.white, TextAlignmentOptions.Left));
+                SetLayer(top.gameObject, 1);
                 seatScreens[d] = top.gameObject;
 
                 // where the store pops up for this seat (same spot as the top screen, independent of the VIEW setting)
@@ -589,6 +595,9 @@ namespace LoopLand.EditorTools
             UImg(lui, "Back", Vector2.zero, new Vector2(1400f, 860f), LoopLandArt.Panel, Color.white);
             UText(lui, "Header", "<b>LIVE <color=#FF3DCB>BOARD</color></b>", new Vector2(0f, 360f), new Vector2(1300f, 100f), 64f, Hex("00E5FF"));
             URaw(lui, "Live View", new Vector2(0f, -50f), new Vector2(1320f, 660f), liveTex);
+            captionsL.Add(UText(lui, "Caption", "", new Vector2(0f, 240f), new Vector2(1000f, 64f), 42f, Color.white));
+            SetLayer(lui.gameObject, 1);
+            SetLayer(sui.gameObject, 1);
             store.sfx = storeAudio;
             store.clickClip = Wav("click", 0.06f, t => Sin(1800f, t) * Env(t, 0.001f, 0.015f) * 0.5f);
             store.buyClip = Wav("coin", 0.5f, t => Notes(t, new[] { 988f, 1319f }, 0.08f, 0.25f));
@@ -712,6 +721,8 @@ namespace LoopLand.EditorTools
             game.rowValues = rowValues;
             game.rowBacks = rowBacks;
             game.liveCam = liveCam;
+            liveCam.game = game;
+            game.captionTexts = captionsL.ToArray();
             game.spaceArt = spaceArt;
             game.infoTexts = info;
             game.primaryLabels = prim;
@@ -1156,25 +1167,29 @@ namespace LoopLand.EditorTools
                 liveTex.antiAliasing = 2;
                 EditorUtility.SetDirty(liveTex);
             }
+            var pose = new GameObject("Live Camera Overview Pose").transform;
+            pose.SetParent(root, false);
+            pose.localPosition = new Vector3(0f, 6.0f, -3.2f);
+            pose.localRotation = Quaternion.LookRotation(new Vector3(0f, TopY, 0f) - pose.localPosition, Vector3.up);
             var camGo = new GameObject("Live Board Camera");
             camGo.transform.SetParent(root, false);
-            camGo.transform.localPosition = new Vector3(0f, 1.4f, 0f);
-            camGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            camGo.transform.localPosition = pose.localPosition;
+            camGo.transform.localRotation = pose.localRotation;
             var cam = camGo.AddComponent<Camera>();
-            cam.orthographic = true;
-            cam.orthographicSize = 1.75f;
-            cam.nearClipPlane = 0.01f;
-            cam.farClipPlane = 1.2f;
+            cam.orthographic = false;
+            cam.fieldOfView = 40f;
+            cam.nearClipPlane = 0.05f;
+            cam.farClipPlane = 25f;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Hex("0A0914");
-            cam.cullingMask = 1;
+            cam.cullingMask = 1; // Default layer only: the board, tokens, dice and effects (all UI panels live on TransparentFX)
             cam.depth = -10f;
             cam.allowHDR = false;
             cam.useOcclusionCulling = false;
             cam.targetTexture = liveTex;
             director = UdonSharpUndo.AddComponent<LoopLandCamera>(camGo);
             director.cam = cam;
-            director.overviewSize = cam.orthographicSize;
+            director.overviewPose = pose;
             made.Add(director);
             return liveTex;
         }
