@@ -32,6 +32,8 @@ namespace LoopLand.EditorTools
         private static readonly List<UdonSharpBehaviour> made = new List<UdonSharpBehaviour>();
         private static readonly System.Random rng = new System.Random(7);
 
+        private const int LiveW = 2048;
+        private const int LiveH = 1024;
         private const float LobeC = 1.75f;
         private const float LobeR = 1.35f;
         private const float CrossGap = 0.55f;
@@ -981,8 +983,16 @@ namespace LoopLand.EditorTools
             var liveTex = AssetDatabase.LoadAssetAtPath<RenderTexture>(rtPath);
             if (liveTex == null)
             {
-                liveTex = new RenderTexture(1536, 768, 24, RenderTextureFormat.ARGB32) { name = "LiveBoardWide", antiAliasing = 2 };
+                liveTex = new RenderTexture(LiveW, LiveH, 24, RenderTextureFormat.ARGB32) { name = "LiveBoardWide", antiAliasing = 2 };
                 AssetDatabase.CreateAsset(liveTex, rtPath);
+            }
+            else if (liveTex.width != LiveW || liveTex.height != LiveH)
+            {
+                liveTex.Release();
+                liveTex.width = LiveW;
+                liveTex.height = LiveH;
+                liveTex.antiAliasing = 2;
+                EditorUtility.SetDirty(liveTex);
             }
             var camGo = new GameObject("Live Board Camera");
             camGo.transform.SetParent(root, false);
@@ -990,7 +1000,7 @@ namespace LoopLand.EditorTools
             camGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             var cam = camGo.AddComponent<Camera>();
             cam.orthographic = true;
-            cam.orthographicSize = 2.1f;
+            cam.orthographicSize = 1.75f;
             cam.nearClipPlane = 0.01f;
             cam.farClipPlane = 1.2f;
             cam.clearFlags = CameraClearFlags.SolidColor;

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.1
+- Sharper Live Board: 2048x1024 feed framed tightly on the board (about 2x the detail).
+
 ## 1.4.0
 - Infinity board: the 40 cards follow a figure-8 (two round lobes and crossing lanes) on an infinity-shaped
   table, over a glowing gradient ribbon with sparkles. Dice roll in the right lobe; logo in the left lobe.
