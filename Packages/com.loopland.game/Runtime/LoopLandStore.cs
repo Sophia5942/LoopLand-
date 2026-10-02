@@ -91,6 +91,10 @@ namespace LoopLand
         [Header("Store pop-up at each console (local to the player who opens it)")]
         public Transform storePanel;
         public Transform[] storeSpots;
+        [Header("Purchase reveal: scratch to reveal the bundle you just bought (its contents are fixed and listed up front)")]
+        public LoopLandTicket revealTicket;
+        public GameObject revealPanel;
+        public TMP_Text revealText;
         public AudioSource sfx;
         public AudioClip buyClip;
         public AudioClip errorClip;
@@ -170,6 +174,7 @@ namespace LoopLand
                     if (grant > 0) _AddCoins(grant * Mathf.Max(1, quantity));
                     message = "<color=#FFE14D>Thank you for supporting LoopLand!</color> " + _ProductName(idx) + (grant > 0 ? " (+" + (grant * Mathf.Max(1, quantity)) + " coins)" : " unlocked!");
                     _Sfx(buyClip);
+                    _ShowReveal(idx, grant * Mathf.Max(1, quantity));
                 }
                 _RefreshUI();
             }
@@ -180,6 +185,29 @@ namespace LoopLand
         {
             if (Utilities.IsValid(player) && player.isLocal) { _RefreshOwned(); _ValidateEquips(); _RefreshUI(); }
             if (game != null) game._OnCosmeticsChanged();
+        }
+
+        /// <summary>A scratch-card style reveal of a purchase. The contents were already granted and are exactly what the listing says.</summary>
+        private void _ShowReveal(int idx, int coins)
+        {
+            if (revealTicket == null) return;
+            if (revealPanel != null) revealPanel.SetActive(true);
+            string contents = productDescriptions != null && idx < productDescriptions.Length ? productDescriptions[idx] : "";
+            Sprite art = productArt != null && idx < productArt.Length ? productArt[idx] : null;
+            revealTicket._Show(art, _ProductName(idx), coins > 0 ? "+" + coins + " Loop Coins" : contents, "YOUR PURCHASE");
+            if (revealText != null) revealText.text = "Thank you! Your bundle is already yours: scratch the silver to reveal it.";
+        }
+
+        public void _OnRevealScratched()
+        {
+            if (revealText != null) revealText.text = "<color=#FFE14D>Enjoy!</color> Everything in the bundle is unlocked. Press DONE to close.";
+        }
+
+        public void _CloseReveal()
+        {
+            if (revealTicket != null) revealTicket._Hide();
+            if (revealPanel != null) revealPanel.SetActive(false);
+            _Sfx(clickClip);
         }
 
         private void _RefreshOwned()
@@ -564,7 +592,9 @@ namespace LoopLand
 
             if (bannerText != null)
             {
-                string first = message.Length > 0 ? message : "Earn <color=#FFE14D>Loop Coins</color> by playing LoopLand, then spend them on dice, tokens, buildings, trails and more!";
+                string first = message.Length > 0 ? message : (tab == PREMIUM_TAB
+                    ? "Every bundle has <color=#FFE14D>fixed contents</color>, listed right here. No random rewards, ever."
+                    : "Earn <color=#FFE14D>Loop Coins</color> by playing LoopLand, then spend them on dice, tokens, glows, trails and more!");
                 bannerText.text = first + "\n<color=#FFE14D>" + (restored ? coins + " Loop Coins saved." : "Loading your save...") + "</color>";
             }
         }

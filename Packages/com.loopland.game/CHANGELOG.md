@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.0.0
+A new, simpler LoopLand: race around the Loop, win challenges, scratch tickets and finish with the most coins.
+- **New rules.** No more buying, rent, building, mortgages, jail or bankruptcy. There are seven tile types:
+  - **Coins:** +50 to +200; two tiles leak 50.
+  - **Lucky Loop:** scratch a ticket for a gameplay reward.
+  - **Challenge:** a quick mini-game.
+  - **Power:** Shield, Boost, Swap or Bonus Roll.
+  - **Mystery:** a random event for you or everyone.
+  - **Portal:** warp 10 tiles ahead.
+  - **Loop Start:** +100 every lap.
+
+  The most coins after the last round (10 by default) wins.
+- **The Loop gets wilder every lap:** bigger rewards from Loop 2, four tiles turn into Mystery tiles at Loop 3,
+  and LOOP JACKPOT tickets from Loop 4.
+- **Lucky Loop tickets** appear on the dashboard nearest you and are scratched with your finger (VR) or your view
+  (desktop). Rewards: coins, Double Boost, Shield, Move +3, Extra Roll, Swap, Jackpot Challenge or nothing.
+- **Challenges:** LASER LOOP (hit 5 targets in 15 s) and COIN RUSH (grab coins for 12 s), played on the dashboard.
+- **Simpler dashboard.**
+  - One big button that changes with the turn: JOIN GAME, START GAME, ROLL, PLAY CHALLENGE, SCRATCH TICKET,
+    TURN COMPLETE, NEW GAME.
+  - Menu: MY STATUS, TICKETS, POWER-UPS, VIEW, HOW TO PLAY, STORE, LEAVE and RESET.
+  - Turns end automatically about 2 seconds after the tile is done.
+- **Free Loop Scratch replaces the paid scratch cards.**
+  - Tickets are free: one every 30 minutes (up to 5) and one per finished game.
+  - Rewards are just for fun: Loop XP and levels, 2x XP, Lucky Start, Shield Start, fireworks for everyone, and
+    8 collectible stamps.
+  - Nothing there costs Loop Coins or Credits, or can be traded or cashed out.
+- **Store:**
+  - Bundles are labelled with fixed contents.
+  - After a purchase you scratch to reveal the bundle you got. It's already granted and exactly as listed.
+  - Building styles are now **tile glows**: the colour of the frame on the tile you land on.
+- Scratching on desktop no longer needs left click: just look across the silver.
+- Rebuild the scene (**LoopLand > Build Game In Scene > Replace**) after updating.
+
 ## 1.13.0
 - Fixed scratching. The scratch card now lies on the **counter** in front of the machine, and the scratching is
   tracked in Udon instead of relying on UI hover events:

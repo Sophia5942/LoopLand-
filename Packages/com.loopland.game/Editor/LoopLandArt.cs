@@ -15,6 +15,7 @@ namespace LoopLand.EditorTools
         public static Sprite Round, Glow, Pill, Panel, Coin, House, Tower;
         public static Sprite IconDice, IconPawn, IconBuilding, IconSparkle, IconCrown, IconGift, IconGlobe;
         public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen, LogoInfinity, ScratchCell, Burst, NoPrize;
+        public static Sprite IconTicket, IconTarget, IconBolt, IconShield, IconTree, IconRocket, IconMystery;
 
         private static string folder;
         private static float aa;
@@ -32,6 +33,11 @@ namespace LoopLand.EditorTools
         private static readonly Vector2[] HammerHead = { new Vector2(0.7244f, 0.3956f), new Vector2(0.8166f, 0.501f), new Vector2(0.5156f, 0.7644f), new Vector2(0.4234f, 0.659f) };
         private static readonly Vector2[] RefreshHead = { new Vector2(0.56f, 0.64f), new Vector2(0.8f, 0.78f), new Vector2(0.56f, 0.94f) };
         private static readonly Vector2[] PlayTri = { new Vector2(0.44f, 0.48f), new Vector2(0.6f, 0.58f), new Vector2(0.44f, 0.68f) };
+        private static readonly Vector2[] BoltTop = { new Vector2(0.62f, 0.94f), new Vector2(0.3f, 0.46f), new Vector2(0.56f, 0.46f) };
+        private static readonly Vector2[] BoltBottom = { new Vector2(0.44f, 0.54f), new Vector2(0.38f, 0.06f), new Vector2(0.7f, 0.54f) };
+        private static readonly Vector2[] ShieldTip = { new Vector2(0.2f, 0.52f), new Vector2(0.5f, 0.08f), new Vector2(0.8f, 0.52f) };
+        private static readonly Vector2[] FinL = { new Vector2(0.37f, 0.36f), new Vector2(0.22f, 0.16f), new Vector2(0.4f, 0.24f) };
+        private static readonly Vector2[] FinR = { new Vector2(0.63f, 0.36f), new Vector2(0.6f, 0.24f), new Vector2(0.78f, 0.16f) };
         private static readonly Vector2[] HouseShape = { new Vector2(0.18f, 0.12f), new Vector2(0.82f, 0.12f), new Vector2(0.82f, 0.55f), new Vector2(0.5f, 0.88f), new Vector2(0.18f, 0.55f) };
 
         public static void Build(string outFolder)
@@ -131,6 +137,45 @@ namespace LoopLand.EditorTools
                 Color c = new Color(v * 0.95f, v * 0.97f, v, 1f);
                 if (Hash(Mathf.Floor(x * 10f) + 3f, Mathf.Floor(y * 10f)) > 0.95f && Circle(Mathf.Repeat(x * 10f, 1f), Mathf.Repeat(y * 10f, 1f), 0.5f, 0.5f, 0.13f) < 0f) c = Color.white;
                 return A(c, Mathf.Clamp01((rim - Mathf.Sqrt(dx * dx + dy * dy)) / 0.012f + 0.5f));
+            });
+            IconTicket = Paint("Icon_Ticket", 128, 0, (x, y) =>
+            {
+                float body = Box(x, y, 0.5f, 0.5f, 0.42f, 0.27f, 0.05f);
+                float notch = Mathf.Min(Circle(x, y, 0.08f, 0.5f, 0.09f), Circle(x, y, 0.92f, 0.5f, 0.09f));
+                float perf = 1f;
+                for (int k = 0; k < 4; k++) perf = Mathf.Min(perf, Circle(x, y, 0.66f, 0.33f + k * 0.113f, 0.022f));
+                return A(Color.white, Cov(body) * (1f - Cov(notch)) * (1f - Cov(perf)));
+            });
+            IconTarget = Paint("Icon_Target", 128, 0, (x, y) =>
+            {
+                float d = Mathf.Min(Mathf.Abs(Circle(x, y, 0.5f, 0.5f, 0.38f)) - 0.055f, Mathf.Abs(Circle(x, y, 0.5f, 0.5f, 0.22f)) - 0.05f);
+                return A(Color.white, Cov(Mathf.Min(d, Circle(x, y, 0.5f, 0.5f, 0.08f))));
+            });
+            IconBolt = Paint("Icon_Bolt", 128, 0, (x, y) => A(Color.white, Cov(Mathf.Min(Poly(x, y, BoltTop), Poly(x, y, BoltBottom)))));
+            IconShield = Paint("Icon_Shield", 128, 0, (x, y) =>
+            {
+                float d = Mathf.Min(Box(x, y, 0.5f, 0.66f, 0.3f, 0.2f, 0.06f), Poly(x, y, ShieldTip));
+                float shine = Box(x, y, 0.4f, 0.62f, 0.05f, 0.14f, 0.03f);
+                return A(Color.white, Cov(d) * (1f - 0.55f * Cov(shine)));
+            });
+            IconTree = Paint("Icon_Tree", 128, 0, (x, y) =>
+            {
+                float d = Mathf.Min(Circle(x, y, 0.5f, 0.66f, 0.2f), Mathf.Min(Circle(x, y, 0.34f, 0.52f, 0.15f), Circle(x, y, 0.66f, 0.52f, 0.15f)));
+                return A(Color.white, Cov(Mathf.Min(d, Box(x, y, 0.5f, 0.24f, 0.05f, 0.16f, 0.02f))));
+            });
+            IconRocket = Paint("Icon_Rocket", 128, 0, (x, y) =>
+            {
+                float body = Mathf.Min(Ellipse(x, y, 0.5f, 0.52f, 0.14f, 0.34f), Mathf.Min(Poly(x, y, FinL), Poly(x, y, FinR)));
+                body = Mathf.Min(body, Ellipse(x, y, 0.5f, 0.12f, 0.06f, 0.08f));
+                return A(Color.white, Cov(body) * (1f - Cov(Circle(x, y, 0.5f, 0.6f, 0.055f))));
+            });
+            IconMystery = Paint("Icon_Mystery", 128, 0, (x, y) =>
+            {
+                float ang = Mathf.Atan2(y - 0.64f, x - 0.5f) * Mathf.Rad2Deg;
+                float arc = Mathf.Abs(Circle(x, y, 0.5f, 0.64f, 0.17f)) - 0.06f;
+                if (ang < -90f && ang > -165f) arc = 1f; // the hook opens at the lower left
+                float d = Mathf.Min(arc, Mathf.Min(Box(x, y, 0.5f, 0.4f, 0.06f, 0.08f, 0.02f), Circle(x, y, 0.5f, 0.16f, 0.07f)));
+                return A(Color.white, Cov(d));
             });
             Burst = Paint("Burst", 128, 0, (x, y) =>
             {
