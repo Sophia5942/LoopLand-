@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.0
+- Real scratching: the scratch card is covered in silver foil that tears away wherever you rub it with your pointer
+  (VR laser or desktop cursor). No more sliding coins.
+  - The foil leaves torn, scalloped holes, and silver flakes fall from where you scratch.
+  - Scratch sound while you rub, plus a light controller buzz in VR.
+  - A SCRATCHED % counter; the prize pops out once about 70% is gone (or press REVEAL ALL).
+- Rebuild the scene (**LoopLand > Build Game In Scene > Replace**) to get the new card.
+
 ## 1.10.0
 - New **LoopLand Scratch Cards** machine beside the store, with a marquee, a "FEEL LUCKY?" sign and a buy desk.
   - Four packs: Common 50, Rare 100, Epic 200 and Legendary 400 Loop Coins.

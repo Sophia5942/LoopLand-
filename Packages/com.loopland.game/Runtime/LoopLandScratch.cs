@@ -4,11 +4,12 @@ using UnityEngine;
 using UnityEngine.UI;
 using VRC.SDK3.Persistence;
 using VRC.SDKBase;
+using VRC.Udon.Common;
 
 namespace LoopLand
 {
     /// <summary>
-    /// LoopLand Scratch Cards: buy a pack with Loop Coins, drag the coins across the silver strips to scratch, and win
+    /// LoopLand Scratch Cards: buy a pack with Loop Coins, rub the silver foil with your pointer to scratch it off, and win
     /// Loop Coins or a store item (dice, token, building style or trail) you don't own yet. Once every item of the rolled
     /// rarity is owned the card pays Loop Coins instead, and coin prizes average below the pack price, so cards can't be
     /// farmed for coins. The prize is granted the moment the card is bought, so leaving mid-scratch never loses it.
@@ -39,8 +40,10 @@ namespace LoopLand
         public TMP_Text cardRarity;
         public Image prizeArt;
         public TMP_Text prizeName;
-        public Slider[] strips;
-        public Image[] foils;
+        public GameObject[] cells;      // foil flakes: each one hides itself (Selectable + Animator) when the pointer rubs over it
+        [Range(0.3f, 1f)] public float revealAt = 0.7f;
+        public TMP_Text progressText;
+        public ParticleSystem dust;
         public Sprite coinArt;
 
         [Header("Result")]
@@ -74,9 +77,12 @@ namespace LoopLand
         private int pack;
         private bool onCard;
         private bool revealed;
-        private bool resetting;
-        private float[] best = new float[8];
+        private int[] remain;
+        private int remainCount;
+        private int scratched;
+        private float nextPoll;
         private float nextScratch;
+        private bool leftHand;
         private int prizeCat = -1;
         private int prizeItem;
         private int prizeCoins;
@@ -130,30 +136,41 @@ namespace LoopLand
             _Refresh();
         }
 
-        /// <summary>Called by every scratch strip (slider) while it is dragged.</summary>
-        public void _OnScratch()
+        public override void InputUse(bool value, UdonInputEventArgs args)
         {
-            if (resetting || !onCard || revealed || strips == null) return;
-            bool done = true;
-            bool moved = false;
-            for (int i = 0; i < strips.Length; i++)
+            if (value) leftHand = args.handType == HandType.LEFT; // the hand that last clicked is the one pointing
+        }
+
+        /// <summary>Watches the foil flakes: the UI hides each one the moment the pointer rubs over it.</summary>
+        private void Update()
+        {
+            if (!onCard || revealed || cells == null || Time.time < nextPoll) return;
+            nextPoll = Time.time + 0.05f;
+            int fresh = 0;
+            for (int k = remainCount - 1; k >= 0; k--)
             {
-                if (strips[i] == null) continue;
-                float v = strips[i].value;
-                if (v > best[i])
+                GameObject cell = cells[remain[k]];
+                if (cell != null && cell.activeSelf) continue;
+                if (fresh < 3 && cell != null && dust != null)
                 {
-                    best[i] = v;
-                    moved = true;
+                    dust.transform.position = cell.transform.position;
+                    dust.Emit(5);
                 }
-                if (foils != null && i < foils.Length && foils[i] != null) foils[i].fillAmount = 1f - best[i];
-                if (best[i] < 0.92f) done = false;
+                fresh++;
+                remainCount--;
+                remain[k] = remain[remainCount];
             }
-            if (moved && Time.time >= nextScratch)
+            if (fresh == 0) return;
+            scratched += fresh;
+            if (Time.time >= nextScratch)
             {
-                nextScratch = Time.time + 0.1f;
+                nextScratch = Time.time + 0.09f;
                 _Sfx(scratchClip);
+                _Buzz();
             }
-            if (done) _Reveal();
+            float done = scratched / (float)cells.Length;
+            if (progressText != null) progressText.text = "SCRATCHED <color=#FFE14D>" + Mathf.FloorToInt(done * 100f) + "%</color>";
+            if (done >= revealAt) _Reveal();
         }
 
         public void _OnRevealAll()
@@ -277,18 +294,15 @@ namespace LoopLand
             if (cardRarity != null) cardRarity.text = packNames[pack] + " CARD";
             if (prizeArt != null) prizeArt.sprite = prizeCat < 0 ? coinArt : store._ArtOf(prizeCat, prizeItem);
             if (prizeName != null) prizeName.text = prizeCat < 0 ? "+" + prizeCoins + " COINS" : store._NameOf(prizeCat, prizeItem);
-            resetting = true;
-            for (int i = 0; i < strips.Length; i++)
+            if (remain == null || remain.Length < cells.Length) remain = new int[cells.Length];
+            for (int i = 0; i < cells.Length; i++)
             {
-                best[i] = 0f;
-                if (strips[i] != null)
-                {
-                    strips[i].gameObject.SetActive(true);
-                    strips[i].value = 0f;
-                }
-                if (foils != null && i < foils.Length && foils[i] != null) foils[i].fillAmount = 1f;
+                if (cells[i] != null) cells[i].SetActive(true);
+                remain[i] = i;
             }
-            resetting = false;
+            remainCount = cells.Length;
+            scratched = 0;
+            if (progressText != null) progressText.text = "SCRATCHED <color=#FFE14D>0%</color>";
             if (infoPanel != null) infoPanel.SetActive(true);
             if (wonPanel != null) wonPanel.SetActive(false);
             _ShowCard(true);
@@ -297,12 +311,8 @@ namespace LoopLand
         private void _Reveal()
         {
             revealed = true;
-            for (int i = 0; i < strips.Length; i++)
-            {
-                best[i] = 1f;
-                if (foils != null && i < foils.Length && foils[i] != null) foils[i].fillAmount = 0f;
-                if (strips[i] != null) strips[i].gameObject.SetActive(false); // the coins get out of the way of the prize
-            }
+            for (int i = 0; i < cells.Length; i++) if (cells[i] != null) cells[i].SetActive(false);
+            remainCount = 0;
             if (infoPanel != null) infoPanel.SetActive(false);
             if (wonPanel != null) wonPanel.SetActive(true);
             if (wonName != null) wonName.text = prizeCat < 0 ? prizeCoins + " LOOP COINS" : store._NameOf(prizeCat, prizeItem);
@@ -366,6 +376,14 @@ namespace LoopLand
         private void _Sfx(AudioClip c)
         {
             if (sfx != null && c != null) sfx.PlayOneShot(c, 0.8f);
+        }
+
+        /// <summary>A light buzz in the pointing hand while scratching (VR only).</summary>
+        private void _Buzz()
+        {
+            VRCPlayerApi me = Networking.LocalPlayer;
+            if (!Utilities.IsValid(me) || !me.IsUserInVR()) return;
+            me.PlayHapticEventInHand(leftHand ? VRC_Pickup.PickupHand.Left : VRC_Pickup.PickupHand.Right, 0.05f, 0.2f, 160f);
         }
     }
 }

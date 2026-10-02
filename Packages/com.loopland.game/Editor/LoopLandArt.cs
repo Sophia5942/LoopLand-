@@ -14,7 +14,7 @@ namespace LoopLand.EditorTools
     {
         public static Sprite Round, Glow, Pill, Panel, Coin, House, Tower;
         public static Sprite IconDice, IconPawn, IconBuilding, IconSparkle, IconCrown, IconGift, IconGlobe;
-        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen, LogoInfinity, Foil;
+        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen, LogoInfinity, ScratchCell;
 
         private static string folder;
         private static float aa;
@@ -121,15 +121,16 @@ namespace LoopLand.EditorTools
                 Color c = Color.HSVToRGB(Mathf.Repeat(0.14f + x * 0.75f, 1f), 0.7f, 1f);
                 return Mix(A(c, 0.45f * Soft(d - 0.02f, 0.08f)), Color.Lerp(c, Color.white, 0.25f), Cov(d));
             });
-            Foil = Paint("Scratch_Foil", 128, 0, (x, y) =>
+            ScratchCell = Paint("Scratch_Cell", 96, 0, (x, y) =>
             {
-                // brushed silver with two diagonal sheens and a few sparkles
-                float grain = Hash(Mathf.Floor(x * 128f), Mathf.Floor(y * 24f)) * 0.12f;
-                float sheen = Mathf.Exp(-Mathf.Pow((x - y * 0.5f - 0.3f) / 0.12f, 2f)) * 0.3f + Mathf.Exp(-Mathf.Pow((x - y * 0.5f - 0.75f) / 0.05f, 2f)) * 0.22f;
-                float v = 0.6f + grain + sheen;
+                // one round flake of silver foil; the flakes overlap, so a scratched hole gets a torn, scalloped edge
+                float dx = x - 0.5f, dy = y - 0.5f;
+                float ang = Mathf.Atan2(dy, dx);
+                float rim = 0.448f + 0.03f * (Mathf.Sin(ang * 5f + 1.3f) * 0.5f + 0.5f) + 0.022f * Hash(Mathf.Floor((ang + 3.1416f) * 9f), 7f);
+                float v = 0.64f + Hash(Mathf.Floor(x * 96f), Mathf.Floor(y * 96f)) * 0.07f + Hash(Mathf.Floor(x * 12f), Mathf.Floor(y * 12f)) * 0.05f;
                 Color c = new Color(v * 0.95f, v * 0.97f, v, 1f);
-                if (Hash(Mathf.Floor(x * 16f), Mathf.Floor(y * 16f)) > 0.9f && Circle(Mathf.Repeat(x * 16f, 1f), Mathf.Repeat(y * 16f, 1f), 0.5f, 0.5f, 0.14f) < 0f) c = Color.white;
-                return c;
+                if (Hash(Mathf.Floor(x * 10f) + 3f, Mathf.Floor(y * 10f)) > 0.95f && Circle(Mathf.Repeat(x * 10f, 1f), Mathf.Repeat(y * 10f, 1f), 0.5f, 0.5f, 0.13f) < 0f) c = Color.white;
+                return A(c, Mathf.Clamp01((rim - Mathf.Sqrt(dx * dx + dy * dy)) / 0.012f + 0.5f));
             });
             IconScreen = Paint("Icon_Screen", 128, 0, (x, y) =>
             {

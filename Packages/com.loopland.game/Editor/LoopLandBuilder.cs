@@ -5,6 +5,7 @@ using TMPro;
 using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEditor.Events;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -868,7 +869,8 @@ namespace LoopLand.EditorTools
             UImg(sp, "Card Glow", new Vector2(-480f, 0f), new Vector2(960f, 1360f), LoopLandArt.Glow, new Color(1f, 1f, 1f, 0.8f));
             Image card = UImg(sp, "Card", new Vector2(-480f, 0f), new Vector2(900f, 1300f), LoopLandArt.Round, packCols[0]);
             Transform ct = card.transform;
-            UImg(ct, "Inner", new Vector2(0f, -45f), new Vector2(840f, 1170f), LoopLandArt.Round, new Color(0.05f, 0.05f, 0.14f, 0.96f));
+            Color inner = new Color(0.05f, 0.05f, 0.14f, 1f);
+            UImg(ct, "Inner", new Vector2(0f, -45f), new Vector2(840f, 1170f), LoopLandArt.Round, inner);
             sc.cardBack = card;
             sc.cardRarity = UText(ct, "Rarity", "<b>COMMON CARD</b>", new Vector2(0f, 595f), new Vector2(820f, 90f), 68f, Color.white);
             TextMeshProUGUI cardBrand = UText(ct, "Brand", "<b>LOOPLAND</b>", new Vector2(0f, 465f), new Vector2(700f, 100f), 80f, Color.white);
@@ -879,21 +881,51 @@ namespace LoopLand.EditorTools
             sc.prizeArt.preserveAspect = true;
             sc.prizeName = UText(ct, "Prize Name", "", new Vector2(0f, -260f), new Vector2(800f, 90f), 64f, Hex("FFE14D"));
             sc.prizeName.fontStyle = FontStyles.Bold;
-            var strips = new Slider[3];
-            var foils = new Image[3];
-            float[] stripY = { 245f, 15f, -215f };
-            for (int s = 0; s < 3; s++) strips[s] = ScratchStrip(ct, "Strip " + s, new Vector2(0f, stripY[s]), new Vector2(780f, 232f), sc, out foils[s]);
-            sc.strips = strips;
-            sc.foils = foils;
-            UText(ct, "Hint", "<b>DRAG THE COINS TO SCRATCH  >>></b>", new Vector2(0f, -420f), new Vector2(780f, 70f), 42f, Hex("00E5FF"));
+            // the foil: 15 x 13 overlapping flakes. Each is a Selectable whose Animator switches it off when the pointer rubs
+            // over it (hover or press), so scratching follows the VR laser or desktop cursor with no Udon work per flake.
+            RuntimeAnimatorController flakeCtrl = ScratchFlakeController();
+            RectTransform foil = URect(ct, "Foil", new Vector2(0f, 15f), new Vector2(780f, 676f));
+            var cells = new GameObject[15 * 13];
+            for (int r = 0; r < 13; r++)
+                for (int c = 0; c < 15; c++)
+                {
+                    Image flake = UImg(foil, "Flake " + (r * 15 + c), new Vector2(-364f + c * 52f, 312f - r * 52f), new Vector2(86f, 86f), LoopLandArt.ScratchCell, Color.white, false, true);
+                    flake.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 90f * rng.Next(4));
+                    var sel = flake.gameObject.AddComponent<Selectable>();
+                    sel.transition = Selectable.Transition.Animation;
+                    sel.targetGraphic = flake;
+                    var nav = sel.navigation;
+                    nav.mode = Navigation.Mode.None;
+                    sel.navigation = nav;
+                    flake.gameObject.AddComponent<Animator>().runtimeAnimatorController = flakeCtrl;
+                    cells[r * 15 + c] = flake.gameObject;
+                }
+            sc.cells = cells;
+            // a clean frame over the scalloped outer edge of the foil
+            for (int e = 0; e < 4; e++)
+            {
+                float dir = e % 2 == 0 ? 1f : -1f;
+                if (e < 2)
+                {
+                    UImg(ct, "Foil Edge " + e, new Vector2(0f, dir > 0f ? 367f : -337f), new Vector2(836f, 28f), null, inner);
+                    UImg(ct, "Foil Trim " + e, new Vector2(0f, dir > 0f ? 355f : -325f), new Vector2(788f, 4f), null, Hex("FFD23F"));
+                }
+                else
+                {
+                    UImg(ct, "Foil Edge " + e, new Vector2(dir * 404f, 15f), new Vector2(28f, 732f), null, inner);
+                    UImg(ct, "Foil Trim " + e, new Vector2(dir * 392f, 15f), new Vector2(4f, 684f), null, Hex("FFD23F"));
+                }
+            }
+            UText(ct, "Hint", "<b>RUB THE SILVER TO SCRATCH!</b>", new Vector2(0f, -420f), new Vector2(780f, 70f), 46f, Hex("00E5FF"));
             UText(ct, "Footer", "SCRATCH   -   WIN   -   BUILD", new Vector2(0f, -540f), new Vector2(780f, 60f), 36f, Hex("8C93C8"));
 
             RectTransform info = URect(sp, "Info Panel", new Vector2(520f, 0f), new Vector2(900f, 1150f));
             UImg(info, "Back", Vector2.zero, new Vector2(900f, 1150f), LoopLandArt.Round, new Color(0.06f, 0.07f, 0.2f, 0.92f));
             UText(info, "Title", "<b>SCRATCH YOUR CARD</b>", new Vector2(0f, 460f), new Vector2(820f, 110f), 72f, Hex("FFE14D"));
-            UText(info, "How", "Point at a <color=#FFE14D>coin</color> and <b>drag it across</b> its silver strip.\n\nScratch all three strips to reveal your prize.\n\nIt's already yours, so take your time!",
-                new Vector2(0f, 120f), new Vector2(780f, 480f), 46f, Color.white);
-            UImg(info, "Coin", new Vector2(0f, -200f), new Vector2(160f, 160f), LoopLandArt.Coin, Color.white, false);
+            UText(info, "How", "Point at the silver and <b>rub it</b> to scratch it off, just like a real scratch card!\n\nScratch most of it away to reveal your prize.\n\nIt's already yours, so take your time!",
+                new Vector2(0f, 150f), new Vector2(780f, 420f), 46f, Color.white);
+            sc.progressText = UText(info, "Progress", "SCRATCHED <color=#FFE14D>0%</color>", new Vector2(0f, -190f), new Vector2(780f, 100f), 64f, Color.white);
+            sc.progressText.fontStyle = FontStyles.Bold;
             NeonButton(info, "Reveal All", "REVEAL ALL", new Vector2(0f, -410f), new Vector2(640f, 150f), Hex("8A2BE2"), LoopLandArt.IconSparkle, sc, "_OnRevealAll", 60f, false);
             sc.infoPanel = info.gameObject;
 
@@ -949,6 +981,9 @@ namespace LoopLand.EditorTools
                 new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) });
             fmain.startColor = new ParticleSystem.MinMaxGradient(rainbow) { mode = ParticleSystemGradientMode.RandomColor };
             sc.confetti = fx;
+            // silver flakes falling from wherever the foil is scratched (moved to each flake before it emits)
+            sc.dust = Fx("Scratch Dust", m, new Vector3(-0.48f, 1.95f, 0.1f), Quaternion.Euler(0f, 180f, 0f), 0.9f, 0.6f, 0.016f, 0f, 0f, false, true,
+                ParticleSystemShapeType.Cone, 0.02f, 1.2f, 300, Hex("F2F5FF"), Hex("9AA3B5"), 0f);
 
             // packs and prizes (odds per pack in percent: coins, common, rare, epic, legendary item)
             sc.packNames = packNames;
@@ -968,31 +1003,35 @@ namespace LoopLand.EditorTools
             sc.winClip = Wav("scratch_win", 1.3f, t => Notes(t, new[] { 523f, 659f, 784f, 1047f, 1319f, 1568f }, 0.085f, 0.45f));
         }
 
-        /// <summary>A scratch strip: a laser-draggable slider whose coin handle wipes the silver foil off the prize underneath.</summary>
-        private static Slider ScratchStrip(Transform parent, string name, Vector2 pos, Vector2 size, LoopLandScratch target, out Image foil)
+        /// <summary>Animator for one foil flake: a hover or press from the UI pointer switches the flake off until the next card.</summary>
+        private static RuntimeAnimatorController ScratchFlakeController()
         {
-            Image hit = UImg(parent, name, pos, size, null, new Color(1f, 1f, 1f, 0f), false, true);
-            foil = UImg(hit.transform, "Foil", Vector2.zero, size, LoopLandArt.Foil, Color.white, false);
-            foil.type = Image.Type.Filled;
-            foil.fillMethod = Image.FillMethod.Horizontal;
-            foil.fillOrigin = (int)Image.OriginHorizontal.Right;
-            foil.fillAmount = 1f;
-            // the handle area spans the whole strip, so the coin's centre is always the edge of the scratched part
-            RectTransform area = URect(hit.transform, "Handle Area", Vector2.zero, size);
-            Image coin = UImg(area, "Coin", Vector2.zero, new Vector2(120f, 120f - size.y), LoopLandArt.Coin, Color.white, false, true);
-            var slider = hit.gameObject.AddComponent<Slider>();
-            slider.direction = Slider.Direction.LeftToRight;
-            slider.minValue = 0f;
-            slider.maxValue = 1f;
-            slider.wholeNumbers = false;
-            slider.handleRect = coin.rectTransform;
-            slider.targetGraphic = coin;
-            slider.value = 0f;
-            var nav = slider.navigation;
-            nav.mode = Navigation.Mode.None;
-            slider.navigation = nav;
-            UnityEventTools.AddStringPersistentListener(slider.onValueChanged, UdonSharpEditorUtility.GetBackingUdonBehaviour(target).SendCustomEvent, "_OnScratch");
-            return slider;
+            Dir(Gen + "/Animation");
+            string path = Gen + "/Animation/ScratchFlake.controller";
+            var ctrl = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+            if (ctrl != null) return ctrl;
+            var off = new AnimationClip { name = "Scratched" };
+            off.SetCurve("", typeof(GameObject), "m_IsActive", AnimationCurve.Constant(0f, 1f / 60f, 0f));
+            AssetDatabase.CreateAsset(off, Gen + "/Animation/ScratchFlakeOff.anim");
+            ctrl = AnimatorController.CreateAnimatorControllerAtPath(path);
+            // the Selectable fires these triggers; only Highlighted (hover) and Pressed matter
+            foreach (string p in new[] { "Normal", "Highlighted", "Pressed", "Selected", "Disabled" }) ctrl.AddParameter(p, AnimatorControllerParameterType.Trigger);
+            AnimatorStateMachine sm = ctrl.layers[0].stateMachine;
+            AnimatorState whole = sm.AddState("Foil");
+            whole.writeDefaultValues = false;
+            AnimatorState gone = sm.AddState("Scratched");
+            gone.motion = off;
+            gone.writeDefaultValues = false;
+            sm.defaultState = whole;
+            foreach (string p in new[] { "Highlighted", "Pressed" })
+            {
+                AnimatorStateTransition t = whole.AddTransition(gone);
+                t.hasExitTime = false;
+                t.duration = 0f;
+                t.AddCondition(AnimatorConditionMode.If, 0f, p);
+            }
+            AssetDatabase.SaveAssets();
+            return ctrl;
         }
 
         // ------------------------------------------------------------------ helpers: objects
