@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.0.0
+- **The Loop:** two huge ring skyways form an infinity with the sky terrace around the tower, like the concept art.
+  - The game now sits on the terrace in front of the tower.
+  - Columns, glass railings, lamps, trees and benches line the rings.
+  - Four waterfalls pour into the pool.
+- **Real glass elevator:** the car physically rides the shaft on a synced timeline, so everyone sees it.
+  - Riders are held in standing spots, so you watch the plaza drop away in real time.
+  - It has call buttons, landing and car doors, floor displays, a chime, door sounds and a motor hum.
+- **New tower:**
+  - A rounded glass skyscraper with a mall podium (shop fronts, canopy, roof garden).
+  - A curved LOOPLAND screen with the gradient infinity, a light spine, a sky lobby, and a crown with a halo
+    and a spire.
+- **New modelling kit (MeshKit):**
+  - Extrusions, lathes, ring slabs, curved panels and glass balustrades with metre-based UVs.
+  - Faces orient themselves, and parts are laid out so nothing pokes through anything else.
+- **The plaza:**
+  - A fountain, arched bridges, shore railings and hedges.
+  - The cream "ALWAYS A NEXT LOOP" sign with the outlined heart, and a glowing guide line to the elevator.
+- **The surroundings:**
+  - A rounded skyline with neon belts and billboards.
+  - Floating islands with little towers, billboard clouds and a daytime sky.
+- **Sound:**
+  - An original LoopLand theme tune, with a per-player MUSIC toggle.
+  - City ambience with birds and wind, and running water at the fountain and the waterfalls.
+  - Elevator chime, doors and hum.
+
 ## 2.0.0
 - New: **LoopLand > Build LoopLand Tower World**. It builds the tower with the LOOPLAND sign, the infinity logo
   and a halo. The game moves onto the infinity-shaped Loop Deck at the top.

@@ -137,7 +137,7 @@ namespace LoopLand.EditorTools
 
         private static void EnsurePrograms()
         {
-            Type[] types = { typeof(LoopLandGame), typeof(LoopLandStore), typeof(LoopLandToken), typeof(LoopLandDice), typeof(LoopLandButton), typeof(LoopLandCamera), typeof(LoopLandElevator), typeof(LoopLandMover) };
+            Type[] types = { typeof(LoopLandGame), typeof(LoopLandStore), typeof(LoopLandToken), typeof(LoopLandDice), typeof(LoopLandButton), typeof(LoopLandCamera), typeof(LoopLandElevator), typeof(LoopLandMover), typeof(LoopLandLift), typeof(LoopLandSeat), typeof(LoopLandAmbience) };
             var existing = new HashSet<Type>();
             foreach (string g in AssetDatabase.FindAssets("t:UdonSharpProgramAsset"))
             {
