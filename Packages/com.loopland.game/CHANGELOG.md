@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.1
+- Much smoother camera: every shot change is an eased glide (smootherstep), the pan back to the overview takes
+  3.2 s with a gentle crane lift, and the chase cam filters out hop bounce and direction snaps.
+
 ## 1.9.0
 - Cinematic live camera: dice close-up, side chase-cam, upright close-up of the landing card, pan back to an
   angled overview (perspective). UI panels, screens and the logo are hidden from the camera.

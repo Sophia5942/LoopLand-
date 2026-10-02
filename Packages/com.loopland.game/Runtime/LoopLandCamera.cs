@@ -24,8 +24,14 @@ namespace LoopLand
         public float closeUpHeight = 0.75f;
         public float closeUpBack = 0.35f;
         [Header("Smoothing")]
-        public float posSharpness = 3f;
-        public float rotSharpness = 3.5f;
+        [Tooltip("Seconds for the eased glide from a close-up back to the overview.")]
+        public float panBackTime = 3.2f;
+        [Tooltip("Seconds for the eased move into a new shot (dice, chase, close-up).")]
+        public float shotBlendTime = 1.1f;
+        [Tooltip("How high the camera lifts (meters) in the middle of the pan back, like a crane move.")]
+        public float panArc = 0.5f;
+        public float posSharpness = 2.5f;
+        public float rotSharpness = 3f;
 
         private const int SHOT_OVERVIEW = 0;
         private const int SHOT_DICE = 1;
@@ -38,6 +44,14 @@ namespace LoopLand
         private Transform diceB;
         private LoopLandToken token;
         private Transform landing;
+        private int lastShot = -1;
+        private Vector3 fromPos;
+        private Quaternion fromRot;
+        private float blendStart;
+        private float blendTime;
+        private float smoothY;
+        private Vector3 smoothF = Vector3.forward;
+        private bool chaseInit;
 
         /// <summary>Dice close-up, then chase the token, then close-up on the landing space.</summary>
         public void _ShowRoll(Transform a, Transform b, LoopLandToken tk, Transform land)
@@ -79,6 +93,18 @@ namespace LoopLand
             }
             else if (shot == SHOT_CLOSE && Time.time > shotEnd) shot = SHOT_OVERVIEW;
 
+            if (shot != lastShot)
+            {
+                // every shot change starts a fresh eased blend from wherever the camera is right now
+                lastShot = shot;
+                fromPos = transform.position;
+                fromRot = transform.rotation;
+                blendStart = Time.time;
+                blendTime = shot == SHOT_OVERVIEW ? panBackTime : shotBlendTime;
+                chaseInit = false;
+            }
+
+            float dt = Time.deltaTime;
             Vector3 gp;
             Quaternion gr;
             if (shot == SHOT_DICE && diceA != null)
@@ -89,14 +115,19 @@ namespace LoopLand
             }
             else if (shot == SHOT_CHASE && token != null)
             {
+                // smooth out the token's hop bounce and the direction snaps between spaces
                 Transform t = token.transform;
                 Vector3 f = t.forward;
                 f.y = 0f;
                 if (f.sqrMagnitude < 0.001f) f = Vector3.forward;
                 f.Normalize();
-                Vector3 right = Vector3.Cross(Vector3.up, f);
-                gp = t.position - f * chaseDistance + right * chaseSide + Vector3.up * chaseHeight;
-                gr = Quaternion.LookRotation(t.position + f * 0.35f + Vector3.up * 0.05f - gp, Vector3.up);
+                if (!chaseInit) { chaseInit = true; smoothY = t.position.y; smoothF = f; }
+                smoothY = Mathf.Lerp(smoothY, t.position.y, 1f - Mathf.Exp(-2f * dt));
+                smoothF = Vector3.Slerp(smoothF, f, 1f - Mathf.Exp(-3f * dt));
+                Vector3 tp = new Vector3(t.position.x, smoothY, t.position.z);
+                Vector3 right = Vector3.Cross(Vector3.up, smoothF);
+                gp = tp - smoothF * chaseDistance + right * chaseSide + Vector3.up * chaseHeight;
+                gr = Quaternion.LookRotation(tp + smoothF * 0.35f + Vector3.up * 0.05f - gp, Vector3.up);
             }
             else if (shot == SHOT_CLOSE && landing != null)
             {
@@ -113,9 +144,21 @@ namespace LoopLand
             }
             else return;
 
-            float dt = Time.deltaTime;
-            transform.position = Vector3.Lerp(transform.position, gp, 1f - Mathf.Exp(-posSharpness * dt));
-            transform.rotation = Quaternion.Slerp(transform.rotation, gr, 1f - Mathf.Exp(-rotSharpness * dt));
+            float k = blendTime > 0f ? Mathf.Clamp01((Time.time - blendStart) / blendTime) : 1f;
+            if (k < 1f)
+            {
+                // smootherstep: zero speed at the start and the end, so the camera eases out and eases in
+                float e = k * k * k * (k * (6f * k - 15f) + 10f);
+                Vector3 p = Vector3.Lerp(fromPos, gp, e);
+                if (shot == SHOT_OVERVIEW) p += Vector3.up * (panArc * Mathf.Sin(e * Mathf.PI));
+                transform.position = p;
+                transform.rotation = Quaternion.Slerp(fromRot, gr, e);
+            }
+            else
+            {
+                transform.position = Vector3.Lerp(transform.position, gp, 1f - Mathf.Exp(-posSharpness * dt));
+                transform.rotation = Quaternion.Slerp(transform.rotation, gr, 1f - Mathf.Exp(-rotSharpness * dt));
+            }
         }
     }
 }
