@@ -515,7 +515,14 @@ namespace LoopLand.EditorTools
             go.transform.localPosition = lpos;
             go.transform.localScale = lscale;
             go.GetComponent<Renderer>().sharedMaterial = m;
-            if (!keepCollider) Object.DestroyImmediate(go.GetComponent<Collider>());
+            Collider col = go.GetComponent<Collider>();
+            if (!keepCollider) Object.DestroyImmediate(col);
+            else if (col is CapsuleCollider)
+            {
+                // A flattened cylinder's capsule collider turns into a huge sphere that blocks every Interact.
+                Object.DestroyImmediate(col);
+                go.AddComponent<MeshCollider>().sharedMesh = go.GetComponent<MeshFilter>().sharedMesh;
+            }
             return go;
         }
 
