@@ -14,7 +14,7 @@ namespace LoopLand.EditorTools
     {
         public static Sprite Round, Glow, Pill, Panel, Coin, House, Tower;
         public static Sprite IconDice, IconPawn, IconBuilding, IconSparkle, IconCrown, IconGift, IconGlobe;
-        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen;
+        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen, LogoInfinity, Foil;
 
         private static string folder;
         private static float aa;
@@ -115,6 +115,22 @@ namespace LoopLand.EditorTools
                 float body = Box(x, y, 0.5f, 0.38f, 0.32f, 0.26f, 0.06f);
                 return A(Color.white, Cov(Mathf.Min(handle, body)));
             });
+            LogoInfinity = Paint("Logo_Infinity", 256, 0, (x, y) =>
+            {
+                float d = Mathf.Min(Mathf.Abs(Ellipse(x, y, 0.31f, 0.5f, 0.2f, 0.17f)), Mathf.Abs(Ellipse(x, y, 0.69f, 0.5f, 0.2f, 0.17f))) - 0.045f;
+                Color c = Color.HSVToRGB(Mathf.Repeat(0.14f + x * 0.75f, 1f), 0.7f, 1f);
+                return Mix(A(c, 0.45f * Soft(d - 0.02f, 0.08f)), Color.Lerp(c, Color.white, 0.25f), Cov(d));
+            });
+            Foil = Paint("Scratch_Foil", 128, 0, (x, y) =>
+            {
+                // brushed silver with two diagonal sheens and a few sparkles
+                float grain = Hash(Mathf.Floor(x * 128f), Mathf.Floor(y * 24f)) * 0.12f;
+                float sheen = Mathf.Exp(-Mathf.Pow((x - y * 0.5f - 0.3f) / 0.12f, 2f)) * 0.3f + Mathf.Exp(-Mathf.Pow((x - y * 0.5f - 0.75f) / 0.05f, 2f)) * 0.22f;
+                float v = 0.6f + grain + sheen;
+                Color c = new Color(v * 0.95f, v * 0.97f, v, 1f);
+                if (Hash(Mathf.Floor(x * 16f), Mathf.Floor(y * 16f)) > 0.9f && Circle(Mathf.Repeat(x * 16f, 1f), Mathf.Repeat(y * 16f, 1f), 0.5f, 0.5f, 0.14f) < 0f) c = Color.white;
+                return c;
+            });
             IconScreen = Paint("Icon_Screen", 128, 0, (x, y) =>
             {
                 float frame = Mathf.Abs(Box(x, y, 0.5f, 0.58f, 0.38f, 0.27f, 0.05f)) - 0.04f;
@@ -162,6 +178,32 @@ namespace LoopLand.EditorTools
                 bh[k] = 0.18f + (float)rnd.NextDouble() * 0.3f + (k == 2 ? 0.15f : 0f);
             }
             return Paint(name, 256, 0, (x, y) => DrawSkyline(Color.clear, x, y, col, variant, bx, bw, bh));
+        }
+
+        /// <summary>Scratch card pack: crimped foil pouch in the rarity colour with a skyline and the infinity logo.</summary>
+        public static Sprite PackArt(string name, Color col)
+        {
+            return Paint(name, 256, 0, (x, y) =>
+            {
+                float zig = Mathf.Abs(Mathf.Repeat(x * 16f, 1f) - 0.5f) * 0.04f;
+                float shape = Mathf.Max(Mathf.Abs(x - 0.5f) - 0.31f, Mathf.Max(y - (0.95f - zig), 0.05f + zig - y));
+                Color dark = new Color(col.r * 0.3f, col.g * 0.3f, col.b * 0.35f, 1f);
+                Color c = Color.Lerp(dark, col, y);
+                if (y > 0.88f || y < 0.12f) c = Color.Lerp(c, new Color(0.85f, 0.88f, 0.95f, 1f), 0.35f);
+                c = Color.Lerp(c, Color.white, Mathf.Exp(-Mathf.Pow((x + y * 0.6f - 0.75f) / 0.06f, 2f)) * 0.4f);
+                float sky = Box(x, y, 0.36f, 0.42f, 0.05f, 0.16f, 0.005f);
+                sky = Mathf.Min(sky, Box(x, y, 0.47f, 0.48f, 0.045f, 0.22f, 0.005f));
+                sky = Mathf.Min(sky, Box(x, y, 0.57f, 0.4f, 0.05f, 0.14f, 0.005f));
+                sky = Mathf.Min(sky, Box(x, y, 0.66f, 0.36f, 0.04f, 0.1f, 0.005f));
+                sky = Mathf.Min(sky, Box(x, y, 0.28f, 0.34f, 0.035f, 0.08f, 0.005f));
+                c = Mix(c, A(Color.Lerp(col, Color.white, 0.55f), 0.85f), Cov(sky));
+                if (sky < -0.006f && Hash(Mathf.Floor(x * 60f), Mathf.Floor(y * 60f)) > 0.72f) c = Color.Lerp(c, Color.white, 0.6f);
+                float inf = Mathf.Min(Mathf.Abs(Ellipse(x, y, 0.42f, 0.18f, 0.085f, 0.055f)), Mathf.Abs(Ellipse(x, y, 0.58f, 0.18f, 0.085f, 0.055f))) - 0.016f;
+                c = Mix(c, A(Color.white, 0.4f), Soft(inf - 0.01f, 0.04f) * 0.6f);
+                c = Mix(c, A(Color.white, 0.95f), Cov(inf));
+                c.a = 1f;
+                return A(c, Cov(shape));
+            });
         }
 
         /// <summary>0 dice pack, 1 token pack, 2 VIP crown, 3 coin pouch, 4 coin vault, 5 skyline pack.</summary>

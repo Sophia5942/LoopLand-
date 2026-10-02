@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.10.0
+- New **LoopLand Scratch Cards** machine beside the store, with a marquee, a "FEEL LUCKY?" sign and a buy desk.
+  - Four packs: Common 50, Rare 100, Epic 200 and Legendary 400 Loop Coins.
+  - Drag the coins across three silver strips to scratch (VR laser or desktop), or press REVEAL ALL.
+  - Prizes are Loop Coins (with a 3% jackpot of 3x the pack price) or a dice, token, building style or trail
+    you don't own yet. The prize is saved the moment you buy, so leaving mid-scratch never loses it.
+  - "YOU WON!" panel with rarity stars, EQUIP, confetti and a win jingle.
+  - A collection strip shows which of the 13 winnable items you own.
+- Rebuild the scene (**LoopLand > Build Game In Scene > Replace**) to add the machine.
+
 ## 1.9.4
 - Tokens hop through the middle of every card and land centred on it.
 - Players on the same card form a neat group centred on it, and slide back to the centre when someone leaves.

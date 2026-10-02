@@ -11,6 +11,8 @@ LoopLand is a networked, Monopoly-style board game for VRChat worlds:
   LOOP START, buying, building, finishing and winning games, plus a daily bonus.
 - **In-game store** with dice skins, token skins, **building styles** (the color of your Loops and Towers on the
   board) and particle trails bought with Loop Coins. Equipped cosmetics are visible to everyone.
+- **Scratch Cards**: an arcade machine beside the store. Buy a Common, Rare, Epic or Legendary card with Loop Coins,
+  drag the coins to scratch the silver strips, and win Loop Coins or a store item you don't own yet.
 - **VRChat Creator Economy (CE) integration**: premium packs, VIP (2x coins), and Loop Coin packs bought
   with VRChat Credits through Udon Products.
 - **Seat screens**: every console has its own screen above it, angled toward the player. It shows a live
@@ -56,6 +58,14 @@ If your scene still has the LoopLand tower world from an earlier version, click
   a close-up of the card it lands on (turned so the card reads upright), then a pan back to the whole board.
   Captions like "ItzSoph rolled 4 + 2" and "ItzSoph landed on Neon Row" appear on every live screen.
 - Press **STORE** to pop the store up above your dashboard (only you see it move); press it again or **X** to send it back.
+- **Scratch Cards** (the machine beside the store):
+  1. Pick a pack on the screen: Common 50, Rare 100, Epic 200 or Legendary 400 Loop Coins.
+  2. Press **BUY** on the desk.
+  3. Drag each coin across its silver strip, or press **REVEAL ALL**.
+
+  Every card wins Loop Coins (with a small jackpot chance) or a dice, token, building style or trail you don't own
+  yet; rarer packs give rarer prizes. Press **EQUIP** to use a new item straight away. The collection strip
+  shows what you've unlocked.
 - The big button is context-sensitive: ROLL DICE / BUY / END TURN / ROLL DOUBLES...
 - The second button does PASS, USE GLITCH PASS, PAY BAIL or LEAVE.
 - Pick a space with **< SPACE / SPACE >** (or **MY SPACE**), then use **BUILD / SELL / MORTGAGE** during your turn.
@@ -115,6 +125,12 @@ Put them in `Assets/LoopLand/Store Art/` and run **Build Game In Scene** again:
 - **Board names / prices / rents**: `Board data` on `LoopLand/Game`, then rebuild.
 - **Catalogue** (names, prices, colors, which product unlocks an item): `LoopLand/Store` inspector.
   Product index `-1` means "buy with Loop Coins".
+- **Scratch cards** (pack names, prices, colors, odds, coin prizes, jackpot chance): `LoopLand/Scratch Cards`
+  inspector.
+  - Odds are 5 numbers per pack, in percent: coins, common, rare, epic and legendary item.
+  - Every coin-priced store item can be won. Its price sets its rarity: up to 200 common, up to 350 rare,
+    up to 450 epic, above that legendary.
+  - Coin prizes average below the pack price, and owned items are never won again, so cards can't be farmed.
 
 ## Technical notes
 - The game uses a manual-sync authority pattern: the owner of `LoopLand/Game` runs the rules, and players send

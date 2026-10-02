@@ -294,6 +294,46 @@ namespace LoopLand
             _Sfx(clickClip);
         }
 
+        // ------------------------------------------------------------ scratch cards (LoopLandScratch uses these)
+
+        public bool _IsReady() { return restored; }
+        public int _ItemCountOf(int cat) { return _Count(cat); }
+        public int _PriceOf(int cat, int i) { return _ItemPrice(cat, i); }
+        public int _ProductOf(int cat, int i) { return _ItemProduct(cat, i); }
+        public string _NameOf(int cat, int i) { return _ItemName(cat, i); }
+        public Sprite _ArtOf(int cat, int i) { return _ItemArt(cat, i); }
+        public bool _OwnsItem(int cat, int i) { return _Owns(cat, i); }
+
+        public bool _SpendCoins(int n)
+        {
+            if (!restored || n < 0 || _Coins() < n) return false;
+            PlayerData.SetInt(K_COINS, _Coins() - n);
+            _RefreshUI();
+            return true;
+        }
+
+        public void _GiveCoins(int n)
+        {
+            if (n <= 0) return;
+            _AddCoins(n);
+            _RefreshUI();
+        }
+
+        public void _GiveItem(int cat, int i)
+        {
+            if (!restored || cat < 0 || cat > 3 || i <= 0 || i >= _Count(cat)) return;
+            PlayerData.SetInt(kOwn[cat], PlayerData.GetInt(Networking.LocalPlayer, kOwn[cat]) | (1 << i));
+            _RefreshUI();
+        }
+
+        public void _EquipItem(int cat, int i)
+        {
+            if (!restored || cat < 0 || cat > 3 || !_Owns(cat, i)) return;
+            PlayerData.SetInt(kEq[cat], i);
+            _RefreshUI();
+            if (game != null) game._OnCosmeticsChanged();
+        }
+
         // ------------------------------------------------------------ catalogue (also used by the game)
 
         public int _GetEquipped(VRCPlayerApi p, int cat)
