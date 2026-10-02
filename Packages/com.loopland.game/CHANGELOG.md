@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.0
+- Live camera director: zooms in on the dice, follows the moving token, then returns to the overview.
+- VIEW swaps between the top screen and the center screens (the side live panel is removed).
+- Property card prices are aligned rows with stripes, $1,500-style formatting, mortgage value, and the
+  current rent row highlighted in gold.
+
 ## 1.7.0
 - Seat dashboards in the style of a property app: card with picture, name, price, full rent table, owner line
   and the big action button, plus an icon menu (browse, my space, build, sell, mortgage, rounds, store, view).

@@ -122,7 +122,7 @@ namespace LoopLand.EditorTools
 
         private static void EnsurePrograms()
         {
-            Type[] types = { typeof(LoopLandGame), typeof(LoopLandStore), typeof(LoopLandToken), typeof(LoopLandDice), typeof(LoopLandButton) };
+            Type[] types = { typeof(LoopLandGame), typeof(LoopLandStore), typeof(LoopLandToken), typeof(LoopLandDice), typeof(LoopLandButton), typeof(LoopLandCamera) };
             var existing = new HashSet<Type>();
             foreach (string g in AssetDatabase.FindAssets("t:UdonSharpProgramAsset"))
             {
@@ -283,7 +283,7 @@ namespace LoopLand.EditorTools
             Prim(PrimitiveType.Cube, "Frame", selChild, new Vector3(0f, 0.001f, 0f), new Vector3(tileW + 0.03f, 0.004f, 0.53f), AddMat("Glow_Select", Hex("FFE14D")));
 
             // center hologram
-            Texture liveTex = LiveCamera(rt);
+            Texture liveTex = LiveCamera(rt, out LoopLandCamera liveCam);
             var statusL = new List<TMP_Text>();
             var playersL = new List<TMP_Text>();
             var cardsL = new List<TMP_Text>();
@@ -400,11 +400,11 @@ namespace LoopLand.EditorTools
             var propArt = new Image[4];
             var propName = new TMP_Text[4];
             var propPrice = new TMP_Text[4];
-            var propLabels = new TMP_Text[4];
-            var propValues = new TMP_Text[4];
+            var rowLabels = new TMP_Text[36];
+            var rowValues = new TMP_Text[36];
+            var rowBacks = new GameObject[36];
             var storeSpots = new Transform[4];
             var seatScreens = new GameObject[4];
-            var seatWings = new GameObject[4];
             Color cBlue = Hex("1F4FD8"), cPurple = Hex("6A2BD9"), cOrange = Hex("D98A00"), cTeal = Hex("0E9F7E"), cRedBtn = Hex("C21836"), cJoin = Hex("E0218A"), cSec = Hex("6A2BD9");
             for (int d = 0; d < 4; d++)
             {
@@ -432,8 +432,14 @@ namespace LoopLand.EditorTools
                 propPrice[d].fontStyle = FontStyles.Bold;
                 info[d] = UText(ui, "Info", "", new Vector2(10f, 172f), new Vector2(460f, 64f), 28f, Color.white, TextAlignmentOptions.Left);
                 UImg(ui, "Table Back", new Vector2(-140f, -5f), new Vector2(760f, 250f), LoopLandArt.Round, new Color(1f, 1f, 1f, 0.06f));
-                propLabels[d] = UText(ui, "Table Labels", "", new Vector2(-300f, -5f), new Vector2(420f, 235f), 28f, Hex("D6DCFF"), TextAlignmentOptions.Left);
-                propValues[d] = UText(ui, "Table Values", "", new Vector2(40f, -5f), new Vector2(330f, 235f), 28f, Color.white, TextAlignmentOptions.Right);
+                for (int r = 0; r < 9; r++)
+                {
+                    float ry = 112f - r * 27f;
+                    int ri = d * 9 + r;
+                    rowBacks[ri] = UImg(ui, "Row " + r, new Vector2(-140f, ry), new Vector2(744f, 25f), null, new Color(1f, 1f, 1f, r % 2 == 0 ? 0.07f : 0.025f), false).gameObject;
+                    rowLabels[ri] = Fixed(UText(ui, "Row Label " + r, "", new Vector2(-305f, ry), new Vector2(400f, 26f), 22f, Hex("D6DCFF"), TextAlignmentOptions.Left));
+                    rowValues[ri] = Fixed(UText(ui, "Row Value " + r, "", new Vector2(70f, ry), new Vector2(300f, 26f), 22f, Color.white, TextAlignmentOptions.Right));
+                }
                 prim[d] = NeonButton(ui, "Primary", "JOIN GAME", new Vector2(-140f, -200f), new Vector2(760f, 110f), cJoin, LoopLandArt.IconPeople, game, "_OnPrimary", 50f, true);
                 sec[d] = NeonButton(ui, "Secondary", "-", new Vector2(-235f, -328f), new Vector2(570f, 84f), cSec, LoopLandArt.IconDice, game, "_OnSecondary", 36f, false);
                 NeonButton(ui, "Reset", "RESET", new Vector2(165f, -328f), new Vector2(140f, 84f), cRedBtn, null, game, "_OnReset", 28f, false);
@@ -446,25 +452,8 @@ namespace LoopLand.EditorTools
                 MenuButton(ui, "Mortgage", "MORTGAGE", new Vector2(mx, -46f), new Vector2(216f, 80f), cPurple, LoopLandArt.IconBank, game, "_OnMortgage");
                 rounds[d] = MenuButton(ui, "Rounds", "ROUNDS", new Vector2(mx, -140f), new Vector2(216f, 80f), cPurple, LoopLandArt.IconChart, game, "_OnRounds");
                 MenuButton(ui, "Store", "STORE", new Vector2(mx, -234f), new Vector2(216f, 80f), cOrange, LoopLandArt.IconStore, store, "_OpenStore" + d);
-                views[d] = MenuButton(ui, "View", "VIEW: DESK", new Vector2(mx, -328f), new Vector2(216f, 80f), Hex("0A9BE0"), LoopLandArt.IconScreen, game, "_OnView" + d);
+                views[d] = MenuButton(ui, "View", "VIEW: TOP", new Vector2(mx, -328f), new Vector2(216f, 80f), Hex("0A9BE0"), LoopLandArt.IconScreen, game, "_OnView" + d);
                 SetLayer(ui.gameObject, 1); // TransparentFX: still clickable, but hidden from the live board camera
-
-                // live board wing beside the dashboard (VIEW: DESK)
-                RectTransform wing = UCanvas(c, "Live Wing", new Vector3(-1.08f, 0.28f, 0f), Quaternion.Euler(35f, -15f, 0f), new Vector2(1000f, 800f), false);
-                Prim(PrimitiveType.Cube, "Back Plate", wing, new Vector3(0f, 0f, 14f), new Vector3(1020f, 820f, 16f), dark);
-                UImg(wing, "Glow", Vector2.zero, new Vector2(1040f, 840f), LoopLandArt.Glow, new Color(0f, 0.9f, 1f, 0.9f));
-                UImg(wing, "Back", Vector2.zero, new Vector2(1000f, 800f), LoopLandArt.Panel, Color.white);
-                UImg(wing, "Live Frame", new Vector2(0f, 110f), new Vector2(958f, 488f), LoopLandArt.Round, new Color(1f, 0.24f, 0.8f, 0.9f));
-                URaw(wing, "Live View", new Vector2(0f, 110f), new Vector2(940f, 470f), liveTex);
-                UImg(wing, "Live Tag", new Vector2(-380f, 315f), new Vector2(160f, 46f), LoopLandArt.Pill, new Color(0.9f, 0.1f, 0.3f, 0.95f));
-                UText(wing, "Live Tag Text", "<b>LIVE</b>", new Vector2(-380f, 315f), new Vector2(140f, 40f), 28f, Color.white);
-                cardsL.Add(UText(wing, "Card", "", new Vector2(0f, -168f), new Vector2(940f, 60f), 32f, Hex("FFE14D")));
-                UImg(wing, "Status Back", new Vector2(-242f, -298f), new Vector2(470f, 165f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
-                statusL.Add(UText(wing, "Status", "", new Vector2(-242f, -298f), new Vector2(450f, 150f), 30f, Color.white));
-                UImg(wing, "Players Back", new Vector2(242f, -298f), new Vector2(470f, 165f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
-                playersL.Add(UText(wing, "Players", "", new Vector2(242f, -298f), new Vector2(450f, 150f), 26f, Color.white, TextAlignmentOptions.Left));
-                SetLayer(wing.gameObject, 1);
-                seatWings[d] = wing.gameObject;
 
                 // top screen above the dashboard (VIEW: TOP), held by two posts that stay off the board
                 var top = new GameObject("Top Screen").transform;
@@ -489,7 +478,6 @@ namespace LoopLand.EditorTools
                 UImg(sc, "Players Back", new Vector2(320f, -360f), new Vector2(620f, 180f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
                 playersL.Add(UText(sc, "Players", "", new Vector2(320f, -360f), new Vector2(590f, 165f), 28f, Color.white, TextAlignmentOptions.Left));
                 seatScreens[d] = top.gameObject;
-                top.gameObject.SetActive(false);
 
                 // where the store pops up for this seat (same spot as the top screen, independent of the VIEW setting)
                 var spot = new GameObject("Store Spot").transform;
@@ -716,13 +704,14 @@ namespace LoopLand.EditorTools
             game.playerTexts = playersL.ToArray();
             game.cardTexts = cardsL.ToArray();
             game.viewLabels = views;
-            game.seatWings = seatWings;
             game.seatScreens = seatScreens;
             game.propArt = propArt;
             game.propName = propName;
             game.propPrice = propPrice;
-            game.propLabels = propLabels;
-            game.propValues = propValues;
+            game.rowLabels = rowLabels;
+            game.rowValues = rowValues;
+            game.rowBacks = rowBacks;
+            game.liveCam = liveCam;
             game.spaceArt = spaceArt;
             game.infoTexts = info;
             game.primaryLabels = prim;
@@ -1033,6 +1022,13 @@ namespace LoopLand.EditorTools
             return t;
         }
 
+        private static TextMeshProUGUI Fixed(TextMeshProUGUI t)
+        {
+            t.enableAutoSizing = false;
+            t.overflowMode = TextOverflowModes.Ellipsis;
+            return t;
+        }
+
         private static Color Lighter(Color c) => new Color(Mathf.Lerp(c.r, 1f, 0.3f), Mathf.Lerp(c.g, 1f, 0.3f), Mathf.Lerp(c.b, 1f, 0.3f), 0.95f);
 
         /// <summary>Square menu button: icon on top, small label underneath (or a big glyph when there's no icon).</summary>
@@ -1142,7 +1138,7 @@ namespace LoopLand.EditorTools
         }
 
         /// <summary>Orthographic camera above the board rendering into a texture for the Live Board views.</summary>
-        private static Texture LiveCamera(Transform root)
+        private static Texture LiveCamera(Transform root, out LoopLandCamera director)
         {
             Dir(Gen + "/Textures");
             string rtPath = Gen + "/Textures/LiveBoardWide.renderTexture";
@@ -1176,6 +1172,10 @@ namespace LoopLand.EditorTools
             cam.allowHDR = false;
             cam.useOcclusionCulling = false;
             cam.targetTexture = liveTex;
+            director = UdonSharpUndo.AddComponent<LoopLandCamera>(camGo);
+            director.cam = cam;
+            director.overviewSize = cam.orthographicSize;
+            made.Add(director);
             return liveTex;
         }
 

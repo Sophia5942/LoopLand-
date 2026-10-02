@@ -100,14 +100,15 @@ namespace LoopLand
         public TMP_Text[] roundsLabels;
         public TMP_Text[] cardTexts;
         public TMP_Text[] viewLabels;
-        public GameObject[] seatWings;
         public GameObject[] seatScreens;
         public Image[] propArt;
         public TMP_Text[] propName;
         public TMP_Text[] propPrice;
-        public TMP_Text[] propLabels;
-        public TMP_Text[] propValues;
+        public TMP_Text[] rowLabels;
+        public TMP_Text[] rowValues;
+        public GameObject[] rowBacks;
         public Sprite[] spaceArt;
+        public LoopLandCamera liveCam;
         public ParticleSystem celebrateFx;
         public ParticleSystem moneyFx;
         public AudioSource sfx;
@@ -211,6 +212,11 @@ namespace LoopLand
         private int[] seatView = new int[4];
         private int storeSeat = -1;
         private float toastUntil;
+        private int camSeenPos = -1;
+        private int camSeenSlot = -1;
+        private string[] rowL = new string[9];
+        private string[] rowV = new string[9];
+        private int rowN;
 
         private void Start()
         {
@@ -262,7 +268,7 @@ namespace LoopLand
 
         public void _OnTile() { _Select(pressedArg); }
 
-        // live view per seat (local only): 0 = beside the dashboard, 1 = top screen, 2 = off
+        // live view per seat (local only): 0 = top screen above the dashboard, 1 = center screens only
         public void _OnView0() { _CycleView(0); }
         public void _OnView1() { _CycleView(1); }
         public void _OnView2() { _CycleView(2); }
@@ -270,7 +276,7 @@ namespace LoopLand
 
         private void _CycleView(int d)
         {
-            seatView[d] = (seatView[d] + 1) % 3;
+            seatView[d] = seatView[d] == 0 ? 1 : 0;
             _ApplyViews();
             _PlayFx(0);
         }
@@ -286,10 +292,9 @@ namespace LoopLand
         {
             for (int d = 0; d < 4; d++)
             {
-                if (seatWings != null && d < seatWings.Length && seatWings[d] != null) seatWings[d].SetActive(seatView[d] == 0);
-                if (seatScreens != null && d < seatScreens.Length && seatScreens[d] != null) seatScreens[d].SetActive(seatView[d] == 1 && storeSeat != d);
+                if (seatScreens != null && d < seatScreens.Length && seatScreens[d] != null) seatScreens[d].SetActive(seatView[d] == 0 && storeSeat != d);
                 if (viewLabels != null && d < viewLabels.Length && viewLabels[d] != null)
-                    viewLabels[d].text = seatView[d] == 0 ? "VIEW: DESK" : (seatView[d] == 1 ? "VIEW: TOP" : "VIEW: OFF");
+                    viewLabels[d].text = seatView[d] == 0 ? "VIEW: TOP" : "VIEW: CENTER";
             }
         }
         public void _OnPrevSpace() { _Select((selected < 0 ? _MyPos() : selected) + SPACES - 1); }
@@ -1017,6 +1022,7 @@ namespace LoopLand
 
             if (seenPhase != phase) { seenPhase = phase; _RefreshTokens(false); }
             _RefreshTokens(rolled);
+            _DirectCamera(rolled);
 
             if (cardSeq != seenCard)
             {
@@ -1035,6 +1041,42 @@ namespace LoopLand
 
             int me = _LocalSlot();
             if (me >= 0 && matchId != 0 && phase != PH_LOBBY && store != null) store._ApplyMatchReward(matchId, coinsEarned[me]);
+        }
+
+        private void _DirectCamera(bool rolled)
+        {
+            if (liveCam == null || tokens == null || turnSlot < 0 || turnSlot >= tokens.Length || tokens[turnSlot] == null) return;
+            int tp = pos[turnSlot];
+            if (phase == PH_PLAY)
+            {
+                int steps = Mathf.Max(1, lastSteps);
+                float travel = 1.0f + steps * Mathf.Min(0.24f, 4f / steps) + 1.6f;
+                Transform tk = tokens[turnSlot].transform;
+                if (rolled && dice != null && dice.Length >= 2 && dice[0] != null && dice[1] != null)
+                    liveCam._FollowSequence(dice[0].transform, dice[1].transform, 1.45f, tk, travel);
+                else if (camSeenSlot == turnSlot && tp != camSeenPos)
+                    liveCam._FollowSequence(null, null, 0f, tk, travel);
+            }
+            else liveCam._Overview();
+            camSeenPos = tp;
+            camSeenSlot = turnSlot;
+        }
+
+        /// <summary>Formats money with thousands separators, e.g. $1,500.</summary>
+        public string _Money(int v)
+        {
+            string sign = v < 0 ? "-" : "";
+            int n = v < 0 ? -v : v;
+            string res = "";
+            do
+            {
+                int g = n % 1000;
+                n /= 1000;
+                string gs = g.ToString();
+                if (n > 0) gs = g < 10 ? "00" + gs : (g < 100 ? "0" + gs : gs);
+                res = res.Length == 0 ? gs : gs + "," + res;
+            } while (n > 0);
+            return sign + "$" + res;
         }
 
         private void _ApplyDiceSkin()
@@ -1136,7 +1178,7 @@ namespace LoopLand
                 else if (!myTurn) { prim = "WAITING..."; sec = "LEAVE GAME"; }
                 else if (stage == ST_ROLL) { prim = doubles > 0 ? "ROLL AGAIN" : "ROLL DICE"; sec = "LEAVE GAME"; }
                 else if (stage == ST_JAIL) { prim = "ROLL DOUBLES"; sec = passes[me] > 0 ? "USE GLITCH PASS" : "PAY $" + jailFine; }
-                else if (stage == ST_BUY) { prim = "BUY $" + spacePrice[pos[me]]; sec = "PASS"; }
+                else if (stage == ST_BUY) { prim = "BUY " + _Money(spacePrice[pos[me]]); sec = "PASS"; }
                 else if (stage == ST_END) { prim = doubles > 0 && jail[me] == 0 ? "ROLL AGAIN" : "END TURN"; sec = "LEAVE GAME"; }
                 else { prim = "MOVING..."; sec = "LEAVE GAME"; }
             }
@@ -1156,7 +1198,7 @@ namespace LoopLand
                     if (alive[i] == 0) line += "  <color=#777777>BANKRUPT</color>";
                     else
                     {
-                        line += "  <color=#7CFF4F>$" + cash[i] + "</color>  " + _CountProps(i) + " spaces";
+                        line += "  <color=#7CFF4F>" + _Money(cash[i]) + "</color>  " + _CountProps(i) + " spaces";
                         if (jail[i] > 0) line += "  <color=#FF4D5E>GLITCHED</color>";
                         if (passes[i] > 0) line += "  pass x" + passes[i];
                     }
@@ -1182,58 +1224,90 @@ namespace LoopLand
             return "can end their turn";
         }
 
+        private void _Row(string label, string value)
+        {
+            if (rowN >= rowL.Length) return;
+            rowL[rowN] = label;
+            rowV[rowN] = value;
+            rowN++;
+        }
+
         private void _RefreshInfo()
         {
             int p = selected >= 0 ? selected : _MyPos();
             int t = spaceType[p];
             int g = spaceGroup[p];
+            int o = owner[p];
+            bool mortgaged = (level[p] & 8) != 0;
             string price;
-            string labels;
-            string values;
+            int hi = -1;
+            rowN = 0;
             if (t == T_PROP)
             {
                 int k = propIdx[p];
-                price = "$" + spacePrice[p];
-                labels = "Purchase Price\nRent (Base)\nRent (1 Loop)\nRent (2 Loops)\nRent (3 Loops)\nRent (4 Loops)\nRent (Tower)\nLoop Cost";
-                values = "$" + spacePrice[p];
-                for (int r = 0; r < 6; r++) values += "\n$" + (k >= 0 ? propRents[k * 6 + r] : 0);
-                values += "\n$" + (g >= 0 && g < houseCost.Length ? houseCost[g] : 0);
+                price = _Money(spacePrice[p]);
+                _Row("Purchase Price", _Money(spacePrice[p]));
+                _Row("Rent", _Money(k >= 0 ? propRents[k * 6] : 0) + (o != 0 && _OwnsGroup(o - 1, g) ? "  (x2 set)" : ""));
+                for (int r = 1; r <= 4; r++) _Row("Rent with " + r + (r == 1 ? " Loop" : " Loops"), _Money(k >= 0 ? propRents[k * 6 + r] : 0));
+                _Row("Rent with Tower", _Money(k >= 0 ? propRents[k * 6 + 5] : 0));
+                _Row("Loop / Tower Cost", _Money(g >= 0 && g < houseCost.Length ? houseCost[g] : 0));
+                _Row("Mortgage Value", _Money(spacePrice[p] / 2));
+                if (o != 0 && !mortgaged) hi = 1 + (level[p] & 7);
             }
             else if (t == T_PORTAL)
             {
-                price = "$" + spacePrice[p];
-                labels = "Purchase Price\nRent (1 Portal)\nRent (2 Portals)\nRent (3 Portals)\nRent (4 Portals)";
-                values = "$" + spacePrice[p] + "\n$25\n$50\n$100\n$200";
+                price = _Money(spacePrice[p]);
+                _Row("Purchase Price", _Money(spacePrice[p]));
+                _Row("Rent with 1 Portal", "$25");
+                _Row("Rent with 2 Portals", "$50");
+                _Row("Rent with 3 Portals", "$100");
+                _Row("Rent with 4 Portals", "$200");
+                _Row("Mortgage Value", _Money(spacePrice[p] / 2));
+                if (o != 0 && !mortgaged) hi = _CountOwnedInGroup(o, 8);
             }
             else if (t == T_UTIL)
             {
-                price = "$" + spacePrice[p];
-                labels = "Purchase Price\nRent (1 owned)\nRent (2 owned)";
-                values = "$" + spacePrice[p] + "\n4x dice\n10x dice";
+                price = _Money(spacePrice[p]);
+                _Row("Purchase Price", _Money(spacePrice[p]));
+                _Row("Rent with 1 owned", "4x dice roll");
+                _Row("Rent with both owned", "10x dice roll");
+                _Row("Mortgage Value", _Money(spacePrice[p] / 2));
+                if (o != 0 && !mortgaged) hi = _CountOwnedInGroup(o, 9);
             }
-            else if (t == T_TAX) { price = "PAY $" + spacePrice[p]; labels = "Tax to the bank"; values = "$" + spacePrice[p]; }
-            else if (t == T_GO) { price = "+$" + goSalary; labels = "Salary every loop\nLoop Coins every loop"; values = "$" + goSalary + "\n+" + coinsPassGo; }
-            else if (t == T_TWIST || t == T_CHEST) { price = "DRAW A CARD"; labels = "Deck\nCards"; values = (t == T_TWIST ? "Twist" : "Loop Chest") + "\n12"; }
-            else if (t == T_JAIL) { price = "GLITCH ZONE"; labels = "Bail\nMax turns inside"; values = "$" + jailFine + "\n3"; }
-            else if (t == T_GOJAIL) { price = "GLITCHED!"; labels = "Go straight to the Glitch Zone"; values = ""; }
-            else { price = "FREE"; labels = "Relax, nothing happens here"; values = ""; }
+            else if (t == T_TAX) { price = "PAY " + _Money(spacePrice[p]); _Row("Tax to the bank", _Money(spacePrice[p])); }
+            else if (t == T_GO) { price = "+" + _Money(goSalary); _Row("Salary every loop", _Money(goSalary)); _Row("Loop Coins every loop", "+" + coinsPassGo); }
+            else if (t == T_TWIST || t == T_CHEST) { price = "DRAW A CARD"; _Row("Deck", t == T_TWIST ? "Twist" : "Loop Chest"); _Row("Cards in deck", "12"); }
+            else if (t == T_JAIL) { price = "GLITCH ZONE"; _Row("Bail", _Money(jailFine)); _Row("Escape with", "Doubles or a Pass"); _Row("Max turns inside", "3"); }
+            else if (t == T_GOJAIL) { price = "GLITCHED!"; _Row("Sends you to", "Glitch Zone"); }
+            else { price = "FREE"; _Row("Nothing happens", "Relax!"); }
 
             string line;
-            int o = owner[p];
             if (o != 0)
             {
                 int b = level[p] & 7;
-                line = "Owned by " + _Name(o - 1) + ((level[p] & 8) != 0 ? "  <color=#FF4D5E>MORTGAGED</color>" : (b == 5 ? "  TOWER" : (b > 0 ? "  Loops " + b : "")));
+                line = "Owned by " + _Name(o - 1) + (mortgaged ? "  <color=#FF4D5E>MORTGAGED</color>" : (b == 5 ? "  TOWER" : (b > 0 ? "  Loops " + b : "")));
             }
             else if (t == T_PROP || t == T_PORTAL || t == T_UTIL) line = "<color=#7CFF4F>For sale</color>" + (g >= 0 && g < groupNames.Length ? "  <color=#" + groupHex[g] + ">" + groupNames[g] + "</color>" : "");
             else line = "<color=#9AF2FF>Use < and > to browse the board</color>";
 
             _SetTexts(propName, spaceName[p]);
             _SetTexts(propPrice, price);
-            _SetTexts(propLabels, labels);
-            _SetTexts(propValues, values);
             if (propArt != null && spaceArt != null && p < spaceArt.Length)
                 for (int i = 0; i < propArt.Length; i++) if (propArt[i] != null) propArt[i].sprite = spaceArt[p];
+            if (rowLabels != null)
+            {
+                Color gold = new Color(1f, 0.86f, 0.3f, 1f);
+                Color soft = new Color(0.84f, 0.87f, 1f, 1f);
+                int per = rowL.Length;
+                for (int i = 0; i < rowLabels.Length; i++)
+                {
+                    int r = i % per;
+                    bool on = r < rowN;
+                    if (rowLabels[i] != null) { rowLabels[i].text = on ? rowL[r] : ""; rowLabels[i].color = r == hi ? gold : soft; }
+                    if (rowValues != null && i < rowValues.Length && rowValues[i] != null) { rowValues[i].text = on ? rowV[r] : ""; rowValues[i].color = r == hi ? gold : Color.white; }
+                    if (rowBacks != null && i < rowBacks.Length && rowBacks[i] != null && rowBacks[i].activeSelf != on) rowBacks[i].SetActive(on);
+                }
+            }
             if (Time.time >= toastUntil) _SetTexts(infoTexts, line);
         }
 

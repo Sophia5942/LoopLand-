@@ -47,8 +47,10 @@ Generated assets go to `Assets/LoopLand/Generated`, and a reusable prefab is sav
 - Walk to a console at the table edge and press **JOIN GAME**, then **START GAME**.
 - Your dashboard shows the selected space like a property card: picture, price, full rent table and owner.
   Browse with **<** / **>** or jump to **MY SPACE**.
-- **VIEW** cycles your live board camera: **DESK** (panel beside your dashboard), **TOP** (screen above it) or **OFF**.
-  The big live screens above the middle of the table are always on.
+- **VIEW** swaps your live board between **TOP** (the screen above your dashboard) and **CENTER** (just the big
+  screens above the middle of the table).
+- The live camera is a director: it zooms in on the dice when someone rolls, follows their token around the
+  loop, then eases back to the full board.
 - Press **STORE** to pop the store up above your dashboard (only you see it move); press it again or **X** to send it back.
 - The big button is context-sensitive: ROLL DICE / BUY / END TURN / ROLL DOUBLES...
 - The second button does PASS, USE GLITCH PASS, PAY BAIL or LEAVE.
