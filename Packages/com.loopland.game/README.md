@@ -43,39 +43,6 @@ LoopLand is a networked, Monopoly-style board game for VRChat worlds:
 Generated assets go to `Assets/LoopLand/Generated`, and a reusable prefab is saved at
 `Assets/LoopLand/LoopLand Game.prefab`. Run the builder again any time to rebuild.
 
-## Build the LoopLand Tower world (one click)
-Click **LoopLand > Build LoopLand Tower World**. It builds the game first if it isn't in the scene yet, then:
-- **The tower:** a rounded glass skyscraper with a mall podium (lit shop fronts, a wrap-around canopy and a roof
-  garden). It has a big curved **LOOPLAND** screen with the glowing gradient infinity, a cyan light spine, a
-  sky lobby, a crown with a halo and a spire.
-- **The Loop:** two huge ring skyways that form an infinity with the sky terrace around the tower, 26 m up.
-  - The game sits on the terrace in front of the tower, with the store kiosk on its left.
-  - Walk the rings: they have glass railings, lamps, trees and benches, and are held up by columns standing in
-    the pool and on the lawn.
-  - Four waterfalls pour from the rings into the water.
-- **The glass elevator (it really moves):**
-  - Press **CALL** at the plaza, step in, and press **THE LOOP**.
-  - The doors close and you ride up in real time, watching the plaza drop away through the glass.
-  - At the top the back doors open onto a bridge to the terrace. **PLAZA** takes you down.
-  - Everyone sees the car move. Up to 6 riders at once stand in place while it moves.
-- **The plaza:** a fountain, trees, lamps, benches, hedges, billboards and the cream "SAME PEOPLE. NEW PLACES.
-  ALWAYS A NEXT LOOP." sign. A glowing guide line leads to the elevator.
-  - The water ring has arched bridges and glass railings.
-- **The surroundings:** a rounded skyline with neon belts and billboards, floating islands with little towers,
-  soft clouds and a bright daytime sky.
-- **Sound:**
-  - The LoopLand theme tune, with a **MUSIC: ON/OFF** toggle at the spawn and on the terrace (per player).
-  - City ambience with birds and wind.
-  - Running water at the fountain and the waterfalls.
-  - Elevator chime, doors and motor hum.
-  - All sounds are original and generated (`Tools~/make_audio.py`).
-- **Spawn:** the VRCWorld spawn moves to the front walkway, facing the tower. The demo floor and light are
-  hidden if you added them.
-
-Run it again to rebuild the world; the game is kept. If you rebuild the game later with
-**Build Game In Scene**, it goes straight back onto the terrace. For the best glass reflections, bake once
-(**Window > Rendering > Lighting > Generate Lighting**).
-
 ## How to play
 - Walk to a console at the table edge and press **JOIN GAME**, then **START GAME**.
 - Your dashboard shows the selected space like a property card: picture, price, full rent table and owner.

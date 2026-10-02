@@ -14,7 +14,7 @@ namespace LoopLand.EditorTools
     {
         public static Sprite Round, Glow, Pill, Panel, Coin, House, Tower;
         public static Sprite IconDice, IconPawn, IconBuilding, IconSparkle, IconCrown, IconGift, IconGlobe;
-        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen, LogoInfinity, IconHeart, IconArrow, IconHeartOutline;
+        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen;
 
         private static string folder;
         private static float aa;
@@ -32,8 +32,6 @@ namespace LoopLand.EditorTools
         private static readonly Vector2[] HammerHead = { new Vector2(0.7244f, 0.3956f), new Vector2(0.8166f, 0.501f), new Vector2(0.5156f, 0.7644f), new Vector2(0.4234f, 0.659f) };
         private static readonly Vector2[] RefreshHead = { new Vector2(0.56f, 0.64f), new Vector2(0.8f, 0.78f), new Vector2(0.56f, 0.94f) };
         private static readonly Vector2[] PlayTri = { new Vector2(0.44f, 0.48f), new Vector2(0.6f, 0.58f), new Vector2(0.44f, 0.68f) };
-        private static readonly Vector2[] ArrowHead = { new Vector2(0.16f, 0.48f), new Vector2(0.84f, 0.48f), new Vector2(0.5f, 0.86f) };
-        private static readonly Vector2[] HeartTip = { new Vector2(0.5f, 0.14f), new Vector2(0.8f, 0.55f), new Vector2(0.2f, 0.55f) };
         private static readonly Vector2[] HouseShape = { new Vector2(0.18f, 0.12f), new Vector2(0.82f, 0.12f), new Vector2(0.82f, 0.55f), new Vector2(0.5f, 0.88f), new Vector2(0.18f, 0.55f) };
 
         public static void Build(string outFolder)
@@ -123,19 +121,6 @@ namespace LoopLand.EditorTools
                 float stand = Mathf.Min(Box(x, y, 0.5f, 0.24f, 0.04f, 0.08f, 0.01f), Box(x, y, 0.5f, 0.15f, 0.18f, 0.03f, 0.02f));
                 return A(Color.white, Cov(Mathf.Min(frame, Mathf.Min(stand, Poly(x, y, PlayTri)))));
             });
-            LogoInfinity = Paint("Logo_Infinity", 256, 0, (x, y) =>
-            {
-                float d = Mathf.Min(Mathf.Abs(Ellipse(x, y, 0.31f, 0.5f, 0.2f, 0.17f)), Mathf.Abs(Ellipse(x, y, 0.69f, 0.5f, 0.2f, 0.17f))) - 0.045f;
-                Color c = Color.HSVToRGB(Mathf.Repeat(0.14f + x * 0.75f, 1f), 0.7f, 1f);
-                Color glow = A(c, 0.45f * Soft(d - 0.02f, 0.08f));
-                return Mix(glow, Color.Lerp(c, Color.white, 0.25f), Cov(d));
-            });
-            IconHeart = Paint("Icon_Heart", 128, 0, (x, y) =>
-                A(Color.white, Cov(Mathf.Min(Mathf.Min(Circle(x, y, 0.36f, 0.6f, 0.17f), Circle(x, y, 0.64f, 0.6f, 0.17f)), Poly(x, y, HeartTip)))));
-            IconHeartOutline = Paint("Icon_Heart_Outline", 256, 0, (x, y) =>
-                A(Color.white, Cov(Mathf.Abs(Mathf.Min(Mathf.Min(Circle(x, y, 0.36f, 0.6f, 0.17f), Circle(x, y, 0.64f, 0.6f, 0.17f)), Poly(x, y, HeartTip))) - 0.026f)));
-            IconArrow = Paint("Icon_Arrow", 128, 0, (x, y) =>
-                A(Color.white, Cov(Mathf.Min(Poly(x, y, ArrowHead), Box(x, y, 0.5f, 0.3f, 0.11f, 0.2f, 0.02f)))));
             IconGlobe = Paint("Icon_Globe", 128, 0, (x, y) =>
             {
                 float ring = Mathf.Abs(Circle(x, y, 0.5f, 0.5f, 0.36f)) - 0.035f;
@@ -303,172 +288,6 @@ namespace LoopLand.EditorTools
                 if (variant == 3) c = Mix(c, Hex(0x5BE36B), Cov(Circle(x, y, bx[k], top + 0.02f, 0.035f)));
             }
             return c;
-        }
-
-        // ------------------------------------------------------------------ world textures
-
-        private static readonly Color[] LogoGradient = { Hex(0xFFD23F), Hex(0xFF8A3D), Hex(0xFF3DCB), Hex(0xB07CFF), Hex(0x4D8BFF), Hex(0x00E5FF) };
-        private static readonly char[] WordChars = { 'L', 'O', 'O', 'P', 'L', 'A', 'N', 'D' };
-        private static readonly float[] WordWidth = { 0.62f, 0.86f, 0.86f, 0.68f, 0.62f, 0.84f, 0.8f, 0.78f };
-        private const float WordGap = 0.13f;
-
-        /// <summary>The big curved LOOPLAND screen: a glowing gradient infinity over the LOOPLAND lettering on a deep blue LED panel.</summary>
-        public static Texture2D SignScreen(string name, int w, int h)
-        {
-            float asp = w / (float)h;
-            float cap = 0.18f, wordW = 0f;
-            foreach (float ww in WordWidth) wordW += ww;
-            wordW = (wordW + WordGap * (WordWidth.Length - 1)) * cap;
-            return PaintTex(name, w, h, false, (x, y) =>
-            {
-                Color c = Color.Lerp(Hex(0x1B1452), Hex(0x0D0B2E), y);
-                float r = new Vector2((x - asp * 0.5f) / asp, y - 0.62f).magnitude;
-                c = Color.Lerp(c, Hex(0x3A2A8A), Mathf.Clamp01(0.55f - r) * 0.9f);
-                if (((int)(x * h) & 3) == 0 || ((int)(y * h) & 3) == 0) c *= 0.86f; // LED pixel grid
-                c.a = 1f;
-                float lx = asp * 0.5f, ly = 0.62f;
-                float band = Mathf.Min(Mathf.Abs(Ellipse(x, y, lx - 0.25f, ly, 0.28f, 0.18f)), Mathf.Abs(Ellipse(x, y, lx + 0.25f, ly, 0.28f, 0.18f))) - 0.055f;
-                Color lc = LogoColor((x - (lx - 0.6f)) / 1.2f);
-                c = Mix(c, A(lc, 0.6f), Soft(band - 0.02f, 0.12f) * 0.85f);
-                float across = Mathf.Clamp01(-band / 0.055f);
-                Color body = Color.Lerp(lc * 0.72f, Color.Lerp(lc, Color.white, 0.6f), across * across);
-                body.a = 1f;
-                c = Mix(c, body, Cov(band));
-                float td = Word((x - (asp - wordW) * 0.5f) / cap, (y - 0.12f) / cap) * cap;
-                c = Mix(c, A(Hex(0x7FE7FF), 0.6f), Soft(td - 0.008f, 0.06f) * 0.7f);
-                c = Mix(c, Color.Lerp(Hex(0xD9D2FF), Color.white, Mathf.Clamp01((y - 0.12f) / cap)), Cov(td));
-                c.a = 1f;
-                return c;
-            });
-        }
-
-        /// <summary>Soft cumulus puff for billboard clouds.</summary>
-        public static Texture2D CloudPuff(string name)
-        {
-            return PaintTex(name, 256, 256, false, (x, y) =>
-            {
-                float d = Blob(x, y, 0.5f, 0.42f, 0.3f) + Blob(x, y, 0.32f, 0.38f, 0.2f) + Blob(x, y, 0.68f, 0.4f, 0.22f)
-                          + Blob(x, y, 0.45f, 0.58f, 0.2f) + Blob(x, y, 0.6f, 0.55f, 0.17f);
-                float n = Mathf.PerlinNoise(x * 6f, y * 6f) * 0.6f + Mathf.PerlinNoise(x * 12.6f + 7f, y * 12.6f) * 0.3f + Mathf.PerlinNoise(x * 25.8f, y * 25.8f + 3f) * 0.1f;
-                float a = Mathf.Clamp01((d * (0.75f + 0.5f * n) - 0.35f) * 2.2f) * Mathf.Clamp01((y - 0.18f) * 6f);
-                Color c = Color.Lerp(new Color(0.8f, 0.84f, 0.93f), Color.white, Mathf.Clamp01((y - 0.25f) * 2f));
-                c.a = a;
-                return c;
-            });
-        }
-
-        /// <summary>Falling-water streaks, tiling in both directions (scrolled along V for the waterfalls).</summary>
-        public static Texture2D WaterStreaks(string name)
-        {
-            return PaintTex(name, 64, 256, true, (x, y) =>
-            {
-                float u = x * 4f, s = 0f;
-                for (int k = 1; k <= 4; k++) s += Mathf.Sin(2f * Mathf.PI * (u * (k * 3 + 2) + 0.37f * k)) * 0.5f / k;
-                float streak = Mathf.Clamp01(0.55f + s * 0.6f);
-                float flow = 0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * (y * 3f + 0.3f * Mathf.Sin(2f * Mathf.PI * u * 2f)));
-                Color c = Color.Lerp(new Color(0.65f, 0.86f, 1f), Color.white, flow * streak);
-                c.a = Mathf.Clamp01(streak * (0.55f + 0.45f * flow)) * 0.85f;
-                return c;
-            });
-        }
-
-        /// <summary>Vertical light column with travelling bars (the tower's glowing spine).</summary>
-        public static Texture2D LightColumn(string name)
-        {
-            return PaintTex(name, 32, 256, true, (x, y) =>
-            {
-                float u = x * 8f;
-                float v = Mathf.Exp(-Mathf.Pow((u - 0.5f) / 0.32f, 2f)) * (0.55f + 0.45f * Mathf.Pow(0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * y * 8f), 3f));
-                Color c = Color.Lerp(Hex(0x0A2A66), Hex(0xBFF6FF), v);
-                c.a = 1f;
-                return c;
-            });
-        }
-
-        private static Color LogoColor(float t)
-        {
-            float f = Mathf.Clamp01(t) * (LogoGradient.Length - 1);
-            int i = Mathf.Min((int)f, LogoGradient.Length - 2);
-            return Color.Lerp(LogoGradient[i], LogoGradient[i + 1], f - i);
-        }
-
-        private static float Blob(float x, float y, float cx, float cy, float r)
-        {
-            float dx = (x - cx) / r, dy = (y - cy) / r;
-            return Mathf.Exp(-(dx * dx + dy * dy) * 1.6f);
-        }
-
-        /// <summary>Signed distance (in cap heights) to LOOPLAND in a rounded geometric face; x from the left edge, y from the baseline.</summary>
-        private static float Word(float x, float y)
-        {
-            float d = 10f, x0 = 0f;
-            for (int i = 0; i < WordChars.Length; i++)
-            {
-                float lx = x - x0;
-                if (lx > -0.4f && lx < WordWidth[i] + 0.4f) d = Mathf.Min(d, Glyph(WordChars[i], lx, y));
-                x0 += WordWidth[i] + WordGap;
-            }
-            return d;
-        }
-
-        private static float Glyph(char ch, float x, float y)
-        {
-            const float h = 0.1f; // half stroke
-            switch (ch)
-            {
-                case 'L':
-                    return Mathf.Min(Seg(x, y, h, h, h, 1f - h), Seg(x, y, h, h, 0.62f - h, h)) - h;
-                case 'O':
-                    return Mathf.Abs(Box(x, y, 0.43f, 0.5f, 0.43f - h, 0.5f - h, 0.43f - h)) - h;
-                case 'P':
-                    return Mathf.Min(Seg(x, y, h, h, h, 1f - h) - h, Mathf.Abs(Box(x, y, 0.34f, 0.72f, 0.34f - h, 0.28f - h, 0.28f - h)) - h);
-                case 'A':
-                {
-                    float d = Mathf.Min(Mathf.Min(Seg(x, y, h, 0f, 0.42f, 1f - h), Seg(x, y, 0.84f - h, 0f, 0.42f, 1f - h)), Seg(x, y, 0.24f, 0.36f, 0.6f, 0.36f));
-                    return Mathf.Max(d - h, -y);
-                }
-                case 'N':
-                    return Mathf.Min(Mathf.Min(Seg(x, y, h, h, h, 1f - h), Seg(x, y, 0.8f - h, h, 0.8f - h, 1f - h)), Seg(x, y, h, 1f - h, 0.8f - h, h)) - h;
-                case 'D':
-                    return Mathf.Min(Seg(x, y, h, h, h, 1f - h) - h, Mathf.Abs(Box(x, y, 0.39f, 0.5f, 0.39f - h, 0.5f - h, 0.29f)) - h);
-                default:
-                    return 10f;
-            }
-        }
-
-        private static float Seg(float x, float y, float ax, float ay, float bx, float by)
-        {
-            float px = x - ax, py = y - ay, dx = bx - ax, dy = by - ay;
-            float t = Mathf.Clamp01((px * dx + py * dy) / (dx * dx + dy * dy + 1e-9f));
-            float ex = px - dx * t, ey = py - dy * t;
-            return Mathf.Sqrt(ex * ex + ey * ey);
-        }
-
-        /// <summary>Non-sprite texture (x runs 0..w/h, y 0..1), cached by file name like the sprites.</summary>
-        private static Texture2D PaintTex(string name, int w, int h, bool repeat, Func<float, float, Color> f)
-        {
-            string path = folder + "/" + name + ".png";
-            var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            if (existing != null) return existing;
-            aa = 1f / h;
-            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-            var px = new Color[w * h];
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                    px[y * w + x] = f((x + 0.5f) / h, (y + 0.5f) / h);
-            tex.SetPixels(px);
-            tex.Apply();
-            File.WriteAllBytes(path, tex.EncodeToPNG());
-            Object.DestroyImmediate(tex);
-            AssetDatabase.ImportAsset(path);
-            var imp = (TextureImporter)AssetImporter.GetAtPath(path);
-            imp.textureType = TextureImporterType.Default;
-            imp.alphaIsTransparency = true;
-            imp.mipmapEnabled = true;
-            imp.wrapMode = repeat ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
-            imp.maxTextureSize = 2048;
-            imp.SaveAndReimport();
-            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
         // ------------------------------------------------------------------ raster helpers

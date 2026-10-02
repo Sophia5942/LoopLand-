@@ -82,7 +82,6 @@ namespace LoopLand.EditorTools
                 EditorSceneManager.MarkSceneDirty(root.scene);
                 AssetDatabase.SaveAssets();
                 PrefabUtility.SaveAsPrefabAssetAndConnect(root, Root + "/LoopLand Game.prefab", InteractionMode.AutomatedAction);
-                LoopLandWorldBuilder.PlaceGame(root); // back onto the Loop Deck when the tower world is in the scene
                 Selection.activeGameObject = root;
                 Debug.Log("[LoopLand] Built! Prefab saved to " + Root + "/LoopLand Game.prefab. Assign your UdonProducts on 'LoopLand/Store' (see README).");
             }
@@ -119,25 +118,11 @@ namespace LoopLand.EditorTools
             Undo.RegisterCreatedObjectUndo(lightGo, "Light");
         }
 
-        /// <summary>Loads the shared font, programs, particle texture and UI art (used by the world builder too).</summary>
-        internal static bool Prepare()
-        {
-            font = TMP_Settings.instance != null ? TMP_Settings.defaultFontAsset : null;
-            if (font == null) font = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
-            if (font == null) return false;
-            EnsurePrograms();
-            dot = DotTexture();
-            fxMat = AddMat("FX_Particle", new Color(0.5f, 0.5f, 0.5f, 0.5f));
-            LoopLandArt.Build(Gen + "/UI");
-            roundSprite = LoopLandArt.Round;
-            return true;
-        }
-
         // ------------------------------------------------------------------ programs
 
         private static void EnsurePrograms()
         {
-            Type[] types = { typeof(LoopLandGame), typeof(LoopLandStore), typeof(LoopLandToken), typeof(LoopLandDice), typeof(LoopLandButton), typeof(LoopLandCamera), typeof(LoopLandElevator), typeof(LoopLandMover), typeof(LoopLandLift), typeof(LoopLandSeat), typeof(LoopLandAmbience) };
+            Type[] types = { typeof(LoopLandGame), typeof(LoopLandStore), typeof(LoopLandToken), typeof(LoopLandDice), typeof(LoopLandButton), typeof(LoopLandCamera) };
             var existing = new HashSet<Type>();
             foreach (string g in AssetDatabase.FindAssets("t:UdonSharpProgramAsset"))
             {
@@ -771,7 +756,7 @@ namespace LoopLand.EditorTools
 
         // ------------------------------------------------------------------ helpers: objects
 
-        internal static GameObject Prim(PrimitiveType type, string name, Transform parent, Vector3 lpos, Vector3 lscale, Material m, bool keepCollider = false)
+        private static GameObject Prim(PrimitiveType type, string name, Transform parent, Vector3 lpos, Vector3 lscale, Material m, bool keepCollider = false)
         {
             GameObject go = GameObject.CreatePrimitive(type);
             go.name = name;
@@ -790,7 +775,7 @@ namespace LoopLand.EditorTools
             return go;
         }
 
-        internal static TextMeshPro Text(Transform parent, string name, string text, Vector3 lpos, Quaternion lrot, Vector2 size, float maxSize, Color color, TextAlignmentOptions align = TextAlignmentOptions.Center)
+        private static TextMeshPro Text(Transform parent, string name, string text, Vector3 lpos, Quaternion lrot, Vector2 size, float maxSize, Color color, TextAlignmentOptions align = TextAlignmentOptions.Center)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -813,7 +798,7 @@ namespace LoopLand.EditorTools
         private static Sprite roundSprite;
 
         /// <summary>World-space canvas set up the way VRChat needs it (VRC Ui Shape, Default layer, collider). 1 canvas unit = 1 mm.</summary>
-        internal static RectTransform UCanvas(Transform parent, string name, Vector3 lpos, Quaternion lrot, Vector2 px, bool interactive = true)
+        private static RectTransform UCanvas(Transform parent, string name, Vector3 lpos, Quaternion lrot, Vector2 px, bool interactive = true)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -870,7 +855,7 @@ namespace LoopLand.EditorTools
             return null;
         }
 
-        internal static Image UImg(Transform parent, string name, Vector2 pos, Vector2 size, Sprite sprite, Color color, bool sliced = true, bool raycast = false)
+        private static Image UImg(Transform parent, string name, Vector2 pos, Vector2 size, Sprite sprite, Color color, bool sliced = true, bool raycast = false)
         {
             var img = URect(parent, name, pos, size).gameObject.AddComponent<Image>();
             img.sprite = sprite;
@@ -1027,7 +1012,7 @@ namespace LoopLand.EditorTools
         }
 
         /// <summary>Glowing button with optional icon on the left and an optional ">" arrow on the right. Returns its label.</summary>
-        internal static TextMeshProUGUI NeonButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Color color, Sprite icon,
+        private static TextMeshProUGUI NeonButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Color color, Sprite icon,
             UdonSharpBehaviour target, string evt, float fontSize, bool arrow)
         {
             UImg(parent, name + " Glow", pos, size + new Vector2(30f, 30f), LoopLandArt.Glow, new Color(Mathf.Lerp(color.r, 1f, 0.3f), Mathf.Lerp(color.g, 1f, 0.3f), Mathf.Lerp(color.b, 1f, 0.3f), 0.95f));
@@ -1091,7 +1076,7 @@ namespace LoopLand.EditorTools
             }
         }
 
-        internal static void SetLayer(GameObject go, int layer)
+        private static void SetLayer(GameObject go, int layer)
         {
             go.layer = layer;
             foreach (Transform child in go.transform) SetLayer(child.gameObject, layer);
@@ -1118,7 +1103,7 @@ namespace LoopLand.EditorTools
             return img;
         }
 
-        internal static RawImage URaw(Transform parent, string name, Vector2 pos, Vector2 size, Texture tex)
+        private static RawImage URaw(Transform parent, string name, Vector2 pos, Vector2 size, Texture tex)
         {
             var raw = URect(parent, name, pos, size).gameObject.AddComponent<RawImage>();
             raw.texture = tex;
@@ -1126,7 +1111,7 @@ namespace LoopLand.EditorTools
             return raw;
         }
 
-        internal static TextMeshProUGUI UText(Transform parent, string name, string text, Vector2 pos, Vector2 size, float fontSize, Color color, TextAlignmentOptions align = TextAlignmentOptions.Center)
+        private static TextMeshProUGUI UText(Transform parent, string name, string text, Vector2 pos, Vector2 size, float fontSize, Color color, TextAlignmentOptions align = TextAlignmentOptions.Center)
         {
             var t = URect(parent, name, pos, size).gameObject.AddComponent<TextMeshProUGUI>();
             t.font = font;
@@ -1143,7 +1128,7 @@ namespace LoopLand.EditorTools
         }
 
         /// <summary>Rounded UI button that calls SendCustomEvent(evt) on the target's UdonBehaviour. Returns its label.</summary>
-        internal static TextMeshProUGUI UButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Color color, UdonSharpBehaviour target, string evt, float fontSize)
+        private static TextMeshProUGUI UButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Color color, UdonSharpBehaviour target, string evt, float fontSize)
         {
             Image img = UImage(parent, name, pos, size, color, true);
             var btn = img.gameObject.AddComponent<Button>();
@@ -1236,7 +1221,7 @@ namespace LoopLand.EditorTools
             return b;
         }
 
-        internal static ParticleSystem Fx(string name, Transform parent, Vector3 lpos, Quaternion lrot, float life, float speed, float size, float rateTime, float rateDist,
+        private static ParticleSystem Fx(string name, Transform parent, Vector3 lpos, Quaternion lrot, float life, float speed, float size, float rateTime, float rateDist,
             bool loop, bool world, ParticleSystemShapeType shape, float radius, float gravity, int max, Color c1, Color c2, float orbit)
         {
             var go = new GameObject(name);
@@ -1298,7 +1283,7 @@ namespace LoopLand.EditorTools
             AssetDatabase.CreateFolder(parent, Path.GetFileName(path));
         }
 
-        internal static Material Std(string name, Color c, float metal, float smooth, Color emission, Texture tex = null)
+        private static Material Std(string name, Color c, float metal, float smooth, Color emission, Texture tex = null)
         {
             Dir(Gen + "/Materials");
             string path = Gen + "/Materials/" + name + ".mat";
@@ -1322,7 +1307,7 @@ namespace LoopLand.EditorTools
             return m;
         }
 
-        internal static Material AddMat(string name, Color tint)
+        private static Material AddMat(string name, Color tint)
         {
             Dir(Gen + "/Materials");
             string path = Gen + "/Materials/" + name + ".mat";
@@ -1336,7 +1321,7 @@ namespace LoopLand.EditorTools
             return m;
         }
 
-        internal static Texture2D SavePng(string name, Texture2D tex)
+        private static Texture2D SavePng(string name, Texture2D tex)
         {
             Dir(Gen + "/Textures");
             string path = Gen + "/Textures/" + name + ".png";
@@ -1449,7 +1434,7 @@ namespace LoopLand.EditorTools
             return mesh;
         }
 
-        internal static AudioClip Wav(string name, float dur, Func<float, float> f)
+        private static AudioClip Wav(string name, float dur, Func<float, float> f)
         {
             Dir(Gen + "/Audio");
             string path = Gen + "/Audio/" + name + ".wav";
@@ -1482,18 +1467,18 @@ namespace LoopLand.EditorTools
             return AssetDatabase.LoadAssetAtPath<AudioClip>(path);
         }
 
-        internal static float Sin(float hz, float t) => Mathf.Sin(2f * Mathf.PI * hz * t);
-        internal static float Noise() => (float)(rng.NextDouble() * 2.0 - 1.0);
-        internal static float Env(float t, float attack, float decay) => t < attack ? t / attack : Mathf.Exp(-(t - attack) / decay);
+        private static float Sin(float hz, float t) => Mathf.Sin(2f * Mathf.PI * hz * t);
+        private static float Noise() => (float)(rng.NextDouble() * 2.0 - 1.0);
+        private static float Env(float t, float attack, float decay) => t < attack ? t / attack : Mathf.Exp(-(t - attack) / decay);
 
-        internal static float Notes(float t, float[] hz, float step, float decay)
+        private static float Notes(float t, float[] hz, float step, float decay)
         {
             int k = Mathf.Min((int)(t / step), hz.Length - 1);
             float lt = t - k * step;
             return (Sin(hz[k], lt) * 0.55f + Sin(hz[k] * 2f, lt) * 0.18f) * Env(lt, 0.004f, decay);
         }
 
-        internal static Color Hex(string hex)
+        private static Color Hex(string hex)
         {
             ColorUtility.TryParseHtmlString("#" + hex, out Color c);
             return c;
