@@ -5,8 +5,10 @@ using TMPro;
 using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
+using UnityEditor.Events;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.UI;
 using VRC.Udon;
 using Object = UnityEngine.Object;
 
@@ -58,6 +60,11 @@ namespace LoopLand.EditorTools
                 EnsurePrograms();
                 EditorUtility.DisplayProgressBar("LoopLand", "Generating materials, dice and sounds...", 0.3f);
                 GameObject root = BuildAll();
+                if (Object.FindObjectsByType<UnityEngine.EventSystems.EventSystem>(FindObjectsSortMode.None).Length == 0)
+                {
+                    var es = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
+                    Undo.RegisterCreatedObjectUndo(es, "EventSystem");
+                }
                 EditorUtility.DisplayProgressBar("LoopLand", "Wiring Udon behaviours...", 0.85f);
                 foreach (UdonSharpBehaviour b in made) UdonSharpEditorUtility.CopyProxyToUdon(b);
                 Undo.RegisterCreatedObjectUndo(root, "Build LoopLand");
@@ -140,18 +147,17 @@ namespace LoopLand.EditorTools
             dot = DotTexture();
             fxMat = AddMat("FX_Particle", new Color(0.5f, 0.5f, 0.5f, 0.5f));
             Material dark = Std("Table", Hex("15131F"), 0.35f, 0.88f, Color.black);
-            Material panel = Std("Panel", Hex("0D0C1A"), 0.2f, 0.95f, Hex("05040C"));
             Material tileMat = Std("Tile", Hex("1C1A30"), 0.1f, 0.75f, Hex("06050E"));
-            Material frameCyan = AddMat("Glow_Cyan", Hex("00B8D4"));
-            Material frameGold = AddMat("Glow_Gold", Hex("C9A227"));
             Material white = Std("OwnerBar", Color.white, 0f, 0.6f, Color.white);
             Material loopMat = Std("Loop", Hex("3DFF8A"), 0.2f, 0.8f, Hex("1A8040"));
             Material towerMat = Std("Tower", Hex("FFD54A"), 0.9f, 0.85f, Hex("806010"));
-            Material btnCyan = Std("Btn_Cyan", Hex("0B5563"), 0.2f, 0.9f, Hex("00B8D4") * 0.6f);
-            Material btnPink = Std("Btn_Pink", Hex("5A1048"), 0.2f, 0.9f, Hex("FF3DCB") * 0.5f);
-            Material btnGold = Std("Btn_Gold", Hex("5E4708"), 0.6f, 0.9f, Hex("FFD54A") * 0.5f);
-            Material btnDark = Std("Btn_Dark", Hex("24223A"), 0.2f, 0.9f, Hex("4D4A80") * 0.4f);
 
+            roundSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            Color cCyan = new Color(0f, 0.55f, 0.68f, 1f);
+            Color cPink = new Color(0.72f, 0.1f, 0.55f, 1f);
+            Color cGold = new Color(0.72f, 0.53f, 0.06f, 1f);
+            Color cDark = new Color(0.17f, 0.16f, 0.29f, 1f);
+            Color cRed = new Color(0.58f, 0.1f, 0.17f, 1f);
             var root = new GameObject("LoopLand");
             Transform rt = root.transform;
 
@@ -205,12 +211,7 @@ namespace LoopLand.EditorTools
                 int type = game.spaceType[i];
                 int grp = game.spaceGroup[i];
                 Material m = type == 0 ? goMat : type == 7 ? jailMat : type == 8 ? freeMat : type == 9 ? goJailMat : (type == 5 || type == 6) ? cardMat : tileMat;
-                GameObject tile = Prim(PrimitiveType.Cube, "Tile", anchor, new Vector3(0f, -0.01f, 0f), new Vector3(tileW, 0.02f, 0.52f), m, true);
-                var tb = UdonSharpUndo.AddComponent<LoopLandButton>(tile);
-                tb.target = game;
-                tb.eventName = "_OnTile";
-                tb.arg = i;
-                Done(tb, game.spaceName[i], 5f);
+                Prim(PrimitiveType.Cube, "Tile", anchor, new Vector3(0f, -0.01f, 0f), new Vector3(tileW, 0.02f, 0.52f), m);
 
                 bool corner = type == 0 || type == 7 || type == 8 || type == 9;
                 if (grp >= 0) Prim(PrimitiveType.Cube, "Color", anchor, new Vector3(0f, 0.003f, 0.2f), new Vector3(tileW * 0.94f, 0.006f, 0.1f), groupMats[grp]);
@@ -244,24 +245,26 @@ namespace LoopLand.EditorTools
 
             // center hologram
             Fx("Loop Ring", rt, new Vector3(0f, TopY + 0.03f, 0f), Quaternion.Euler(-90f, 0f, 0f), 2.6f, 0f, 0.035f, 70f, 0f, true, false, ParticleSystemShapeType.Circle, 1.6f, 0f, 400, Hex("00E5FF"), Hex("FF3DCB"), 0.35f);
+            Texture liveTex = LiveCamera(rt);
             var holo = new GameObject("Hologram").transform;
             holo.SetParent(rt, false);
-            holo.localPosition = new Vector3(0f, 1.95f, 0f);
-            var status = new TextMeshPro[4];
-            var players = new TextMeshPro[4];
-            var cards = new TextMeshPro[4];
+            holo.localPosition = new Vector3(0f, 2.0f, 0f);
+            var status = new TMP_Text[4];
+            var players = new TMP_Text[4];
+            var cards = new TMP_Text[4];
             for (int d = 0; d < 4; d++)
             {
                 Vector3 dir = Quaternion.Euler(0f, d * 90f, 0f) * Vector3.back;
-                var face = new GameObject("Screen " + d).transform;
-                face.SetParent(holo, false);
-                face.localPosition = dir * 0.66f;
-                face.localRotation = Quaternion.LookRotation(-dir, Vector3.up);
-                Prim(PrimitiveType.Cube, "Glass", face, new Vector3(0f, 0f, 0.012f), new Vector3(1.22f, 0.98f, 0.02f), panel);
-                Prim(PrimitiveType.Cube, "Frame", face, new Vector3(0f, 0f, 0.022f), new Vector3(1.27f, 1.03f, 0.01f), frameCyan);
-                status[d] = Text(face, "Status", "LOOPLAND", new Vector3(0f, 0.22f, -0.003f), Quaternion.identity, new Vector2(1.12f, 0.5f), 0.75f, Color.white);
-                players[d] = Text(face, "Players", "", new Vector3(0f, -0.26f, -0.003f), Quaternion.identity, new Vector2(1.12f, 0.42f), 0.45f, Color.white, TextAlignmentOptions.Left);
-                cards[d] = Text(face, "Card", "", new Vector3(0f, -0.68f, -0.01f), Quaternion.identity, new Vector2(1.2f, 0.3f), 0.5f, Hex("FFE14D"));
+                RectTransform c = UCanvas(holo, "Screen " + d, dir * 0.8f, Quaternion.LookRotation(-dir, Vector3.up), new Vector2(1500f, 1100f));
+                UImage(c, "Glow", Vector2.zero, new Vector2(1530f, 1130f), new Color(0f, 0.9f, 1f, 0.55f));
+                UImage(c, "Panel", Vector2.zero, new Vector2(1500f, 1100f), new Color(0.035f, 0.03f, 0.07f, 0.94f));
+                UImage(c, "Live Frame", new Vector2(-290f, 70f), new Vector2(878f, 878f), new Color(1f, 0.24f, 0.8f, 0.85f));
+                URaw(c, "Live View", new Vector2(-290f, 70f), new Vector2(860f, 860f), liveTex);
+                UText(c, "Header", "<b>LIVE BOARD</b>", new Vector2(445f, 470f), new Vector2(540f, 70f), 40f, Hex("00E5FF"));
+                status[d] = UText(c, "Status", "LOOPLAND", new Vector2(445f, 260f), new Vector2(540f, 330f), 42f, Color.white);
+                players[d] = UText(c, "Players", "", new Vector2(445f, -150f), new Vector2(540f, 420f), 34f, Color.white, TextAlignmentOptions.TopLeft);
+                UImage(c, "Card Strip", new Vector2(0f, -455f), new Vector2(1440f, 150f), new Color(1f, 0.85f, 0.25f, 0.12f));
+                cards[d] = UText(c, "Card", "", new Vector2(0f, -455f), new Vector2(1400f, 140f), 40f, Hex("FFE14D"));
             }
             var spinner = new GameObject("Logo Spinner").transform;
             spinner.SetParent(rt, false);
@@ -345,13 +348,13 @@ namespace LoopLand.EditorTools
                 tokens[s] = tk;
             }
 
-            // consoles
+            // consoles: clean world-space UI panels at the table edge
             var consoles = new GameObject("Consoles").transform;
             consoles.SetParent(rt, false);
-            var info = new TextMeshPro[4];
-            var prim = new TextMeshPro[4];
-            var sec = new TextMeshPro[4];
-            var rounds = new TextMeshPro[4];
+            var info = new TMP_Text[4];
+            var prim = new TMP_Text[4];
+            var sec = new TMP_Text[4];
+            var rounds = new TMP_Text[4];
             for (int d = 0; d < 4; d++)
             {
                 Vector3 dir = Quaternion.Euler(0f, d * 90f, 0f) * Vector3.back;
@@ -359,57 +362,66 @@ namespace LoopLand.EditorTools
                 c.SetParent(consoles, false);
                 c.localPosition = dir * 2.62f + Vector3.up * (TopY + 0.02f);
                 c.localRotation = Quaternion.LookRotation(-dir, Vector3.up);
-                var face = new GameObject("Face").transform;
-                face.SetParent(c, false);
-                face.localPosition = new Vector3(0f, 0.17f, 0f);
-                face.localRotation = Quaternion.Euler(35f, 0f, 0f);
-                Prim(PrimitiveType.Cube, "Back", face, new Vector3(0f, 0f, 0.014f), new Vector3(1.12f, 0.58f, 0.02f), panel);
-                Prim(PrimitiveType.Cube, "Frame", face, new Vector3(0f, 0f, 0.024f), new Vector3(1.16f, 0.62f, 0.01f), frameCyan);
-                info[d] = Text(face, "Info", "", new Vector3(0f, 0.18f, -0.004f), Quaternion.identity, new Vector2(1.04f, 0.19f), 0.32f, Color.white);
-                prim[d] = Button(face, "Primary", "JOIN GAME", new Vector3(-0.26f, 0.0f, 0f), new Vector2(0.5f, 0.13f), btnCyan, game, "_OnPrimary", 0, "Main action");
-                sec[d] = Button(face, "Secondary", "-", new Vector3(0.26f, 0.0f, 0f), new Vector2(0.5f, 0.13f), btnPink, game, "_OnSecondary", 0, "Second action");
-                Button(face, "Build", "BUILD", new Vector3(-0.42f, -0.18f, 0f), new Vector2(0.2f, 0.1f), btnDark, game, "_OnBuild", 0, "Build a Loop on the selected space");
-                Button(face, "Sell", "SELL", new Vector3(-0.21f, -0.18f, 0f), new Vector2(0.2f, 0.1f), btnDark, game, "_OnSell", 0, "Sell an upgrade");
-                Button(face, "Mortgage", "MORTGAGE", new Vector3(0f, -0.18f, 0f), new Vector2(0.2f, 0.1f), btnDark, game, "_OnMortgage", 0, "Mortgage / unmortgage");
-                rounds[d] = Button(face, "Rounds", "ROUNDS", new Vector3(0.21f, -0.18f, 0f), new Vector2(0.2f, 0.1f), btnDark, game, "_OnRounds", 0, "Change the round limit (lobby)");
-                Button(face, "Reset", "RESET", new Vector3(0.42f, -0.18f, 0f), new Vector2(0.2f, 0.1f), btnPink, game, "_OnReset", 0, "Reset the game (press twice)");
+                RectTransform ui = UCanvas(c, "Panel", new Vector3(0f, 0.26f, 0f), Quaternion.Euler(35f, 0f, 0f), new Vector2(1100f, 640f));
+                UImage(ui, "Glow", Vector2.zero, new Vector2(1124f, 664f), new Color(0f, 0.9f, 1f, 0.5f));
+                UImage(ui, "Back", Vector2.zero, new Vector2(1100f, 640f), new Color(0.035f, 0.03f, 0.07f, 0.95f));
+                UImage(ui, "Info Back", new Vector2(0f, 222f), new Vector2(1060f, 160f), new Color(1f, 1f, 1f, 0.05f));
+                info[d] = UText(ui, "Info", "", new Vector2(0f, 222f), new Vector2(1030f, 150f), 30f, Color.white);
+                prim[d] = UButton(ui, "Primary", "JOIN GAME", new Vector2(-265f, 62f), new Vector2(510f, 120f), cCyan, game, "_OnPrimary", 44f);
+                sec[d] = UButton(ui, "Secondary", "-", new Vector2(265f, 62f), new Vector2(510f, 120f), cPink, game, "_OnSecondary", 40f);
+                UButton(ui, "Prev Space", "< SPACE", new Vector2(-397f, -82f), new Vector2(245f, 95f), cDark, game, "_OnPrevSpace", 30f);
+                UButton(ui, "Next Space", "SPACE >", new Vector2(-132f, -82f), new Vector2(245f, 95f), cDark, game, "_OnNextSpace", 30f);
+                UButton(ui, "Build", "BUILD", new Vector2(132f, -82f), new Vector2(245f, 95f), cDark, game, "_OnBuild", 30f);
+                UButton(ui, "Sell", "SELL", new Vector2(397f, -82f), new Vector2(245f, 95f), cDark, game, "_OnSell", 30f);
+                UButton(ui, "Mortgage", "MORTGAGE", new Vector2(-397f, -200f), new Vector2(245f, 95f), cDark, game, "_OnMortgage", 30f);
+                UButton(ui, "My Space", "MY SPACE", new Vector2(-132f, -200f), new Vector2(245f, 95f), cDark, game, "_OnMySpace", 30f);
+                rounds[d] = UButton(ui, "Rounds", "ROUNDS", new Vector2(132f, -200f), new Vector2(245f, 95f), cDark, game, "_OnRounds", 28f);
+                UButton(ui, "Reset", "RESET", new Vector2(397f, -200f), new Vector2(245f, 95f), cRed, game, "_OnReset", 30f);
             }
 
-            // store kiosk
+            // store kiosk: clean UI panel, live mini view and a 3D preview pedestal
             Transform st = storeGo.transform;
             AudioSource storeAudio = Audio(storeGo);
-            Prim(PrimitiveType.Cube, "Stage", st, new Vector3(0f, 0.03f, -0.25f), new Vector3(4.4f, 0.06f, 1.5f), dark, true);
-            Prim(PrimitiveType.Cube, "Back", st, new Vector3(0f, 1.45f, 0.05f), new Vector3(2.75f, 1.8f, 0.06f), panel, true);
-            Prim(PrimitiveType.Cube, "Frame", st, new Vector3(0f, 1.45f, 0.09f), new Vector3(2.83f, 1.88f, 0.02f), frameGold);
-            Text(st, "Title", "<b>LOOPLAND <color=#FFE14D>STORE</color></b>", new Vector3(0f, 2.2f, -0.01f), Quaternion.identity, new Vector2(2.5f, 0.22f), 2f, Color.white);
-            store.coinsText = Text(st, "Coins", "", new Vector3(0f, 2.0f, -0.01f), Quaternion.identity, new Vector2(2.5f, 0.15f), 1.1f, Hex("FFE14D"));
-            var tabs = new TextMeshPro[4];
+            Prim(PrimitiveType.Cube, "Stage", st, new Vector3(0f, 0.03f, -0.25f), new Vector3(5.8f, 0.06f, 1.5f), dark, true);
+            RectTransform sui = UCanvas(st, "Store UI", new Vector3(0f, 1.45f, 0f), Quaternion.identity, new Vector2(2700f, 1800f));
+            UImage(sui, "Glow", Vector2.zero, new Vector2(2730f, 1830f), new Color(1f, 0.83f, 0.29f, 0.55f));
+            UImage(sui, "Back", Vector2.zero, new Vector2(2700f, 1800f), new Color(0.035f, 0.03f, 0.07f, 0.96f));
+            UText(sui, "Title", "<b>LOOPLAND <color=#FFE14D>STORE</color></b>", new Vector2(0f, 790f), new Vector2(2500f, 120f), 96f, Color.white);
+            store.coinsText = UText(sui, "Coins", "", new Vector2(0f, 680f), new Vector2(2500f, 80f), 56f, Hex("FFE14D"));
+            var tabs = new TMP_Text[4];
             string[] tabNames = { "DICE", "TOKENS", "TRAILS", "PREMIUM" };
             for (int i = 0; i < 4; i++)
-                tabs[i] = Button(st, "Tab " + tabNames[i], tabNames[i], new Vector3(-0.93f + i * 0.62f, 1.8f, 0f), new Vector2(0.56f, 0.12f), i == 3 ? btnGold : btnDark, store, "_OnTab", i, tabNames[i]);
+                tabs[i] = UButton(sui, "Tab " + tabNames[i], tabNames[i], new Vector2(-930f + i * 620f, 560f), new Vector2(580f, 100f), i == 3 ? cGold : cDark, store, "_OnTab" + i, 40f);
             store.tabLabels = tabs;
             var itemRoots = new GameObject[8];
-            var itemLabels = new TextMeshPro[8];
-            var swatches = new Renderer[8];
-            Material swatchMat = Std("Swatch", Color.white, 0.3f, 0.9f, Color.white);
+            var itemLabels = new TMP_Text[8];
+            var swatches = new Image[8];
             for (int i = 0; i < 8; i++)
             {
-                Vector3 p = new Vector3(-0.95f + (i % 4) * 0.633f, i < 4 ? 1.53f : 1.25f, 0f);
-                itemLabels[i] = Button(st, "Item " + i, "", p, new Vector2(0.6f, 0.25f), btnDark, store, "_OnItem", i, "Preview item");
-                itemRoots[i] = itemLabels[i].transform.parent.parent.gameObject;
-                swatches[i] = Prim(PrimitiveType.Cube, "Swatch", itemLabels[i].transform.parent, new Vector3(-0.26f, 0.09f, -0.016f), new Vector3(0.045f, 0.045f, 0.01f), swatchMat).GetComponent<Renderer>();
+                var p = new Vector2(-950f + (i % 4) * 633f, i < 4 ? 330f : 50f);
+                TextMeshProUGUI label = UButton(sui, "Item " + i, "", p, new Vector2(600f, 250f), new Color(0.12f, 0.11f, 0.22f, 1f), store, "_OnItem" + i, 38f);
+                label.rectTransform.anchoredPosition = new Vector2(40f, 0f);
+                label.rectTransform.sizeDelta = new Vector2(500f, 230f);
+                itemLabels[i] = label;
+                itemRoots[i] = label.transform.parent.gameObject;
+                swatches[i] = UImage(itemRoots[i].transform, "Swatch", new Vector2(-245f, 0f), new Vector2(70f, 70f), Color.white);
             }
             store.itemButtons = itemRoots;
             store.itemLabels = itemLabels;
             store.itemSwatches = swatches;
-            store.detailText = Text(st, "Detail", "", new Vector3(-0.33f, 0.93f, -0.01f), Quaternion.identity, new Vector2(1.9f, 0.36f), 0.5f, Color.white, TextAlignmentOptions.Left);
-            store.actionLabel = Button(st, "Action", "SELECT AN ITEM", new Vector3(0.97f, 0.93f, 0f), new Vector2(0.62f, 0.18f), btnGold, store, "_OnAction", 0, "Buy / Equip");
-            Button(st, "Daily", "DAILY BONUS", new Vector3(-0.9f, 0.62f, 0f), new Vector2(0.62f, 0.12f), btnCyan, store, "_OnDaily", 0, "Claim your daily Loop Coins");
-            Button(st, "World Store", "WORLD STORE", new Vector3(0f, 0.62f, 0f), new Vector2(0.62f, 0.12f), btnGold, store, "_OnWorldStore", 0, "Open this world's VRChat store");
-            Prim(PrimitiveType.Cylinder, "Preview Pedestal", st, new Vector3(1.85f, 0.45f, -0.45f), new Vector3(0.45f, 0.45f, 0.45f), Std("Pedestal", Hex("2A2208"), 0.9f, 0.9f, Hex("FFD54A") * 0.2f), true);
+            store.detailText = UText(sui, "Detail", "", new Vector2(-330f, -270f), new Vector2(1900f, 330f), 44f, Color.white, TextAlignmentOptions.Left);
+            store.actionLabel = UButton(sui, "Action", "SELECT AN ITEM", new Vector2(950f, -270f), new Vector2(620f, 180f), cGold, store, "_OnAction", 48f);
+            UButton(sui, "Daily", "DAILY BONUS", new Vector2(-640f, -640f), new Vector2(760f, 130f), cCyan, store, "_OnDaily", 46f);
+            UButton(sui, "World Store", "WORLD STORE", new Vector2(640f, -640f), new Vector2(760f, 130f), cGold, store, "_OnWorldStore", 46f);
+            RectTransform lui = UCanvas(st, "Live Board UI", new Vector3(-2.2f, 1.45f, -0.25f), Quaternion.Euler(0f, -20f, 0f), new Vector2(1000f, 1150f));
+            UImage(lui, "Glow", Vector2.zero, new Vector2(1030f, 1180f), new Color(0f, 0.9f, 1f, 0.55f));
+            UImage(lui, "Back", Vector2.zero, new Vector2(1000f, 1150f), new Color(0.035f, 0.03f, 0.07f, 0.96f));
+            UText(lui, "Header", "<b>LIVE <color=#FF3DCB>BOARD</color></b>", new Vector2(0f, 510f), new Vector2(900f, 90f), 56f, Hex("00E5FF"));
+            URaw(lui, "Live View", new Vector2(0f, -40f), new Vector2(920f, 920f), liveTex);
+            Prim(PrimitiveType.Cylinder, "Preview Pedestal", st, new Vector3(2.15f, 0.45f, -0.45f), new Vector3(0.45f, 0.45f, 0.45f), Std("Pedestal", Hex("2A2208"), 0.9f, 0.9f, Hex("FFD54A") * 0.2f), true);
             var spin = new GameObject("Preview Spinner").transform;
             spin.SetParent(st, false);
-            spin.localPosition = new Vector3(1.85f, 1.12f, -0.45f);
+            spin.localPosition = new Vector3(2.15f, 1.12f, -0.45f);
             var pdie = new GameObject("Preview Die");
             pdie.transform.SetParent(spin, false);
             pdie.transform.localPosition = new Vector3(-0.12f, 0.06f, 0f);
@@ -465,44 +477,6 @@ namespace LoopLand.EditorTools
             store.productCoins = new[] { 0, 0, 0, 500, 3000 };
             store.vipProduct = 2;
 
-            // live board view: overhead camera -> render texture -> spectator screens
-            Dir(Gen + "/Textures");
-            string rtPath = Gen + "/Textures/LiveBoard.renderTexture";
-            var liveTex = AssetDatabase.LoadAssetAtPath<RenderTexture>(rtPath);
-            if (liveTex == null)
-            {
-                liveTex = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGB32) { name = "LiveBoard", antiAliasing = 2 };
-                AssetDatabase.CreateAsset(liveTex, rtPath);
-            }
-            string liveMatPath = Gen + "/Materials/LiveBoard.mat";
-            var liveMat = AssetDatabase.LoadAssetAtPath<Material>(liveMatPath);
-            if (liveMat == null)
-            {
-                liveMat = new Material(Shader.Find("Unlit/Texture"));
-                AssetDatabase.CreateAsset(liveMat, liveMatPath);
-            }
-            liveMat.mainTexture = liveTex;
-            var camGo = new GameObject("Live Board Camera");
-            camGo.transform.SetParent(rt, false);
-            camGo.transform.localPosition = new Vector3(0f, 1.4f, 0f);
-            camGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            var cam = camGo.AddComponent<Camera>();
-            cam.orthographic = true;
-            cam.orthographicSize = 2.6f;
-            cam.nearClipPlane = 0.01f;
-            cam.farClipPlane = 1.2f;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = Hex("0A0914");
-            cam.cullingMask = 1;
-            cam.depth = -10f;
-            cam.allowHDR = false;
-            cam.useOcclusionCulling = false;
-            cam.targetTexture = liveTex;
-            var liveStatus = new List<TextMeshPro>(status);
-            var livePlayers = new List<TextMeshPro>(players);
-            LiveScreen(rt, "Live Board Screen", new Vector3(0f, 0f, 5.0f), 2.0f, liveMat, panel, frameCyan, liveStatus, livePlayers);
-            LiveScreen(st, "Live Board Mini Screen", new Vector3(-2.8f, 0f, 0.05f), 1.2f, liveMat, panel, frameGold, liveStatus, livePlayers);
-
             // game wiring
             game.store = store;
             game.tokens = tokens;
@@ -512,8 +486,8 @@ namespace LoopLand.EditorTools
             game.buildMarkers = markers;
             game.selectionMarker = selChild;
             game.spinner = spinner;
-            game.statusTexts = liveStatus.ToArray();
-            game.playerTexts = livePlayers.ToArray();
+            game.statusTexts = status;
+            game.playerTexts = players;
             game.cardTexts = cards;
             game.infoTexts = info;
             game.primaryLabels = prim;
@@ -584,50 +558,125 @@ namespace LoopLand.EditorTools
             return t;
         }
 
-        private static TextMeshPro Button(Transform parent, string name, string label, Vector3 lpos, Vector2 size, Material cap, UdonSharpBehaviour target, string evt, int arg, string interact)
+        private static Sprite roundSprite;
+
+        /// <summary>World-space canvas set up the way VRChat needs it (VRC Ui Shape, Default layer, collider). 1 canvas unit = 1 mm.</summary>
+        private static RectTransform UCanvas(Transform parent, string name, Vector3 lpos, Quaternion lrot, Vector2 px)
         {
-            var root = new GameObject(name);
-            root.transform.SetParent(parent, false);
-            root.transform.localPosition = lpos;
-            var col = root.AddComponent<BoxCollider>();
-            col.size = new Vector3(size.x, size.y, 0.05f);
-            var vis = new GameObject("Visual").transform;
-            vis.SetParent(root.transform, false);
-            Prim(PrimitiveType.Cube, "Cap", vis, Vector3.zero, new Vector3(size.x, size.y, 0.025f), cap);
-            TextMeshPro tmp = Text(vis, "Label", label, new Vector3(0f, 0f, -0.0135f), Quaternion.identity, size * 0.9f, size.y * 3.2f, Color.white);
-            var b = UdonSharpUndo.AddComponent<LoopLandButton>(root);
-            b.target = target;
-            b.eventName = evt;
-            b.arg = arg;
-            b.pressVisual = vis;
-            Done(b, interact, 3f);
-            return tmp;
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = lpos;
+            go.transform.localRotation = lrot;
+            go.transform.localScale = Vector3.one * 0.001f;
+            var rect = (RectTransform)go.transform;
+            rect.sizeDelta = px;
+            var canvas = go.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            var scaler = go.AddComponent<CanvasScaler>();
+            scaler.dynamicPixelsPerUnit = 2f;
+            go.AddComponent<GraphicRaycaster>();
+            go.AddComponent<VRC.SDK3.Components.VRCUiShape>();
+            var box = go.AddComponent<BoxCollider>();
+            box.size = new Vector3(px.x, px.y, 4f);
+            return rect;
         }
 
-        /// <summary>Standing screen showing the overhead live board feed, with turn status and the player list beside it.</summary>
-        private static void LiveScreen(Transform parent, string name, Vector3 lpos, float size, Material screenMat, Material panel, Material frame,
-            List<TextMeshPro> statusOut, List<TextMeshPro> playersOut)
+        private static RectTransform URect(Transform parent, string name, Vector2 pos, Vector2 size)
         {
-            var root = new GameObject(name).transform;
-            root.SetParent(parent, false);
-            root.localPosition = lpos;
-            float cy = 0.9f + size * 0.5f;
-            Prim(PrimitiveType.Cube, "Pole", root, new Vector3(0f, 0.45f, 0.06f), new Vector3(0.08f, 0.9f, 0.08f), panel);
-            Prim(PrimitiveType.Cube, "Back", root, new Vector3(0f, cy, 0.03f), new Vector3(size + 0.9f, size + 0.12f, 0.04f), panel);
-            Prim(PrimitiveType.Cube, "Frame", root, new Vector3(0f, cy, 0.055f), new Vector3(size + 0.96f, size + 0.18f, 0.01f), frame);
-            Prim(PrimitiveType.Quad, "Screen", root, new Vector3(-0.42f, cy, 0f), new Vector3(size, size, 1f), screenMat);
-            Text(root, "Title", "<b>LIVE <color=#FF3DCB>BOARD</color></b>", new Vector3(0f, cy + size * 0.5f + 0.14f, 0f), Quaternion.identity, new Vector2(size + 0.8f, 0.2f), 1.6f, Hex("00E5FF"));
-            statusOut.Add(Text(root, "Status", "", new Vector3(size * 0.5f + 0.02f, cy + size * 0.22f, -0.01f), Quaternion.identity, new Vector2(0.8f, size * 0.5f), 0.6f, Color.white));
-            playersOut.Add(Text(root, "Players", "", new Vector3(size * 0.5f + 0.02f, cy - size * 0.25f, -0.01f), Quaternion.identity, new Vector2(0.8f, size * 0.45f), 0.45f, Color.white, TextAlignmentOptions.Left));
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rect = (RectTransform)go.transform;
+            rect.anchoredPosition = pos;
+            rect.sizeDelta = size;
+            return rect;
         }
 
-        private static void Done(UdonSharpBehaviour b, string interact, float proximity)
+        private static Image UImage(Transform parent, string name, Vector2 pos, Vector2 size, Color color, bool raycast = false)
         {
-            made.Add(b);
-            UdonBehaviour ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(b);
-            if (ub == null) return;
-            ub.interactText = interact;
-            ub.proximity = proximity;
+            var img = URect(parent, name, pos, size).gameObject.AddComponent<Image>();
+            img.sprite = roundSprite;
+            img.type = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = 0.35f;
+            img.color = color;
+            img.raycastTarget = raycast;
+            return img;
+        }
+
+        private static RawImage URaw(Transform parent, string name, Vector2 pos, Vector2 size, Texture tex)
+        {
+            var raw = URect(parent, name, pos, size).gameObject.AddComponent<RawImage>();
+            raw.texture = tex;
+            raw.raycastTarget = false;
+            return raw;
+        }
+
+        private static TextMeshProUGUI UText(Transform parent, string name, string text, Vector2 pos, Vector2 size, float fontSize, Color color, TextAlignmentOptions align = TextAlignmentOptions.Center)
+        {
+            var t = URect(parent, name, pos, size).gameObject.AddComponent<TextMeshProUGUI>();
+            t.font = font;
+            t.text = text;
+            t.color = color;
+            t.alignment = align;
+            t.richText = true;
+            t.raycastTarget = false;
+            t.enableAutoSizing = true;
+            t.fontSizeMax = fontSize;
+            t.fontSizeMin = fontSize * 0.35f;
+            t.fontSize = fontSize;
+            return t;
+        }
+
+        /// <summary>Rounded UI button that calls SendCustomEvent(evt) on the target's UdonBehaviour. Returns its label.</summary>
+        private static TextMeshProUGUI UButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Color color, UdonSharpBehaviour target, string evt, float fontSize)
+        {
+            Image img = UImage(parent, name, pos, size, color, true);
+            var btn = img.gameObject.AddComponent<Button>();
+            btn.targetGraphic = img;
+            var nav = btn.navigation;
+            nav.mode = Navigation.Mode.None;
+            btn.navigation = nav;
+            ColorBlock cb = btn.colors;
+            cb.normalColor = new Color(0.86f, 0.86f, 0.86f, 1f);
+            cb.highlightedColor = Color.white;
+            cb.pressedColor = new Color(0.6f, 0.6f, 0.6f, 1f);
+            cb.selectedColor = cb.normalColor;
+            cb.fadeDuration = 0.08f;
+            btn.colors = cb;
+            UdonBehaviour ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(target);
+            UnityEventTools.AddStringPersistentListener(btn.onClick, ub.SendCustomEvent, evt);
+            TextMeshProUGUI t = UText(img.transform, "Label", label, Vector2.zero, size - new Vector2(24f, 12f), fontSize, Color.white);
+            t.fontStyle = FontStyles.Bold;
+            return t;
+        }
+
+        /// <summary>Orthographic camera above the board rendering into a texture for the Live Board views.</summary>
+        private static Texture LiveCamera(Transform root)
+        {
+            Dir(Gen + "/Textures");
+            string rtPath = Gen + "/Textures/LiveBoard.renderTexture";
+            var liveTex = AssetDatabase.LoadAssetAtPath<RenderTexture>(rtPath);
+            if (liveTex == null)
+            {
+                liveTex = new RenderTexture(1024, 1024, 24, RenderTextureFormat.ARGB32) { name = "LiveBoard", antiAliasing = 2 };
+                AssetDatabase.CreateAsset(liveTex, rtPath);
+            }
+            var camGo = new GameObject("Live Board Camera");
+            camGo.transform.SetParent(root, false);
+            camGo.transform.localPosition = new Vector3(0f, 1.4f, 0f);
+            camGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            var cam = camGo.AddComponent<Camera>();
+            cam.orthographic = true;
+            cam.orthographicSize = 2.6f;
+            cam.nearClipPlane = 0.01f;
+            cam.farClipPlane = 1.2f;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = Hex("0A0914");
+            cam.cullingMask = 1;
+            cam.depth = -10f;
+            cam.allowHDR = false;
+            cam.useOcclusionCulling = false;
+            cam.targetTexture = liveTex;
+            return liveTex;
         }
 
         private static AudioSource Audio(GameObject go)

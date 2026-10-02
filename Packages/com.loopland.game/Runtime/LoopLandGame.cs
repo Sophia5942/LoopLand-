@@ -91,13 +91,13 @@ namespace LoopLand
         public GameObject[] buildMarkers;
         public Transform selectionMarker;
         public Transform spinner;
-        public TextMeshPro[] statusTexts;
-        public TextMeshPro[] playerTexts;
-        public TextMeshPro[] infoTexts;
-        public TextMeshPro[] primaryLabels;
-        public TextMeshPro[] secondaryLabels;
-        public TextMeshPro[] roundsLabels;
-        public TextMeshPro[] cardTexts;
+        public TMP_Text[] statusTexts;
+        public TMP_Text[] playerTexts;
+        public TMP_Text[] infoTexts;
+        public TMP_Text[] primaryLabels;
+        public TMP_Text[] secondaryLabels;
+        public TMP_Text[] roundsLabels;
+        public TMP_Text[] cardTexts;
         public ParticleSystem celebrateFx;
         public ParticleSystem moneyFx;
         public AudioSource sfx;
@@ -246,9 +246,20 @@ namespace LoopLand
             _Send(C_RESET, 0);
         }
 
-        public void _OnTile()
+        public void _OnTile() { _Select(pressedArg); }
+        public void _OnPrevSpace() { _Select((selected < 0 ? _MyPos() : selected) + SPACES - 1); }
+        public void _OnNextSpace() { _Select((selected < 0 ? _MyPos() : selected) + 1); }
+        public void _OnMySpace() { _Select(_MyPos()); }
+
+        private int _MyPos()
         {
-            selected = Mathf.Clamp(pressedArg, 0, SPACES - 1);
+            int me = _LocalSlot();
+            return me >= 0 ? pos[me] : 0;
+        }
+
+        private void _Select(int p)
+        {
+            selected = ((p % SPACES) + SPACES) % SPACES;
             if (selectionMarker != null && spaceAnchors != null && spaceAnchors.Length == SPACES)
             {
                 selectionMarker.gameObject.SetActive(true);
@@ -261,9 +272,8 @@ namespace LoopLand
 
         private bool _NeedSelection()
         {
-            if (selected >= 0) return true;
-            _Toast("Tap a space on the board first.");
-            return false;
+            if (selected < 0) _Select(_MyPos());
+            return true;
         }
 
         // =====================================================================
@@ -1122,7 +1132,7 @@ namespace LoopLand
 
         private void _RefreshInfo()
         {
-            if (selected < 0) { _SetTexts(infoTexts, "<color=#9AF2FF>Tap any board space</color>\nto inspect, build, sell\nor mortgage it."); return; }
+            if (selected < 0) { _SetTexts(infoTexts, "<color=#9AF2FF>Use < SPACE > to inspect a space</color>\nthen BUILD, SELL or MORTGAGE it."); return; }
             int p = selected;
             int t = spaceType[p];
             int g = spaceGroup[p];
@@ -1149,7 +1159,7 @@ namespace LoopLand
             _SetTexts(infoTexts, s);
         }
 
-        private void _SetTexts(TextMeshPro[] arr, string value)
+        private void _SetTexts(TMP_Text[] arr, string value)
         {
             if (arr == null) return;
             for (int i = 0; i < arr.Length; i++) if (arr[i] != null) arr[i].text = value;

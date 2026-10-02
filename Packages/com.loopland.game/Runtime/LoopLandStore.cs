@@ -1,6 +1,7 @@
 using TMPro;
 using UdonSharp;
 using UnityEngine;
+using UnityEngine.UI;
 using VRC.Economy;
 using VRC.SDK3.Persistence;
 using VRC.SDKBase;
@@ -54,13 +55,13 @@ namespace LoopLand
         public int dailyBonus = 50;
 
         [Header("UI (auto-wired by the builder)")]
-        public TextMeshPro coinsText;
-        public TextMeshPro detailText;
-        public TextMeshPro actionLabel;
-        public TextMeshPro[] tabLabels;
+        public TMP_Text coinsText;
+        public TMP_Text detailText;
+        public TMP_Text actionLabel;
+        public TMP_Text[] tabLabels;
         public GameObject[] itemButtons;
-        public TextMeshPro[] itemLabels;
-        public Renderer[] itemSwatches;
+        public TMP_Text[] itemLabels;
+        public Image[] itemSwatches;
         public Renderer previewDie;
         public Renderer[] previewToken;
         public ParticleSystem previewTrail;
@@ -323,6 +324,19 @@ namespace LoopLand
             _RefreshUI();
         }
 
+        public void _OnTab0() { pressedArg = 0; _OnTab(); }
+        public void _OnTab1() { pressedArg = 1; _OnTab(); }
+        public void _OnTab2() { pressedArg = 2; _OnTab(); }
+        public void _OnTab3() { pressedArg = 3; _OnTab(); }
+        public void _OnItem0() { pressedArg = 0; _OnItem(); }
+        public void _OnItem1() { pressedArg = 1; _OnItem(); }
+        public void _OnItem2() { pressedArg = 2; _OnItem(); }
+        public void _OnItem3() { pressedArg = 3; _OnItem(); }
+        public void _OnItem4() { pressedArg = 4; _OnItem(); }
+        public void _OnItem5() { pressedArg = 5; _OnItem(); }
+        public void _OnItem6() { pressedArg = 6; _OnItem(); }
+        public void _OnItem7() { pressedArg = 7; _OnItem(); }
+
         public void _OnAction()
         {
             if (sel < 0) { _Fail("Pick an item first."); return; }
@@ -413,9 +427,7 @@ namespace LoopLand
                     itemLabels[i].text = (i == sel ? "<color=#FFE14D>" : "") + "<b>" + _ItemName(tab, i) + "</b>" + (i == sel ? "</color>" : "") + "\n<size=75%>" + _StatusLine(tab, i, eq) + "</size>";
                     if (itemSwatches != null && i < itemSwatches.Length && itemSwatches[i] != null)
                     {
-                        Color c = _ItemColor(tab, i);
-                        itemSwatches[i].material.SetColor("_Color", c);
-                        itemSwatches[i].material.SetColor("_EmissionColor", c);
+                        itemSwatches[i].color = _ItemColor(tab, i);
                     }
                 }
             }

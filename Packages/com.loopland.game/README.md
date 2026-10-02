@@ -13,8 +13,10 @@ LoopLand is a networked, Monopoly-style board game for VRChat worlds:
   cosmetics are visible to everyone.
 - **VRChat Creator Economy (CE) integration**: premium packs, VIP (2x coins), and Loop Coin packs bought
   with VRChat Credits through Udon Products.
-- **Live Board screens**: an overhead camera streams the board (tokens, trails, dice) to a big spectator
-  screen and a mini screen at the store, with the turn status and every player's cash next to it.
+- **Live Board**: an overhead camera streams the board (tokens, trails, dice) onto the four hologram
+  screens above the table and a panel at the store, next to the turn status and player list.
+- **Clean VRChat UI**: every control is a point-and-click UI panel (VR laser or desktop mouse), with no
+  3D buttons or interact colliders.
 - **One-click builder** that generates the whole game, including materials, dice, particles and sounds.
 
 ## Requirements
@@ -45,7 +47,7 @@ Generated assets go to `Assets/LoopLand/Generated`, and a reusable prefab is sav
 - Walk to a console at the table edge and press **JOIN GAME**, then **START GAME**.
 - The big button is context-sensitive: ROLL DICE / BUY / END TURN / ROLL DOUBLES...
 - The second button does PASS, USE GLITCH PASS, PAY BAIL or LEAVE.
-- Tap any board space to inspect it, then use **BUILD / SELL / MORTGAGE** during your turn.
+- Pick a space with **< SPACE / SPACE >** (or **MY SPACE**), then use **BUILD / SELL / MORTGAGE** during your turn.
 - Own a whole color group to build Loops (up to 4), then a Tower. You must build evenly.
 - Landing on **GLITCHED!** or rolling 3 doubles sends you to the Glitch Zone. To get out, roll doubles,
   pay $50, or use a Glitch Pass.
