@@ -81,6 +81,15 @@ Notes:
   Keep it that way.
 - "World Store" opens your world's VRChat store page (needs a published world store).
 
+## Custom card art (board spaces)
+The 40 board spaces are UI cards on one flat canvas (`LoopLand > Board > Board UI > Card NN ...`).
+- **Easiest:** put images in `Assets/LoopLand/Space Art/` named by space number (`00.png` ... `39.png`) or by
+  exact space name (`Neon Row.png`), then run **LoopLand > Build Game In Scene** again. Portrait images
+  around **560 x 1000 px** fit best. They're switched to Sprite import automatically.
+- **By hand:** select a `Card NN` object, drag your sprite into the Image's **Source Image**, set **Image Type**
+  to *Simple* and **Color** to white. Delete or move the `Name` / `Price` texts if your art already has them.
+- Space numbers start at 00 = LOOP START and go clockwise. The card object names show the number and name.
+
 ## Customize
 - **Rules** (cash, salary, fines, coin rewards, AFK timer, min players): `LoopLand/Game` inspector.
   Set *Min Players To Start* to **2** for public worlds (1 lets you test solo).

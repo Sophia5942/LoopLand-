@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+- Board spaces are now UI cards on a single flat canvas: no overlapping, fewer draw calls.
+- Custom card art: drop images into Assets/LoopLand/Space Art (00-39 or space name) and rebuild.
+- Ownership strips and Loop/Tower markers are UI on each card.
+
 ## 1.2.0
 - All controls are now world-space VRChat UI (Canvas + VRC Ui Shape) instead of 3D interact buttons.
 - The live board feed is shown on the hologram screens above the table and on a store panel.

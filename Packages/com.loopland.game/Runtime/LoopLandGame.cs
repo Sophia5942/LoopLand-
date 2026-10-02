@@ -1,6 +1,7 @@
 using TMPro;
 using UdonSharp;
 using UnityEngine;
+using UnityEngine.UI;
 using VRC.SDK3.UdonNetworkCalling;
 using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
@@ -87,7 +88,7 @@ namespace LoopLand
         public LoopLandToken[] tokens;
         public LoopLandDice[] dice;
         public Transform[] spaceAnchors;
-        public Renderer[] ownerBars;
+        public Image[] ownerBars;
         public GameObject[] buildMarkers;
         public Transform selectionMarker;
         public Transform spinner;
@@ -1034,14 +1035,13 @@ namespace LoopLand
                 int o = owner[i];
                 if (ownerBars != null && i < ownerBars.Length && ownerBars[i] != null)
                 {
-                    Renderer r = ownerBars[i];
+                    Image r = ownerBars[i];
                     r.enabled = o != 0;
                     if (o != 0 && slotColors != null && o - 1 < slotColors.Length)
                     {
                         Color c = slotColors[o - 1];
-                        if ((level[i] & 8) != 0) c = c * 0.25f;
-                        r.material.SetColor("_Color", c);
-                        r.material.SetColor("_EmissionColor", c * 1.4f);
+                        if ((level[i] & 8) != 0) c = new Color(c.r * 0.3f, c.g * 0.3f, c.b * 0.3f, 1f);
+                        r.color = c;
                     }
                 }
                 if (buildMarkers == null || buildMarkers.Length < SPACES * 5) continue;

@@ -147,10 +147,6 @@ namespace LoopLand.EditorTools
             dot = DotTexture();
             fxMat = AddMat("FX_Particle", new Color(0.5f, 0.5f, 0.5f, 0.5f));
             Material dark = Std("Table", Hex("15131F"), 0.35f, 0.88f, Color.black);
-            Material tileMat = Std("Tile", Hex("1C1A30"), 0.1f, 0.75f, Hex("06050E"));
-            Material white = Std("OwnerBar", Color.white, 0f, 0.6f, Color.white);
-            Material loopMat = Std("Loop", Hex("3DFF8A"), 0.2f, 0.8f, Hex("1A8040"));
-            Material towerMat = Std("Tower", Hex("FFD54A"), 0.9f, 0.85f, Hex("806010"));
 
             roundSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
             Color cCyan = new Color(0f, 0.55f, 0.68f, 1f);
@@ -181,27 +177,23 @@ namespace LoopLand.EditorTools
             Prim(PrimitiveType.Cylinder, "Table Pedestal", rt, new Vector3(0f, 0.42f, 0f), new Vector3(1.3f, 0.42f, 1.3f), dark, true);
             Prim(PrimitiveType.Cylinder, "Center Disc", rt, new Vector3(0f, TopY + 0.002f, 0f), new Vector3(3.4f, 0.002f, 3.4f), Std("CenterDisc", Hex("120F26"), 0.3f, 0.95f, Hex("1A0F3A")));
 
-            // board
+            // board: one flat UI canvas with 40 cards (no overlap, one draw batch, easy custom art)
             var board = new GameObject("Board").transform;
             board.SetParent(rt, false);
-            float tileW = 2f * Mathf.PI * R / 40f * 0.95f;
+            RectTransform boardUi = UCanvas(board, "Board UI", new Vector3(0f, TopY + 0.002f, 0f), Quaternion.Euler(90f, 0f, 0f), new Vector2(5000f, 5000f), false);
+            const float cardW = 280f, cardH = 500f;
+            float tileW = cardW / 1000f;
             var anchors = new Transform[40];
-            var ownerBars = new Renderer[40];
+            var ownerBars = new Image[40];
             var markers = new GameObject[200];
             Color[] groupCol = new Color[game.groupHex.Length];
             for (int g = 0; g < groupCol.Length; g++) groupCol[g] = Hex(game.groupHex[g]);
-            var groupMats = new Material[groupCol.Length];
-            for (int g = 0; g < groupCol.Length; g++) groupMats[g] = Std("Group_" + g, groupCol[g], 0.2f, 0.85f, groupCol[g] * 0.9f);
-            Material goMat = Std("Tile_Go", Hex("3A2E08"), 0.6f, 0.9f, Hex("FFD54A") * 0.35f);
-            Material jailMat = Std("Tile_Glitch", Hex("2A0F3A"), 0.3f, 0.9f, Hex("B07CFF") * 0.35f);
-            Material freeMat = Std("Tile_Chill", Hex("0E2A1C"), 0.3f, 0.9f, Hex("3DFF8A") * 0.3f);
-            Material goJailMat = Std("Tile_Glitched", Hex("3A0E14"), 0.3f, 0.9f, Hex("FF4D5E") * 0.35f);
-            Material cardMat = Std("Tile_Card", Hex("2B1430"), 0.3f, 0.9f, Hex("FF5FBF") * 0.2f);
-
+            Dir(Root + "/Space Art");
             for (int i = 0; i < 40; i++)
             {
-                float a = (-90f - 9f * i) * Mathf.Deg2Rad;
-                Vector3 p = new Vector3(Mathf.Cos(a) * R, TopY + 0.02f, Mathf.Sin(a) * R);
+                float deg = -90f - 9f * i;
+                float a = deg * Mathf.Deg2Rad;
+                Vector3 p = new Vector3(Mathf.Cos(a) * R, TopY + 0.004f, Mathf.Sin(a) * R);
                 var anchor = new GameObject("Space " + i.ToString("00") + " " + game.spaceName[i]).transform;
                 anchor.SetParent(board, false);
                 anchor.localPosition = p;
@@ -210,29 +202,37 @@ namespace LoopLand.EditorTools
 
                 int type = game.spaceType[i];
                 int grp = game.spaceGroup[i];
-                Material m = type == 0 ? goMat : type == 7 ? jailMat : type == 8 ? freeMat : type == 9 ? goJailMat : (type == 5 || type == 6) ? cardMat : tileMat;
-                Prim(PrimitiveType.Cube, "Tile", anchor, new Vector3(0f, -0.01f, 0f), new Vector3(tileW, 0.02f, 0.52f), m);
-
                 bool corner = type == 0 || type == 7 || type == 8 || type == 9;
-                if (grp >= 0) Prim(PrimitiveType.Cube, "Color", anchor, new Vector3(0f, 0.003f, 0.2f), new Vector3(tileW * 0.94f, 0.006f, 0.1f), groupMats[grp]);
-                Text(anchor, "Name", game.spaceName[i], new Vector3(0f, 0.004f, corner ? 0.05f : 0.02f), Quaternion.Euler(90f, 0f, 0f), new Vector2(tileW * 0.9f, corner ? 0.3f : 0.2f), corner ? 0.4f : 0.28f, Color.white);
+                RectTransform card = URect(boardUi, "Card " + i.ToString("00") + " " + game.spaceName[i], new Vector2(p.x, p.z) * 1000f, new Vector2(cardW, cardH));
+                card.localRotation = Quaternion.Euler(0f, 0f, deg + 90f);
+                Image bg = card.gameObject.AddComponent<Image>();
+                bg.raycastTarget = false;
+                Sprite art = SpaceArt(i, game.spaceName[i]);
+                if (art != null) { bg.sprite = art; bg.color = Color.white; }
+                else
+                {
+                    bg.sprite = roundSprite;
+                    bg.type = Image.Type.Sliced;
+                    bg.pixelsPerUnitMultiplier = 0.35f;
+                    bg.color = CardColor(type);
+                }
+                if (grp >= 0) UImage(card, "Band", new Vector2(0f, 200f), new Vector2(cardW - 16f, 84f), groupCol[grp]);
+                UText(card, "Name", game.spaceName[i], new Vector2(0f, corner ? 20f : 40f), new Vector2(cardW - 30f, corner ? 260f : 170f), corner ? 46f : 36f, Color.white).fontStyle = FontStyles.Bold;
                 string sub = (type == 1 || type == 2 || type == 3) ? "$" + game.spacePrice[i] : type == 4 ? "PAY $" + game.spacePrice[i] : type == 0 ? "COLLECT $200" : type == 5 ? "?" : type == 6 ? "CHEST" : "";
-                if (sub.Length > 0) Text(anchor, "Price", sub, new Vector3(0f, 0.004f, -0.17f), Quaternion.Euler(90f, 0f, 0f), new Vector2(tileW * 0.9f, 0.08f), 0.22f, Hex("9AF2FF"));
-
+                if (sub.Length > 0) UText(card, "Price", sub, new Vector2(0f, -165f), new Vector2(cardW - 30f, 60f), 30f, Hex("9AF2FF"));
                 if (type == 1 || type == 2 || type == 3)
                 {
-                    GameObject bar = Prim(PrimitiveType.Cube, "Owner", anchor, new Vector3(0f, 0.004f, -0.235f), new Vector3(tileW * 0.9f, 0.006f, 0.03f), white);
-                    ownerBars[i] = bar.GetComponent<Renderer>();
+                    ownerBars[i] = UImage(card, "Owner", new Vector2(0f, -226f), new Vector2(cardW - 40f, 24f), Color.white);
                     ownerBars[i].enabled = false;
                 }
                 if (type == 1)
                 {
                     for (int k = 0; k < 4; k++)
                     {
-                        markers[i * 5 + k] = Prim(PrimitiveType.Cube, "Loop " + (k + 1), anchor, new Vector3(-0.105f + k * 0.07f, 0.026f, 0.2f), Vector3.one * 0.04f, loopMat);
+                        markers[i * 5 + k] = UImage(card, "Loop " + (k + 1), new Vector2(-90f + k * 60f, 200f), new Vector2(42f, 42f), Hex("3DFF8A")).gameObject;
                         markers[i * 5 + k].SetActive(false);
                     }
-                    markers[i * 5 + 4] = Prim(PrimitiveType.Cube, "Tower", anchor, new Vector3(0f, 0.046f, 0.2f), new Vector3(0.075f, 0.08f, 0.075f), towerMat);
+                    markers[i * 5 + 4] = UImage(card, "Tower", new Vector2(0f, 200f), new Vector2(150f, 56f), Hex("FFD54A")).gameObject;
                     markers[i * 5 + 4].SetActive(false);
                 }
             }
@@ -241,7 +241,7 @@ namespace LoopLand.EditorTools
             selChild.localScale = Vector3.one;
             Object.DestroyImmediate(sel.GetComponent<MeshRenderer>());
             Object.DestroyImmediate(sel.GetComponent<MeshFilter>());
-            Prim(PrimitiveType.Cube, "Frame", selChild, new Vector3(0f, 0.001f, 0f), new Vector3(tileW + 0.03f, 0.004f, 0.55f), AddMat("Glow_Select", Hex("FFE14D")));
+            Prim(PrimitiveType.Cube, "Frame", selChild, new Vector3(0f, 0.001f, 0f), new Vector3(tileW + 0.03f, 0.004f, 0.53f), AddMat("Glow_Select", Hex("FFE14D")));
 
             // center hologram
             Fx("Loop Ring", rt, new Vector3(0f, TopY + 0.03f, 0f), Quaternion.Euler(-90f, 0f, 0f), 2.6f, 0f, 0.035f, 70f, 0f, true, false, ParticleSystemShapeType.Circle, 1.6f, 0f, 400, Hex("00E5FF"), Hex("FF3DCB"), 0.35f);
@@ -561,7 +561,7 @@ namespace LoopLand.EditorTools
         private static Sprite roundSprite;
 
         /// <summary>World-space canvas set up the way VRChat needs it (VRC Ui Shape, Default layer, collider). 1 canvas unit = 1 mm.</summary>
-        private static RectTransform UCanvas(Transform parent, string name, Vector3 lpos, Quaternion lrot, Vector2 px)
+        private static RectTransform UCanvas(Transform parent, string name, Vector3 lpos, Quaternion lrot, Vector2 px, bool interactive = true)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -574,11 +574,48 @@ namespace LoopLand.EditorTools
             canvas.renderMode = RenderMode.WorldSpace;
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.dynamicPixelsPerUnit = 2f;
+            if (!interactive) return rect;
             go.AddComponent<GraphicRaycaster>();
             go.AddComponent<VRC.SDK3.Components.VRCUiShape>();
             var box = go.AddComponent<BoxCollider>();
             box.size = new Vector3(px.x, px.y, 4f);
             return rect;
+        }
+
+        private static Color CardColor(int type)
+        {
+            switch (type)
+            {
+                case 0: return Hex("5A4510");
+                case 4: return Hex("2A2A38");
+                case 5: return Hex("4A1A44");
+                case 6: return Hex("4A3A10");
+                case 7: return Hex("3A1D5A");
+                case 8: return Hex("134A2E");
+                case 9: return Hex("5A1420");
+                default: return Hex("1C1A30");
+            }
+        }
+
+        /// <summary>Custom card art: Assets/LoopLand/Space Art/NN.png (space number 00-39) or "Space Name.png".</summary>
+        private static Sprite SpaceArt(int index, string spaceName)
+        {
+            string folder = Root + "/Space Art";
+            foreach (string g in AssetDatabase.FindAssets("t:Texture2D", new[] { folder }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(g);
+                string file = Path.GetFileNameWithoutExtension(path);
+                if (!file.StartsWith(index.ToString("00")) && !string.Equals(file, spaceName, StringComparison.OrdinalIgnoreCase)) continue;
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer != null && importer.textureType != TextureImporterType.Sprite)
+                {
+                    importer.textureType = TextureImporterType.Sprite;
+                    importer.spriteImportMode = SpriteImportMode.Single;
+                    importer.SaveAndReimport();
+                }
+                return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            }
+            return null;
         }
 
         private static RectTransform URect(Transform parent, string name, Vector2 pos, Vector2 size)
