@@ -14,7 +14,7 @@ namespace LoopLand.EditorTools
     {
         public static Sprite Round, Glow, Pill, Panel, Coin, House, Tower;
         public static Sprite IconDice, IconPawn, IconBuilding, IconSparkle, IconCrown, IconGift, IconGlobe;
-        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen;
+        public static Sprite IconBank, IconHammer, IconChart, IconRefresh, IconPeople, IconStore, IconScreen, LogoInfinity, IconHeart, IconArrow;
 
         private static string folder;
         private static float aa;
@@ -32,6 +32,8 @@ namespace LoopLand.EditorTools
         private static readonly Vector2[] HammerHead = { new Vector2(0.7244f, 0.3956f), new Vector2(0.8166f, 0.501f), new Vector2(0.5156f, 0.7644f), new Vector2(0.4234f, 0.659f) };
         private static readonly Vector2[] RefreshHead = { new Vector2(0.56f, 0.64f), new Vector2(0.8f, 0.78f), new Vector2(0.56f, 0.94f) };
         private static readonly Vector2[] PlayTri = { new Vector2(0.44f, 0.48f), new Vector2(0.6f, 0.58f), new Vector2(0.44f, 0.68f) };
+        private static readonly Vector2[] ArrowHead = { new Vector2(0.16f, 0.48f), new Vector2(0.84f, 0.48f), new Vector2(0.5f, 0.86f) };
+        private static readonly Vector2[] HeartTip = { new Vector2(0.5f, 0.14f), new Vector2(0.8f, 0.55f), new Vector2(0.2f, 0.55f) };
         private static readonly Vector2[] HouseShape = { new Vector2(0.18f, 0.12f), new Vector2(0.82f, 0.12f), new Vector2(0.82f, 0.55f), new Vector2(0.5f, 0.88f), new Vector2(0.18f, 0.55f) };
 
         public static void Build(string outFolder)
@@ -121,6 +123,17 @@ namespace LoopLand.EditorTools
                 float stand = Mathf.Min(Box(x, y, 0.5f, 0.24f, 0.04f, 0.08f, 0.01f), Box(x, y, 0.5f, 0.15f, 0.18f, 0.03f, 0.02f));
                 return A(Color.white, Cov(Mathf.Min(frame, Mathf.Min(stand, Poly(x, y, PlayTri)))));
             });
+            LogoInfinity = Paint("Logo_Infinity", 256, 0, (x, y) =>
+            {
+                float d = Mathf.Min(Mathf.Abs(Ellipse(x, y, 0.31f, 0.5f, 0.2f, 0.17f)), Mathf.Abs(Ellipse(x, y, 0.69f, 0.5f, 0.2f, 0.17f))) - 0.045f;
+                Color c = Color.HSVToRGB(Mathf.Repeat(0.14f + x * 0.75f, 1f), 0.7f, 1f);
+                Color glow = A(c, 0.45f * Soft(d - 0.02f, 0.08f));
+                return Mix(glow, Color.Lerp(c, Color.white, 0.25f), Cov(d));
+            });
+            IconHeart = Paint("Icon_Heart", 128, 0, (x, y) =>
+                A(Color.white, Cov(Mathf.Min(Mathf.Min(Circle(x, y, 0.36f, 0.6f, 0.17f), Circle(x, y, 0.64f, 0.6f, 0.17f)), Poly(x, y, HeartTip)))));
+            IconArrow = Paint("Icon_Arrow", 128, 0, (x, y) =>
+                A(Color.white, Cov(Mathf.Min(Poly(x, y, ArrowHead), Box(x, y, 0.5f, 0.3f, 0.11f, 0.2f, 0.02f)))));
             IconGlobe = Paint("Icon_Globe", 128, 0, (x, y) =>
             {
                 float ring = Mathf.Abs(Circle(x, y, 0.5f, 0.5f, 0.36f)) - 0.035f;

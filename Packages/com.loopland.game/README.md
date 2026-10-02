@@ -43,6 +43,27 @@ LoopLand is a networked, Monopoly-style board game for VRChat worlds:
 Generated assets go to `Assets/LoopLand/Generated`, and a reusable prefab is saved at
 `Assets/LoopLand/LoopLand Game.prefab`. Run the builder again any time to rebuild.
 
+## Build the LoopLand Tower world (one click)
+Click **LoopLand > Build LoopLand Tower World**. It builds the game first if it isn't in the scene yet, then:
+- **The tower:** a stepped glass skyscraper with lit windows and neon corners. It has the glowing **LOOPLAND**
+  sign, a neon infinity logo near the top, and a rainbow halo ring.
+- **The Loop Deck:** an infinity-shaped deck with a neon rim and a glass railing, 60 m up on top of the tower.
+  The game sits on the deck, with the store kiosk at the left end.
+- **The elevator:** a glass shaft from the plaza to the deck. Press **UP TO LOOPLAND** inside the cabin, or the
+  call button by the doors. The doors close, the floor counter rolls 1 to 60 and the lights pulse. Then you
+  arrive in the top cabin and its doors open onto the deck. **DOWN TO PLAZA** brings you back. Each player
+  rides on their own, so everyone can use it at once.
+- **The plaza:** a paved island with trees, lamps, benches and planters, ringed by water with four bridges.
+  It has a "GOOD PEOPLE. BETTER PLACES." billboard, the "SAME PEOPLE. NEW PLACES. ALWAYS A NEXT LOOP." sign,
+  and glowing walkways to the elevator.
+- **The surroundings:** a city skyline with more billboards, floating islands, clouds and a twilight sky with fog.
+- **Spawn:** the VRCWorld spawn moves to the front walkway, facing the tower. The demo floor and light are
+  hidden if you added them.
+
+Run it again to rebuild the world; the game is kept. If you rebuild the game later with
+**Build Game In Scene**, it goes straight back onto the deck. For the best glass reflections, bake once
+(**Window > Rendering > Lighting > Generate Lighting**).
+
 ## How to play
 - Walk to a console at the table edge and press **JOIN GAME**, then **START GAME**.
 - Your dashboard shows the selected space like a property card: picture, price, full rent table and owner.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0
+- New: **LoopLand > Build LoopLand Tower World**. It builds the tower with the LOOPLAND sign, the infinity logo
+  and a halo. The game moves onto the infinity-shaped Loop Deck at the top.
+- Working elevator from the plaza to the deck: doors close, a 1 to 60 floor counter, pulsing lights, a ding, and
+  you arrive with the doors opening. It's local per player, so any number of people can ride at once.
+- The plaza has trees, lamps, benches, planters, a water ring with four bridges, billboards and the
+  "SAME PEOPLE. NEW PLACES. ALWAYS A NEXT LOOP." sign. Around it are a city skyline, floating islands, clouds
+  and a twilight sky.
+- Rebuilding the game while the tower world is in the scene puts it back on the deck.
+
 ## 1.9.2
 - VIEW is a true swap: CENTER shows only the middle screens, TOP shows only the screen in front of the console
   you pressed it on (the middle screens hide). Local to each player; starts on CENTER.
