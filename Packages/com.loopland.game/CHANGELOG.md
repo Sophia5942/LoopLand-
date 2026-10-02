@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0
+- Seat screens: each console gets its own live board + status screen above eye level, replacing the far-away
+  center hologram screens (the spinning logo stays).
+- Console panels are hidden from the live board camera, so the feed shows only the board.
+
 ## 1.4.1
 - Sharper Live Board: 2048x1024 feed framed tightly on the board (about 2x the detail).
 

@@ -281,28 +281,9 @@ namespace LoopLand.EditorTools
 
             // center hologram
             Texture liveTex = LiveCamera(rt);
-            var holo = new GameObject("Hologram").transform;
-            holo.SetParent(rt, false);
-            holo.localPosition = new Vector3(0f, 2.0f, 0f);
             var status = new TMP_Text[4];
             var players = new TMP_Text[4];
             var cards = new TMP_Text[4];
-            for (int d = 0; d < 4; d++)
-            {
-                Vector3 dir = Quaternion.Euler(0f, 45f + d * 90f, 0f) * Vector3.back;
-                RectTransform c = UCanvas(holo, "Screen " + d, dir * 0.8f, Quaternion.LookRotation(-dir, Vector3.up), new Vector2(1500f, 1100f));
-                UImg(c, "Glow", Vector2.zero, new Vector2(1560f, 1160f), LoopLandArt.Glow, new Color(0f, 0.9f, 1f, 0.9f));
-                UImg(c, "Panel", Vector2.zero, new Vector2(1500f, 1100f), LoopLandArt.Panel, Color.white);
-                UImg(c, "Live Frame", new Vector2(0f, 175f), new Vector2(1462f, 742f), LoopLandArt.Round, new Color(1f, 0.24f, 0.8f, 0.9f));
-                URaw(c, "Live View", new Vector2(0f, 175f), new Vector2(1440f, 720f), liveTex);
-                UImg(c, "Live Tag", new Vector2(-590f, 500f), new Vector2(200f, 56f), LoopLandArt.Pill, new Color(0.9f, 0.1f, 0.3f, 0.95f));
-                UText(c, "Live Tag Text", "<b>LIVE</b>", new Vector2(-590f, 500f), new Vector2(180f, 50f), 34f, Color.white);
-                cards[d] = UText(c, "Card", "", new Vector2(0f, -248f), new Vector2(1420f, 86f), 40f, Hex("FFE14D"));
-                UImg(c, "Status Back", new Vector2(-365f, -420f), new Vector2(710f, 230f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
-                status[d] = UText(c, "Status", "LOOPLAND", new Vector2(-365f, -420f), new Vector2(680f, 215f), 40f, Color.white);
-                UImg(c, "Players Back", new Vector2(365f, -420f), new Vector2(710f, 230f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
-                players[d] = UText(c, "Players", "", new Vector2(365f, -420f), new Vector2(680f, 215f), 32f, Color.white, TextAlignmentOptions.Left);
-            }
             var spinner = new GameObject("Logo Spinner").transform;
             spinner.SetParent(rt, false);
             spinner.localPosition = new Vector3(0f, 2.7f, 0f);
@@ -416,6 +397,27 @@ namespace LoopLand.EditorTools
                 UButton(ui, "My Space", "MY SPACE", new Vector2(-132f, -200f), new Vector2(245f, 95f), cDark, game, "_OnMySpace", 30f);
                 rounds[d] = UButton(ui, "Rounds", "ROUNDS", new Vector2(132f, -200f), new Vector2(245f, 95f), cDark, game, "_OnRounds", 28f);
                 UButton(ui, "Reset", "RESET", new Vector2(397f, -200f), new Vector2(245f, 95f), cRed, game, "_OnReset", 30f);
+                SetLayer(ui.gameObject, 1); // TransparentFX: still clickable, but hidden from the live board camera
+
+                // seat screen: personal live board, card, status and players above each console (above eye level)
+                Prim(PrimitiveType.Cube, "Screen Stand", c, new Vector3(0f, 0.5f, 0.36f), new Vector3(0.05f, 1.0f, 0.05f), dark);
+                var screen = new GameObject("Seat Screen").transform;
+                screen.SetParent(c, false);
+                screen.localPosition = new Vector3(0f, 1.1f, 0.26f);
+                screen.localRotation = Quaternion.Euler(-20f, 0f, 0f);
+                Prim(PrimitiveType.Cube, "Back", screen, new Vector3(0f, 0f, 0.025f), new Vector3(1.34f, 0.99f, 0.03f), dark);
+                RectTransform sc = UCanvas(screen, "Seat Screen UI", Vector3.zero, Quaternion.identity, new Vector2(1300f, 950f), false);
+                UImg(sc, "Glow", Vector2.zero, new Vector2(1360f, 1010f), LoopLandArt.Glow, new Color(0f, 0.9f, 1f, 0.9f));
+                UImg(sc, "Panel", Vector2.zero, new Vector2(1300f, 950f), LoopLandArt.Panel, Color.white);
+                UImg(sc, "Live Frame", new Vector2(0f, 150f), new Vector2(1262f, 642f), LoopLandArt.Round, new Color(1f, 0.24f, 0.8f, 0.9f));
+                URaw(sc, "Live View", new Vector2(0f, 150f), new Vector2(1240f, 620f), liveTex);
+                UImg(sc, "Live Tag", new Vector2(-520f, 425f), new Vector2(170f, 50f), LoopLandArt.Pill, new Color(0.9f, 0.1f, 0.3f, 0.95f));
+                UText(sc, "Live Tag Text", "<b>LIVE</b>", new Vector2(-520f, 425f), new Vector2(150f, 44f), 30f, Color.white);
+                cards[d] = UText(sc, "Card", "", new Vector2(0f, -205f), new Vector2(1240f, 70f), 36f, Hex("FFE14D"));
+                UImg(sc, "Status Back", new Vector2(-320f, -360f), new Vector2(620f, 180f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
+                status[d] = UText(sc, "Status", "LOOPLAND", new Vector2(-320f, -360f), new Vector2(590f, 165f), 34f, Color.white);
+                UImg(sc, "Players Back", new Vector2(320f, -360f), new Vector2(620f, 180f), LoopLandArt.Round, new Color(0f, 0f, 0f, 0.3f));
+                players[d] = UText(sc, "Players", "", new Vector2(320f, -360f), new Vector2(590f, 165f), 28f, Color.white, TextAlignmentOptions.Left);
             }
 
             // store kiosk: premium store UI + live board panel
@@ -905,6 +907,12 @@ namespace LoopLand.EditorTools
             m.SetColor("_TintColor", new Color(0.5f, 0.5f, 0.5f, 0.5f));
             EditorUtility.SetDirty(m);
             return m;
+        }
+
+        private static void SetLayer(GameObject go, int layer)
+        {
+            go.layer = layer;
+            foreach (Transform child in go.transform) SetLayer(child.gameObject, layer);
         }
 
         private static RectTransform URect(Transform parent, string name, Vector2 pos, Vector2 size)
