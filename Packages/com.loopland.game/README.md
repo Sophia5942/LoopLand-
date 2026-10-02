@@ -43,6 +43,9 @@ LoopLand is a networked, Monopoly-style board game for VRChat worlds:
 Generated assets go to `Assets/LoopLand/Generated`, and a reusable prefab is saved at
 `Assets/LoopLand/LoopLand Game.prefab`. Run the builder again any time to rebuild.
 
+If your scene still has the LoopLand tower world from an earlier version, click
+**LoopLand > Remove Tower World (back to the floor)** once, then save the scene.
+
 ## How to play
 - Walk to a console at the table edge and press **JOIN GAME**, then **START GAME**.
 - Your dashboard shows the selected space like a property card: picture, price, full rent table and owner.

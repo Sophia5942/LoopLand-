@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.3
+- Back to the board game on the floor: the tower world, elevator and world sounds from 2.0/3.0 are removed.
+- New **LoopLand > Remove Tower World (back to the floor)** cleans a scene built with them. It:
+  - deletes the tower world;
+  - puts the game and store back;
+  - shows the demo floor and light again;
+  - moves the spawn back next to the table;
+  - restores the default sky.
+
 ## 1.9.2
 - VIEW is a true swap: CENTER shows only the middle screens, TOP shows only the screen in front of the console
   you pressed it on (the middle screens hide). Local to each player; starts on CENTER.
