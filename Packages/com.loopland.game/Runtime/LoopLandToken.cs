@@ -35,6 +35,9 @@ namespace LoopLand
         private float stepTime;
         private Vector3 from;
         private Vector3 to;
+        private bool gliding;
+        private float glideT;
+        private Vector3 glideFrom;
         private bool rainbowBody;
         private bool rainbowTrail;
         private Color glowCol = Color.white;
@@ -44,17 +47,25 @@ namespace LoopLand
             return moving;
         }
 
+        /// <summary>Where this token stands on its card (offset from the card's centre): tokens sharing a card stay centred as a group.</summary>
+        public void _SetSlot(Vector3 offset)
+        {
+            if (offset == slotOffset) return;
+            slotOffset = offset;
+            if (init && !moving) _Glide();
+        }
+
         public void _MoveTo(int p, int m, float d)
         {
             if (spaces == null || spaces.Length == 0) return;
-            if (!init) { init = true; cur = p; target = p; transform.position = _Point(p); return; }
+            if (!init) { init = true; cur = p; target = p; transform.position = _Spot(p); return; }
             if (p == target) return;
             target = p;
             mode = m;
             delay = d;
             int dist = m == 2 ? (cur - p + spaces.Length) % spaces.Length : (p - cur + spaces.Length) % spaces.Length;
             stepTime = Mathf.Min(hopTime, 4f / Mathf.Max(1, dist));
-            if (!moving) { moving = true; t = 1f; next = cur; from = transform.position; to = from; }
+            if (!moving) { moving = true; gliding = false; t = 1f; next = cur; from = transform.position; to = from; }
         }
 
         public void _Skin(Color bodyCol, Color glow, Color trailCol, bool rbBody, bool rbTrail, string label)
@@ -80,7 +91,17 @@ namespace LoopLand
                 if (rainbowTrail) _TintFx(trail, rb);
             }
             if (body != null) body.localPosition = new Vector3(0f, moving ? 0f : Mathf.Sin(Time.time * 2.4f) * 0.008f, 0f);
-            if (!moving) return;
+            if (!moving)
+            {
+                if (gliding)
+                {
+                    // slide aside (or back to the centre) when another token arrives on or leaves this card
+                    glideT += dt / 0.3f;
+                    transform.position = Vector3.Lerp(glideFrom, _Spot(cur), Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(glideT)));
+                    if (glideT >= 1f) gliding = false;
+                }
+                return;
+            }
             if (delay > 0f) { delay -= dt; return; }
 
             if (mode == 1)
@@ -88,7 +109,7 @@ namespace LoopLand
                 _Burst(40);
                 _Play(warpClip);
                 cur = target;
-                transform.position = _Point(cur);
+                transform.position = _Spot(cur);
                 _Burst(60);
                 moving = false;
                 return;
@@ -105,11 +126,13 @@ namespace LoopLand
                     if (trail != null) trail.Stop();
                     _Burst(45);
                     _Play(landClip);
+                    if ((transform.position - _Spot(cur)).sqrMagnitude > 0.000001f) _Glide();
                     return;
                 }
                 next = mode == 2 ? (cur + spaces.Length - 1) % spaces.Length : (cur + 1) % spaces.Length;
-                from = _Point(cur);
-                to = _Point(next);
+                // hop through the middle of every card, and land on this token's spot on the last one
+                from = transform.position;
+                to = next == target ? _Spot(next) : spaces[next].position;
                 t = 0f;
                 if (trail != null && !trail.isPlaying) trail.Play();
                 _Play(hopClip);
@@ -121,10 +144,17 @@ namespace LoopLand
             transform.position = Vector3.Lerp(from, to, e) + Vector3.up * (Mathf.Sin(t * Mathf.PI) * hopHeight);
         }
 
-        private Vector3 _Point(int p)
+        private Vector3 _Spot(int p)
         {
             Transform a = spaces[Mathf.Clamp(p, 0, spaces.Length - 1)];
             return a.TransformPoint(slotOffset);
+        }
+
+        private void _Glide()
+        {
+            glideFrom = transform.position;
+            glideT = 0f;
+            gliding = true;
         }
 
         private void _Burst(int n)

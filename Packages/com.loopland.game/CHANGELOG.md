@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.4
+- Tokens hop through the middle of every card and land centred on it.
+- Players on the same card form a neat group centred on it, and slide back to the centre when someone leaves.
+
 ## 1.9.3
 - Back to the board game on the floor: the tower world, elevator and world sounds from 2.0/3.0 are removed.
 - New **LoopLand > Remove Tower World (back to the floor)** cleans a scene built with them. It:

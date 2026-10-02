@@ -1139,8 +1139,28 @@ namespace LoopLand
                     tk._Skin(body, store._TokenGlow(skin, baseCol), store._TrailColor(trail), store._IsRainbowToken(skin), store._IsRainbowTrail(trail), label);
                 }
                 else tk._Skin(baseCol, baseCol, baseCol, false, false, label);
+                tk._SetSlot(_TokenSpot(s));
                 tk._MoveTo(pos[s], moveMode[s], rolled ? 1.3f : 0.9f);
             }
+        }
+
+        /// <summary>A token alone on a card stands in its centre; tokens sharing a card form a group centred on it (rows of two).</summary>
+        private Vector3 _TokenSpot(int s)
+        {
+            int count = 0;
+            int rank = 0;
+            for (int o = 0; o < MAXP && o < tokens.Length; o++)
+            {
+                if (slotPid[o] == 0 || (alive[o] == 0 && phase != PH_LOBBY) || pos[o] != pos[s]) continue;
+                if (o < s) rank++;
+                count++;
+            }
+            int rows = (count + 1) / 2;
+            int row = rank / 2;
+            bool single = row == rows - 1 && count % 2 == 1;
+            float x = single ? 0f : (rank % 2 == 0 ? -0.065f : 0.065f);
+            float z = ((rows - 1) * 0.5f - row) * 0.11f;
+            return new Vector3(x, 0f, z);
         }
 
         private void _RefreshBoard()
