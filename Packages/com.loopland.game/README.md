@@ -9,7 +9,9 @@ challenges, scratch Lucky Loop tickets, survive the chaos and finish with the mo
 - **The Loop gets wilder every lap**: bigger rewards from Loop 2, more Mystery tiles from Loop 3, jackpot tickets from Loop 4.
 - **Lucky Loop tickets**: a real scratch ticket appears on your dashboard. Scratch it with your finger (VR) or
   your view (desktop) to reveal a gameplay reward.
-- **Challenges**: 15-second mini-games on your dashboard (LASER LOOP and COIN RUSH) that win you coins.
+- **Head-to-head competition**: Challenge tiles are **DUELS** against your closest rival, everyone plays a
+  **LOOP BATTLE** every 2 rounds (plus a FINAL BATTLE), and landing on another player **BUMPS** them for coins.
+- **Mini-games**: 15-second games on your dashboard (LASER LOOP and COIN RUSH).
 - **Particle tokens** that hop space-by-space with trails, landing bursts and auras.
 - **Animated 3D dice** that always land on the synced result, with skin-specific glow trails.
 - **Loop Coins**, a persistent currency saved with VRChat PlayerData. You earn them for laps, challenges,
@@ -54,7 +56,7 @@ If your scene still has the LoopLand tower world from an earlier version, click
 **LoopLand > Remove Tower World (back to the floor)** once, then save the scene.
 
 ## How to play
-**Goal:** finish with the **most coins** after the last round (10 rounds by default).
+**Goal:** beat everyone. Finish with the **most coins** after the last round (10 rounds by default).
 
 1. Walk to a console at the table edge and press **JOIN GAME**, then **START GAME**.
 2. On your turn, the big button tells you what to do: **ROLL**, then **PLAY CHALLENGE** or **SCRATCH TICKET** when a
@@ -65,11 +67,25 @@ If your scene still has the LoopLand tower world from an earlier version, click
 |------|--------------|
 | **Coins** | Gain 50-200 coins. Two tiles leak 50 coins instead (a Shield blocks it). |
 | **Lucky Loop** | A ticket appears on your dashboard. Scratch it to reveal a reward (below). |
-| **Challenge** | A quick mini-game. LASER LOOP: hit 5 glowing targets in 15 s (+30 coins a hit). COIN RUSH: grab coins for 12 s (+15 a coin). |
+| **Challenge** | A **DUEL** against your closest rival (see below). In a solo game it's a normal mini-game: LASER LOOP (+30 coins a hit, 5 targets) or COIN RUSH (+15 a coin). |
 | **Power** | Get a Shield, a Boost, a Swap or a Bonus Roll. |
 | **Mystery** | A random event: Coin Shower for everyone, Glitch Tax, Robin Loop, Warp Ahead, Time Slip, Swap Chaos, a surprise challenge... |
 | **Portal** | Warp to the next section of the Loop (10 tiles ahead). |
 | **Loop Start** | +100 coins every time you complete a lap. |
+
+**Competing with each other:**
+- **Duels:** with 2+ players, a Challenge tile (or a Surprise Challenge) is a duel against your **closest rival**:
+  the player just ahead of you in coins, or just behind you if you're leading. You both press **PLAY DUEL** and
+  play the same mini-game on your own dashboards (no target cap: the most hits wins). The winner gets 100 coins and
+  the loser pays 100 (a Shield blocks it). A draw costs nobody anything.
+- **Loop Battles:** after every 2nd round **everyone** presses **PLAY BATTLE** and plays the same mini-game.
+  1st place +200, 2nd +100, 3rd and below +50, and the **last place pays 50**. After the last round there's a
+  **FINAL BATTLE** with everything doubled.
+- **Bumps:** land on a tile where another player stands and you grab 50 of their coins (a Shield blocks it).
+- Duel stakes, battle prizes and bumps grow x1.5 from Loop 2, like everything else.
+- You have about 50 seconds to start a duel or battle. Anyone who doesn't play scores 0.
+- The player list shows everyone's place (1st, 2nd...) and live duel and battle scores. **MY STATUS** shows how far
+  ahead or behind you are.
 
 **Lucky Loop rewards:** +100 or +250 coins, Double Boost (your next coin reward is x2), Shield, Move +3, Extra Roll,
 Swap places with a random player, Jackpot Challenge (a challenge with coins x3), or Nothing this time. From Loop 4
@@ -159,6 +175,8 @@ Put them in `Assets/LoopLand/Store Art/` and run **Build Game In Scene** again:
   - *Space Wake*: 1 = becomes a Mystery tile from Loop 3.
 - **Catalogue** (names, prices, colors, which product unlocks an item): `LoopLand/Store` inspector.
   Product index `-1` means "buy with Loop Coins".
+- **Competition** (duel stake, how often Loop Battles happen or 0 for none, battle prizes, what the last place pays,
+  bump amount, how long players get to play): the *Competition* section of the `LoopLand/Game` inspector.
 - **Free Loop Scratch** (refill time, max tickets, reward odds): `LoopLand/Free Loop Scratch` inspector.
 
 ## Technical notes

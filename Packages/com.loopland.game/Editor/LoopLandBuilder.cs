@@ -412,15 +412,17 @@ namespace LoopLand.EditorTools
             var seatScreens = new GameObject[4];
             Color cBlue = Hex("1F4FD8"), cPurple = Hex("6A2BD9"), cOrange = Hex("D98A00"), cTeal = Hex("0E9F7E"), cRedBtn = Hex("C21836"), cJoin = Hex("E0218A"), cTicket = Hex("D61F8C");
             string[] panelNames = { "MY STATUS", "TICKETS", "POWER-UPS", "HOW TO PLAY" };
-            string howTo = "<b>GOAL:</b> race around the Loop and finish with the <color=#FFE14D>most coins</color> after the last round.\n"
+            string howTo = "<b>GOAL:</b> beat everyone: finish with the <color=#FFE14D>most coins</color> after the last round.\n"
                 + "Press <b>ROLL</b>, move, and your tile does its thing:\n"
                 + "<color=#FFE14D><b>COINS</b></color>  gain 50-200 (watch out for leaks)\n"
                 + "<color=#FF3DCB><b>LUCKY LOOP</b></color>  scratch a ticket for a reward\n"
-                + "<color=#00E5FF><b>CHALLENGE</b></color>  a quick mini-game: win coins\n"
+                + "<color=#00E5FF><b>CHALLENGE</b></color>  <b>DUEL</b> your closest rival: winner takes " + game.duelStake + "\n"
                 + "<color=#B07CFF><b>POWER</b></color>  Shield, Boost, Swap or Bonus Roll\n"
                 + "<color=#3DFF8A><b>MYSTERY</b></color>  a random event for you or everyone\n"
                 + "<color=#4D8BFF><b>PORTAL</b></color>  warp to the next section\n"
                 + "<color=#FFD23F><b>LOOP START</b></color>  +" + game.lapBonus + " coins every lap\n"
+                + "<color=#FF8A3D><b>BUMP</b></color>  land on a player to grab " + game.bumpSteal + " of their coins\n"
+                + "<color=#FF3DCB><b>LOOP BATTLE</b></color>  every " + game.battleEveryRounds + " rounds everyone plays: 1st wins big, last pays!\n"
                 + "Every loop gets wilder: <b>2</b> bigger rewards, <b>3</b> more Mystery, <b>4</b> jackpots!";
             for (int d = 0; d < 4; d++)
             {

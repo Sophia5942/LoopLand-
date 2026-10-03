@@ -103,6 +103,20 @@ namespace LoopLand
         public float turnDoneSeconds = 2f;
         public int maxPowerUps = 3;
 
+        [Header("Competition")]
+        [Tooltip("With 2+ players, Challenge tiles are DUELS against your closest rival in coins. The winner gets this many coins and the loser pays it.")]
+        public int duelStake = 100;
+        [Tooltip("Everyone plays a LOOP BATTLE after every this many rounds, plus a FINAL BATTLE (double prizes) after the last round. 0 = off.")]
+        public int battleEveryRounds = 2;
+        [Tooltip("LOOP BATTLE prizes for 1st, 2nd and 3rd+ place.")]
+        public int[] battlePrizes = { 200, 100, 50 };
+        [Tooltip("Coins the last place pays in a LOOP BATTLE (a Shield blocks it).")]
+        public int battleLastPays = 50;
+        [Tooltip("Landing on another player's tile BUMPS them: you grab this many of their coins (a Shield blocks it).")]
+        public int bumpSteal = 50;
+        [Tooltip("Seconds everyone gets to play a duel or battle. Anyone who hasn't played by then scores 0.")]
+        public float contestSeconds = 75f;
+
         [Header("Loop Coin rewards (persistent store currency)")]
         public int coinsPerLap = 5;
         public int coinsPerChallenge = 3;
@@ -192,7 +206,12 @@ namespace LoopLand
         [UdonSynced] private int challengeSeq;
         [UdonSynced] private int challengeType;
         [UdonSynced] private bool challengeJackpot;
+        [UdonSynced] private int contest;                   // the current challenge: 0 solo, 1 duel, 2 Loop Battle
+        [UdonSynced] private int[] score = new int[MAXP];   // duel and battle scores: -2 not playing, -1 still playing
+        [UdonSynced] private int contestEnd;                // server time (ms) when the duel or battle closes
+        [UdonSynced] private int battleRound;               // the last round that had its Loop Battle
         [UdonSynced] private int resultSeq;
+        [UdonSynced] private string resultName = "";
         [UdonSynced] private int resultIcon;
         [UdonSynced] private string resultTitle = "";
         [UdonSynced] private string resultSub = "";
@@ -253,9 +272,10 @@ namespace LoopLand
             if (phase == PH_LOBBY) { _Send(me < 0 ? C_JOIN : C_START, 0); return; }
             if (phase == PH_OVER) { _Send(C_RESET, 0); return; }
             if (me < 0) { _Toast("A game is running. Join the next one from the lobby!"); return; }
-            if (me != turnSlot) { _Toast("Wait for your turn!"); return; }
+            // duels and battles: everyone taking part plays, not just the player whose turn it is
+            if (_InContest(me)) { _StartChallenge(); return; }
+            if (me != turnSlot) { _Toast(stage == ST_CHALLENGE && contest == 1 ? "You're not in this duel. Watch the scores!" : "Wait for your turn!"); return; }
             if (stage == ST_ROLL) _Send(C_ROLL, 0);
-            else if (stage == ST_CHALLENGE) _StartChallenge();
             else if (stage == ST_TICKET) _Toast("Rub the silver on your ticket to scratch it!");
             else if (stage == ST_DONE) _Toast("Turn complete!");
         }
@@ -337,7 +357,7 @@ namespace LoopLand
         /// <summary>The challenge mini-game reports the player's hits.</summary>
         public void _ChallengeFinished(int hits)
         {
-            if (phase != PH_PLAY || stage != ST_CHALLENGE || _LocalSlot() != turnSlot || challengeSentSeq == challengeSeq) return;
+            if (!_InContest(_LocalSlot()) || challengeSentSeq == challengeSeq) return;
             challengeSentSeq = challengeSeq;
             _Send(C_CHALLENGE, hits);
             _RefreshDashboards();
@@ -345,9 +365,12 @@ namespace LoopLand
 
         private void _StartChallenge()
         {
-            if (challenge == null || challenge._IsRunning() || challengeSentSeq == challengeSeq) return;
+            if (challenge == null || challenge._IsRunning()) return;
+            int me = _LocalSlot();
+            if (challengeSentSeq == challengeSeq || score[me] >= 0) { _Toast("Done! Waiting for the others to finish."); return; }
+            if (contest > 0 && _StartLeft() <= 0) { _Toast("Too late to play this one!"); return; }
             if (challenge.root != null) _Dock(challenge.root.transform);
-            challenge._Begin(challengeType, challengeJackpot);
+            challenge._Begin(challengeType, challengeJackpot, contest, contest == 1 ? _Name(_Opponent(me)) : "");
             _RefreshDashboards();
         }
 
@@ -440,11 +463,15 @@ namespace LoopLand
                     if (phase == PH_PLAY && s < 0) return;
                     _ToLobby();
                     break;
+                case C_CHALLENGE:
+                    // anyone taking part in the challenge, duel or battle reports their own score once
+                    if (!_InContest(s) || score[s] != -1) return;
+                    _Report(s, arg);
+                    break;
                 default:
                     if (phase != PH_PLAY || s < 0 || s != turnSlot) return;
                     if (cmd == C_ROLL && stage == ST_ROLL) _DoRoll();
                     else if (cmd == C_TICKET && stage == ST_TICKET && arg == ticketSeq) _ApplyTicket(s);
-                    else if (cmd == C_CHALLENGE && stage == ST_CHALLENGE) _ApplyChallenge(s, arg);
                     else return;
                     break;
             }
@@ -484,7 +511,12 @@ namespace LoopLand
             }
             else if (stage == ST_DONE)
             {
-                if (elapsed > turnDoneSeconds) { _NextTurn(); _Commit(); }
+                // a little longer after a duel or battle, so everyone can read the scores
+                if (elapsed > turnDoneSeconds + (contest > 0 ? 3f : 0f)) { _NextTurn(); _Commit(); }
+            }
+            else if (stage == ST_CHALLENGE && contest > 0)
+            {
+                if (_ContestLeft() <= 0) { _ResolveContest(); _Commit(); }
             }
             else if (afkSeconds > 0f && elapsed > afkSeconds + (stage == ST_ROLL ? 0f : 30f))
             {
@@ -560,6 +592,8 @@ namespace LoopLand
             loopLevel = 1;
             turnSlot = first;
             chain = 0;
+            contest = 0;
+            battleRound = 0;
             log = "";
             _Announce("<color=#FFE14D>LOOP 1</color>  Race around the Loop!\nMost coins after " + maxRounds + " rounds wins.");
             _Log("Game on! " + _Name(first) + " rolls first.");
@@ -583,6 +617,12 @@ namespace LoopLand
             string who = _Name(s);
             slotPid[s] = 0;
             _Log(who + why);
+            // a duel or battle doesn't wait for someone who left (if it was the player whose turn it is, the turn moves on)
+            if (phase == PH_PLAY && stage == ST_CHALLENGE && contest > 0 && s != turnSlot && score[s] != -2)
+            {
+                score[s] = -2;
+                _CheckContest();
+            }
         }
 
         private void _DoRoll()
@@ -652,6 +692,38 @@ namespace LoopLand
             int p = pos[s];
             int t = _TileType(p);
             chain++;
+            int card = cardSeq;
+            string bump = _Bump(s, p);
+            _ResolveTile(s, p, t);
+            if (bump.Length == 0) return;
+            // the tile may have made its own announcement: add the bump to it
+            if (cardSeq != card) cardText += "\n<size=80%>" + bump + "</size>";
+            else _Announce(bump);
+        }
+
+        /// <summary>Landing on other players BUMPS them: grab some of their coins (a Shield blocks it).</summary>
+        private string _Bump(int s, int p)
+        {
+            if (bumpSteal <= 0) return "";
+            string msg = "";
+            for (int i = 0; i < MAXP; i++)
+            {
+                if (i == s || slotPid[i] == 0 || pos[i] != p) continue;
+                bool shielded = shields[i] > 0;
+                int took = _Lose(i, _Scaled(bumpSteal));
+                if (took > 0)
+                {
+                    coins[s] += took;
+                    msg += (msg.Length > 0 ? "\n" : "") + "<color=#FF8A3D>BUMP!</color> " + _Name(s) + " grabbed " + took + " coins from " + _Name(i) + "!";
+                }
+                else if (shielded) msg += (msg.Length > 0 ? "\n" : "") + "<color=#FF8A3D>BUMP!</color> " + _Name(i) + "'s Shield blocked it.";
+            }
+            if (msg.Length > 0) _Log(_Name(s) + " bumped into someone!");
+            return msg;
+        }
+
+        private void _ResolveTile(int s, int p, int t)
+        {
             if (t == T_START)
             {
                 _Done("LOOP START", "+" + lapBonus + " coins every lap. Keep looping!", I_START);
@@ -741,11 +813,18 @@ namespace LoopLand
 
         private void _Result(string title, string sub, int icon)
         {
+            _ResultFor(_Name(turnSlot), title, sub, icon);
+        }
+
+        /// <summary>The result card everyone sees; 'who' is the line above the details (a name, DUEL or LOOP BATTLE).</summary>
+        private void _ResultFor(string who, string title, string sub, int icon)
+        {
             resultSeq++;
+            resultName = who;
             resultTitle = title;
             resultSub = sub;
             resultIcon = icon;
-            _Log(_Name(turnSlot) + ": " + title);
+            _Log(who + ": " + title);
         }
 
         private void _Done(string title, string sub, int icon)
@@ -761,14 +840,231 @@ namespace LoopLand
             _SetStage(ST_ROLL);
         }
 
+        /// <summary>A challenge for slot s. With 2+ players it's a DUEL against their closest rival; a Jackpot Challenge
+        /// from a ticket is the player's own reward, so it's always played solo.</summary>
         private void _OfferChallenge(int s, bool jackpot)
         {
             challengeType = Random.Range(0, 2);
             challengeJackpot = jackpot;
             challengeSeq++;
-            _Log(_Name(s) + " faces a " + (jackpot ? "JACKPOT " : "") + "challenge!");
+            int o = jackpot ? -1 : _Rival(s);
+            contest = o >= 0 ? 1 : 0;
+            for (int i = 0; i < MAXP; i++) score[i] = i == s || i == o ? -1 : -2;
+            contestEnd = Networking.GetServerTimeInMilliseconds() + Mathf.RoundToInt(contestSeconds * 1000f);
+            if (o >= 0)
+            {
+                _Announce("<color=#FF3DCB>DUEL!</color>  " + _Name(s) + " vs " + _Name(o) + "\n" + _GameName(challengeType) + ": the winner takes " + _Num(_Scaled(duelStake)) + " coins!");
+                _Log(_Name(s) + " challenged " + _Name(o) + " to a duel!");
+            }
+            else _Log(_Name(s) + " faces a " + (jackpot ? "JACKPOT " : "") + "challenge!");
             _Fx(FX_CHALLENGE);
             _SetStage(ST_CHALLENGE);
+        }
+
+        /// <summary>Everyone plays the same mini-game at the end of the round. Prizes by place, and the last place pays.</summary>
+        private void _OfferBattle()
+        {
+            battleRound = round;
+            contest = 2;
+            challengeType = Random.Range(0, 2);
+            challengeJackpot = false;
+            challengeSeq++;
+            for (int i = 0; i < MAXP; i++) score[i] = slotPid[i] != 0 ? -1 : -2;
+            contestEnd = Networking.GetServerTimeInMilliseconds() + Mathf.RoundToInt(contestSeconds * 1000f);
+            _Announce("<color=#FF3DCB>" + _BattleName() + "!</color>\nEveryone plays " + _GameName(challengeType) + ". 1st place wins " + _Num(_BattlePrize(0)) + " coins!");
+            _Log(_BattleName() + ": everyone plays " + _GameName(challengeType) + "!");
+            _Fx(FX_CHALLENGE);
+            _SetStage(ST_CHALLENGE);
+        }
+
+        private bool _BattleDue()
+        {
+            if (battleEveryRounds <= 0 || battleRound == round || slotPid[turnSlot] == 0) return false;
+            return round % battleEveryRounds == 0 || round >= maxRounds;
+        }
+
+        private void _Report(int s, int hits)
+        {
+            hits = Mathf.Clamp(hits, 0, 40);
+            if (contest == 0)
+            {
+                _ApplyChallenge(s, hits);
+                return;
+            }
+            score[s] = hits;
+            _Log(_Name(s) + " scored " + hits + "!");
+            _CheckContest();
+        }
+
+        /// <summary>Settles the duel or battle once everyone taking part has a score.</summary>
+        private void _CheckContest()
+        {
+            for (int i = 0; i < MAXP; i++) if (score[i] == -1 && slotPid[i] != 0) return;
+            _ResolveContest();
+        }
+
+        private void _ResolveContest()
+        {
+            for (int i = 0; i < MAXP; i++)
+            {
+                if (score[i] == -2) continue;
+                if (slotPid[i] == 0) score[i] = -2;
+                else if (score[i] < 0) score[i] = 0;   // didn't play in time
+            }
+            if (contest == 1) _ResolveDuel();
+            else _ResolveBattle();
+        }
+
+        private void _ResolveDuel()
+        {
+            int a = turnSlot;
+            int b = _Opponent(a);
+            if (b < 0)
+            {
+                // the rival left: it counts as a normal challenge
+                _ApplyChallenge(a, Mathf.Max(0, score[a]));
+                return;
+            }
+            string vs = _Name(a) + " <b>" + score[a] + " - " + score[b] + "</b> " + _Name(b);
+            if (score[a] == score[b])
+            {
+                _ResultFor("DUEL", "DRAW!", vs + "\nNobody pays.", I_CHALLENGE);
+                _SetStage(ST_DONE);
+                return;
+            }
+            int w = score[a] > score[b] ? a : b;
+            int l = w == a ? b : a;
+            int stake = _Scaled(duelStake);
+            int got = _Gain(w, stake);
+            int lost = _Lose(l, stake);
+            wins[w]++;
+            coinsEarned[w] += coinsPerChallenge;
+            string money = _Name(w) + " <color=#7CFF4F>+" + _Num(got) + "</color>     " + _Name(l) + (lost > 0 ? " <color=#FF5A5A>-" + _Num(lost) + "</color>" : " <color=#9AF2FF>SHIELD</color>");
+            _Announce("<color=#FFE14D>DUEL:</color> " + _Name(w) + " <color=#FFE14D>WINS!</color>\n" + vs);
+            _ResultFor("DUEL", _Name(w) + " WINS!", vs + "\n" + money, I_CHALLENGE);
+            _Fx(FX_WIN);
+            _SetStage(ST_DONE);
+        }
+
+        private void _ResolveBattle()
+        {
+            int n = 0;
+            int top = -1;
+            int low = 100000;
+            for (int i = 0; i < MAXP; i++)
+            {
+                if (score[i] < 0) continue;
+                n++;
+                top = Mathf.Max(top, score[i]);
+                low = Mathf.Min(low, score[i]);
+            }
+            string lines = "";
+            string champs = "";
+            for (int place = 1; place <= MAXP; place++)
+            {
+                for (int i = 0; i < MAXP; i++)
+                {
+                    if (score[i] < 0 || _ScorePlace(i) != place) continue;
+                    string change;
+                    if (n >= 2 && score[i] == low && low < top)
+                    {
+                        int lost = _Lose(i, _BattleLastPays());
+                        change = lost > 0 ? "<color=#FF5A5A>-" + _Num(lost) + "</color>" : "<color=#9AF2FF>SHIELD</color>";
+                    }
+                    else change = "<color=#7CFF4F>+" + _Num(_Gain(i, _BattlePrize(place - 1))) + "</color>";
+                    if (place == 1)
+                    {
+                        wins[i]++;
+                        coinsEarned[i] += coinsPerChallenge;
+                        champs += (champs.Length > 0 ? " & " : "") + _Name(i);
+                    }
+                    lines += (lines.Length > 0 ? "\n" : "") + _PlaceText(place) + "  " + _Name(i) + "  <b>" + score[i] + "</b>  " + change;
+                }
+            }
+            if (n == 0)
+            {
+                _ResultFor(_BattleName(), "NOBODY PLAYED", "No prizes this time.", I_CHALLENGE);
+                _SetStage(ST_DONE);
+                return;
+            }
+            _Announce("<color=#FFE14D>" + _BattleName() + ":</color> " + champs + " <color=#FFE14D>WINS!</color>");
+            _ResultFor(_BattleName(), champs + " WINS!", lines, I_CHALLENGE);
+            _Fx(FX_WIN);
+            _SetStage(ST_DONE);
+        }
+
+        /// <summary>1 + how many players scored more than slot s in the current duel or battle.</summary>
+        private int _ScorePlace(int s)
+        {
+            int place = 1;
+            for (int i = 0; i < MAXP; i++) if (score[i] > score[s]) place++;
+            return place;
+        }
+
+        private int _BattlePrize(int k)
+        {
+            if (battlePrizes == null || battlePrizes.Length == 0) return 0;
+            int v = _Scaled(battlePrizes[Mathf.Clamp(k, 0, battlePrizes.Length - 1)]);
+            return round >= maxRounds ? v * 2 : v;
+        }
+
+        private int _BattleLastPays()
+        {
+            int v = _Scaled(battleLastPays);
+            return round >= maxRounds ? v * 2 : v;
+        }
+
+        private string _BattleName()
+        {
+            return round >= maxRounds ? "FINAL BATTLE" : "LOOP BATTLE";
+        }
+
+        private string _GameName(int t)
+        {
+            return challenge != null ? challenge._Name(t) : "a mini-game";
+        }
+
+        /// <summary>Your duel rival: the player just ahead of you in coins, or just behind you if you're leading.</summary>
+        private int _Rival(int s)
+        {
+            int above = -1;
+            int below = -1;
+            for (int i = 0; i < MAXP; i++)
+            {
+                if (i == s || slotPid[i] == 0) continue;
+                if (coins[i] >= coins[s])
+                {
+                    if (above < 0 || coins[i] < coins[above]) above = i;
+                }
+                else if (below < 0 || coins[i] > coins[below]) below = i;
+            }
+            return above >= 0 ? above : below;
+        }
+
+        /// <summary>The other player in the current duel.</summary>
+        private int _Opponent(int s)
+        {
+            for (int i = 0; i < MAXP; i++) if (i != s && slotPid[i] != 0 && score[i] != -2) return i;
+            return -1;
+        }
+
+        /// <summary>Is slot s taking part in the current challenge, duel or battle?</summary>
+        private bool _InContest(int s)
+        {
+            return phase == PH_PLAY && stage == ST_CHALLENGE && s >= 0 && s < MAXP && slotPid[s] != 0 && score[s] != -2;
+        }
+
+        /// <summary>Seconds left to start the current duel or battle: a run takes about 21 seconds, so it has to start in time to count.</summary>
+        private int _StartLeft()
+        {
+            return Mathf.Max(0, _ContestLeft() - 23);
+        }
+
+        /// <summary>Seconds left to play the current duel or battle.</summary>
+        private int _ContestLeft()
+        {
+            int ms = contestEnd - Networking.GetServerTimeInMilliseconds();
+            return ms <= 0 ? 0 : (ms + 999) / 1000;
         }
 
         private void _ApplyChallenge(int s, int hits)
@@ -1003,12 +1299,22 @@ namespace LoopLand
 
         private void _NextTurn()
         {
+            contest = 0;
             int s = turnSlot;
             for (int k = 1; k <= MAXP; k++)
             {
                 int n = (s + k) % MAXP;
                 if (slotPid[n] == 0) continue;
-                if (n <= s) round++;
+                if (n <= s)
+                {
+                    // the round is over: Loop Battle time?
+                    if (_BattleDue())
+                    {
+                        _OfferBattle();
+                        return;
+                    }
+                    round++;
+                }
                 turnSlot = n;
                 break;
             }
@@ -1136,7 +1442,7 @@ namespace LoopLand
             if (t == T_START) return "+" + lapBonus + " coins every time you complete a lap.";
             if (t == T_COINS) return spaceValue[p] >= 0 ? "Gain " + _Scaled(spaceValue[p]) + " coins." : "Lose " + (-spaceValue[p]) + " coins (a Shield blocks it).";
             if (t == T_LUCKY) return "Scratch a ticket and reveal a reward.";
-            if (t == T_CHALLENGE) return "A quick mini-game: win it for coins.";
+            if (t == T_CHALLENGE) return _SeatedCount() >= 2 ? "A DUEL vs your closest rival: the winner takes coins from the loser." : "A quick mini-game: win it for coins.";
             if (t == T_POWER) return "Get a Shield, Boost, Swap or Bonus Roll.";
             if (t == T_MYSTERY) return "A random event for you or everyone!";
             return "Warp to the next section of the Loop.";
@@ -1231,7 +1537,7 @@ namespace LoopLand
             }
             if (resultSeq != seenResult)
             {
-                if (seenResult >= 0) resultUntil = Time.time + Mathf.Max(2.2f, turnDoneSeconds + 0.4f);
+                if (seenResult >= 0) resultUntil = Time.time + Mathf.Max(2.2f, turnDoneSeconds + 0.4f) + (contest > 0 ? 3f : 0f);
                 seenResult = resultSeq;
             }
 
@@ -1387,21 +1693,24 @@ namespace LoopLand
             }
             else
             {
-                status = "<size=120%><b>ROUND " + round + " / " + maxRounds + "</b>   <color=#FF3DCB>LOOP " + loopLevel + "</color></size>\n" + _Name(turnSlot) + " " + _StageHint();
+                status = "<size=120%><b>ROUND " + round + " / " + maxRounds + "</b>   <color=#FF3DCB>LOOP " + loopLevel + "</color></size>\n" + _NowText();
             }
             if (log.Length > 0) status += "\n<size=75%><color=#C8C8E0>" + log + "</color></size>";
             _SetTexts(statusTexts, status);
 
             string players = "";
+            bool live = phase == PH_PLAY && stage == ST_CHALLENGE && contest > 0;
             for (int i = 0; i < MAXP; i++)
             {
                 if (slotPid[i] == 0) continue;
-                string line = (phase == PH_PLAY && i == turnSlot ? "> " : "  ") + _Name(i);
+                string line = (phase == PH_PLAY && i == turnSlot ? "> " : "  ") + (phase != PH_LOBBY ? "<b>" + _PlaceText(_Place(i)) + "</b>  " : "") + _Name(i);
                 if (phase != PH_LOBBY)
                 {
                     line += "  <color=#FFE14D>" + _Num(coins[i]) + "</color>  lap " + laps[i];
                     if (shields[i] > 0) line += "  <color=#9AF2FF>SHIELD</color>";
                     if (boosts[i] > 0) line += "  <color=#FF3DCB>BOOST</color>";
+                    // live duel and battle scores
+                    if (live && score[i] != -2) line += score[i] >= 0 ? "  <color=#7CFF4F>SCORED " + score[i] + "</color>" : "  <color=#FF3DCB>PLAYING...</color>";
                 }
                 players += line + "\n";
             }
@@ -1416,24 +1725,45 @@ namespace LoopLand
             if (phase == PH_LOBBY) return me < 0 ? "JOIN GAME" : (_SeatedCount() < Mathf.Max(1, minPlayersToStart) ? "WAITING FOR PLAYERS" : "START GAME");
             if (phase == PH_OVER) return "NEW GAME";
             if (me < 0) return "WATCHING";
+            if (_InContest(me))
+            {
+                if (challenge != null && challenge._IsRunning()) return "PLAYING...";
+                if (challengeSentSeq == challengeSeq || score[me] >= 0) return "WAITING...";
+                if (contest > 0 && _StartLeft() <= 0) return "TOO LATE";
+                if (contest == 1) return "PLAY DUEL  " + _StartLeft();
+                if (contest == 2) return "PLAY BATTLE  " + _StartLeft();
+                return "PLAY CHALLENGE";
+            }
             if (me != turnSlot) return "WAITING...";
             if (stage == ST_ROLL) return "ROLL";
             if (stage == ST_MOVING) return "MOVING...";
             if (stage == ST_TICKET) return "SCRATCH TICKET";
-            if (stage == ST_CHALLENGE) return challenge != null && challenge._IsRunning() ? "PLAYING..." : "PLAY CHALLENGE";
-            return "TURN COMPLETE!";
+            if (stage == ST_CHALLENGE) return "WAITING...";
+            return contest == 2 ? "ROUND COMPLETE!" : "TURN COMPLETE!";
         }
 
         private string _Hint(int me)
         {
             if (phase == PH_LOBBY) return me < 0 ? "Press JOIN GAME to take a seat (up to 6 players)." : "You're in! Press START GAME when everyone has joined.";
             if (phase == PH_OVER) return "Press NEW GAME to play again.";
-            if (me != turnSlot || me < 0) return _Name(turnSlot) + " " + _StageHint();
+            if (_InContest(me) && score[me] < 0 && challengeSentSeq != challengeSeq && contest > 0)
+                return "<color=#FFE14D>" + (contest == 1 ? "DUEL vs " + _Name(_Opponent(me)) : _BattleName()) + "! Press PLAY within " + _StartLeft() + "s.</color>";
+            if (me != turnSlot || me < 0 || contest > 0) return _NowText();
             if (stage == ST_ROLL) return "<color=#FFE14D>Your turn!</color> Press ROLL.";
             if (stage == ST_TICKET) return "<color=#FFE14D>Scratch your Lucky Loop ticket!</color>";
             if (stage == ST_CHALLENGE) return "<color=#FFE14D>Press PLAY CHALLENGE when you're ready!</color>";
             if (stage == ST_DONE) return "<color=#7CFF4F>Turn complete!</color>";
             return "On the move...";
+        }
+
+        /// <summary>What's happening right now, for the status screens.</summary>
+        private string _NowText()
+        {
+            if (contest == 2 && (stage == ST_CHALLENGE || stage == ST_DONE))
+                return "<color=#FF3DCB>" + _BattleName() + "</color>" + (stage == ST_DONE ? " is over!" : ": everyone plays " + _GameName(challengeType) + "!");
+            if (contest == 1 && stage == ST_CHALLENGE)
+                return _Name(turnSlot) + " is in a <color=#FF3DCB>DUEL</color> with " + _Name(_Opponent(turnSlot)) + "!";
+            return _Name(turnSlot) + " " + _StageHint();
         }
 
         private string _StageHint()
@@ -1452,7 +1782,8 @@ namespace LoopLand
             bool myTurn = phase == PH_PLAY && me >= 0 && me == turnSlot;
             bool ticketOn = myTurn && stage == ST_TICKET && ticketSentSeq != ticketSeq;
             bool gameOn = challenge != null && challenge._IsRunning();
-            bool introOn = myTurn && stage == ST_CHALLENGE && !gameOn && challengeSentSeq != challengeSeq;
+            bool myContest = _InContest(me);
+            bool introOn = myContest && !gameOn && challengeSentSeq != challengeSeq && score[me] < 0;
             bool resultOn = Time.time < resultUntil && phase == PH_PLAY;
 
             if (ticket != null)
@@ -1465,7 +1796,7 @@ namespace LoopLand
                 }
                 else if (!(myTurn && stage == ST_TICKET) && ticket._IsActive()) ticket._Hide();
             }
-            if (challenge != null && gameOn && !(myTurn && stage == ST_CHALLENGE))
+            if (challenge != null && gameOn && !myContest)
             {
                 challenge._Stop();
                 gameOn = false;
@@ -1475,6 +1806,28 @@ namespace LoopLand
             string status = _StatusBody(me);
             string powers = _PowerBody(me);
             string tickets = freeScratch != null ? freeScratch._Summary() : "";
+            string introTitle = "";
+            string introBody = "";
+            if (introOn)
+            {
+                string gname = _GameName(challengeType);
+                string rules = challenge != null ? challenge._Rules(challengeType, contest > 0) : "";
+                if (contest == 1)
+                {
+                    introTitle = "DUEL: " + gname;
+                    introBody = "vs " + _Name(_Opponent(me)) + "\n" + rules + "\n<size=80%>Higher score wins " + _Num(_Scaled(duelStake)) + " coins. The loser pays " + _Num(_Scaled(duelStake)) + ".</size>\n\n<color=#7CFF4F>Press PLAY DUEL to start.</color>";
+                }
+                else if (contest == 2)
+                {
+                    introTitle = _BattleName() + ": " + gname;
+                    introBody = "Everyone plays! " + rules + "\n<size=80%>1st +" + _Num(_BattlePrize(0)) + "    2nd +" + _Num(_BattlePrize(1)) + "    last place -" + _Num(_BattleLastPays()) + "</size>\n\n<color=#7CFF4F>Press PLAY BATTLE to start.</color>";
+                }
+                else
+                {
+                    introTitle = (challengeJackpot ? "<color=#FFE14D>JACKPOT</color> " : "") + gname;
+                    introBody = rules + "\n<size=80%>" + (challengeType == 0 ? "+30" : "+15") + " coins a hit" + (challengeJackpot ? ", then x3!" : "") + "</size>\n\n<color=#7CFF4F>Press PLAY CHALLENGE to start.</color>";
+                }
+            }
             for (int d = 0; d < 4; d++)
             {
                 for (int k = 0; k < PANELS; k++)
@@ -1489,9 +1842,9 @@ namespace LoopLand
                 if (introOn)
                 {
                     if (introTitles != null && d < introTitles.Length && introTitles[d] != null)
-                        introTitles[d].text = (challengeJackpot ? "<color=#FFE14D>JACKPOT</color> " : "") + (challenge != null ? challenge._Name(challengeType) : "CHALLENGE");
+                        introTitles[d].text = introTitle;
                     if (introBodies != null && d < introBodies.Length && introBodies[d] != null)
-                        introBodies[d].text = (challenge != null ? challenge._Rules(challengeType) : "") + "\n<size=80%>" + (challengeType == 0 ? "+30" : "+15") + " coins a hit" + (challengeJackpot ? ", then x3!" : "") + "</size>\n\n<color=#7CFF4F>Press PLAY CHALLENGE to start.</color>";
+                        introBodies[d].text = introBody;
                 }
                 bool showResult = resultOn && !ticketShown && !gameOn && !introOn;
                 if (resultCards != null && d < resultCards.Length && resultCards[d] != null) resultCards[d].SetActive(showResult);
@@ -1499,7 +1852,7 @@ namespace LoopLand
                 {
                     if (resultTitles != null && d < resultTitles.Length && resultTitles[d] != null) resultTitles[d].text = resultTitle;
                     if (resultSubs != null && d < resultSubs.Length && resultSubs[d] != null)
-                        resultSubs[d].text = _Name(turnSlot) + "\n" + resultSub + (stage == ST_DONE ? "\n<color=#7CFF4F><b>TURN COMPLETE</b></color>" : "");
+                        resultSubs[d].text = resultName + "\n" + resultSub + (stage == ST_DONE ? "\n<color=#7CFF4F><b>" + (contest == 2 ? "ROUND COMPLETE" : "TURN COMPLETE") + "</b></color>" : "");
                     if (resultIcons != null && d < resultIcons.Length && resultIcons[d] != null) resultIcons[d].sprite = _Art(resultIcon);
                 }
             }
@@ -1512,12 +1865,49 @@ namespace LoopLand
             if (phase == PH_LOBBY) return "<b>You're in!</b>\nPress <b>START GAME</b> when everyone has joined.\n\nTip: open <b>HOW TO PLAY</b> for the tiles.";
             int p = pos[me];
             string s = "<size=130%><b><color=#FFE14D>" + _Num(coins[me]) + " COINS</color></b></size>\n";
-            s += "LAPS <b>" + laps[me] + "</b>     CHALLENGES WON <b>" + wins[me] + "</b>\n";
+            s += _PlaceLine(me);
+            s += "LAPS <b>" + laps[me] + "</b>     DUELS & BATTLES WON <b>" + wins[me] + "</b>\n";
             s += "SHIELD <b>x" + shields[me] + "</b>     BOOST <b>x" + boosts[me] + "</b>\n\n";
             s += "You're on <b>" + spaceName[p] + "</b>  <color=#9AF2FF>" + _TileTitle(_TileType(p)) + "</color>\n<size=85%>" + _TileDesc(p) + "</size>\n\n";
             s += "ROUND " + round + " / " + maxRounds + "     <color=#FF3DCB>LOOP " + loopLevel + "</color>\n<size=85%>" + _LevelDesc() + "</size>";
             if (phase == PH_OVER) s += "\n\n<color=#FFE14D>GAME OVER</color>  " + (winner > 0 ? _Name(winner - 1) + " wins!" : "");
             return s;
+        }
+
+        /// <summary>"2nd of 4  ·  120 behind Alex" (empty in a solo game).</summary>
+        private string _PlaceLine(int me)
+        {
+            int n = _SeatedCount();
+            if (n < 2) return "";
+            int place = _Place(me);
+            string s = "<color=#FF3DCB><b>" + _PlaceText(place) + "</b></color> of " + n + "   <size=85%>";
+            if (place == 1)
+            {
+                int r = _Rival(me);
+                if (r >= 0) s += (coins[me] - coins[r]) + " ahead of " + _Name(r);
+            }
+            else
+            {
+                int lead = _Leader(me);
+                if (lead >= 0) s += (coins[lead] - coins[me]) + " behind " + _Name(lead);
+            }
+            return s + "</size>\n";
+        }
+
+        /// <summary>1 + how many players have more coins than slot s.</summary>
+        private int _Place(int s)
+        {
+            int place = 1;
+            for (int i = 0; i < MAXP; i++) if (slotPid[i] != 0 && coins[i] > coins[s]) place++;
+            return place;
+        }
+
+        private string _PlaceText(int place)
+        {
+            if (place == 1) return "1st";
+            if (place == 2) return "2nd";
+            if (place == 3) return "3rd";
+            return place + "th";
         }
 
         private string _PowerBody(int me)

@@ -7,8 +7,9 @@ namespace LoopLand
     /// <summary>
     /// Challenge tile mini-games, played on the dashboard in front of the player (VR laser or desktop click):
     /// LASER LOOP (hit 5 glowing targets in 15 seconds) and COIN RUSH (grab as many coins as you can in 12 seconds).
+    /// In a duel or Loop Battle there's no cap: the highest score wins.
     /// The game moves the panel to the player's dashboard, calls _Begin, and gets the hits back in _ChallengeFinished.
-    /// Local to the player whose turn it is.
+    /// Local to each player taking part.
     /// </summary>
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class LoopLandChallenge : UdonSharpBehaviour
@@ -32,6 +33,8 @@ namespace LoopLand
 
         private int type;
         private bool jackpot;
+        private int mode;           // 0 solo, 1 duel, 2 Loop Battle
+        private string versus = "";
         private int state;          // 0 idle, 1 countdown, 2 playing, 3 result
         private float until;
         private float goUntil;
@@ -46,15 +49,20 @@ namespace LoopLand
             return t == 0 ? "LASER LOOP" : "COIN RUSH";
         }
 
-        public string _Rules(int t)
+        /// <summary>The rules; in a duel or battle LASER LOOP has no target count, the most hits wins.</summary>
+        public string _Rules(int t, bool vs)
         {
-            return t == 0 ? "Hit 5 glowing targets in 15 seconds!" : "Grab as many coins as you can in 12 seconds!";
+            if (t == 0) return vs ? "Hit as many glowing targets as you can in 15 seconds!" : "Hit 5 glowing targets in 15 seconds!";
+            return "Grab as many coins as you can in 12 seconds!";
         }
 
-        public void _Begin(int t, bool jp)
+        /// <summary>Starts a run. m: 0 solo, 1 duel (vs = the rival's name), 2 Loop Battle.</summary>
+        public void _Begin(int t, bool jp, int m, string vs)
         {
             type = t;
             jackpot = jp;
+            mode = m;
+            versus = vs;
             hits = 0;
             state = 1;
             until = Time.time + 3f;
@@ -68,8 +76,9 @@ namespace LoopLand
                     targetImages[k].sprite = t == 0 ? laserSprite : coinSprite;
                     targetImages[k].color = t == 0 ? laserColor : Color.white;
                 }
-            if (titleText != null) titleText.text = (jp ? "<color=#FFE14D>JACKPOT</color> " : "") + _Name(t);
-            if (infoText != null) infoText.text = _Rules(t);
+            string title = m == 1 ? "DUEL vs " + vs : (m == 2 ? "LOOP BATTLE: " + _Name(t) : _Name(t));
+            if (titleText != null) titleText.text = (jp ? "<color=#FFE14D>JACKPOT</color> " : "") + title;
+            if (infoText != null) infoText.text = _Rules(t, m > 0);
         }
 
         public void _Stop()
@@ -88,7 +97,7 @@ namespace LoopLand
             if (state != 2) return;
             hits++;
             _Sfx(hitClip);
-            if (type == 0 && hits >= 5)
+            if (type == 0 && mode == 0 && hits >= 5)
             {
                 _End();
                 return;
@@ -152,8 +161,13 @@ namespace LoopLand
             state = 3;
             until = Time.time + 2.5f;
             _HideTargets();
-            if (bigText != null) bigText.text = type == 0 ? hits + " / 5 HITS!" : hits + " COINS GRABBED!";
-            if (infoText != null) infoText.text = jackpot ? "JACKPOT CHALLENGE: your coins are tripled!" : "Nice! Your coins are on the way.";
+            if (bigText != null) bigText.text = type != 0 ? hits + " COINS GRABBED!" : (mode == 0 ? hits + " / 5 HITS!" : hits + " HITS!");
+            if (infoText != null)
+            {
+                if (mode == 1) infoText.text = "Waiting for " + versus + "...";
+                else if (mode == 2) infoText.text = "Waiting for everyone to finish...";
+                else infoText.text = jackpot ? "JACKPOT CHALLENGE: your coins are tripled!" : "Nice! Your coins are on the way.";
+            }
             _Sfx(endClip);
         }
 
@@ -161,7 +175,7 @@ namespace LoopLand
         {
             if (infoText == null) return;
             int secs = Mathf.CeilToInt(Mathf.Max(0f, until - Time.time));
-            infoText.text = "TIME <color=#FFE14D>" + secs + "</color>      HITS <color=#7CFF4F>" + hits + (type == 0 ? " / 5" : "") + "</color>";
+            infoText.text = "TIME <color=#FFE14D>" + secs + "</color>      HITS <color=#7CFF4F>" + hits + (type == 0 && mode == 0 ? " / 5" : "") + "</color>";
         }
 
         /// <summary>Puts target k somewhere new inside the play area, away from the other targets.</summary>

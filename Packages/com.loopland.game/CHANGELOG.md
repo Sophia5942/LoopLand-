@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.1.0
+- **Compete with each other.**
+  - **Duels:** with 2+ players, Challenge tiles (and Surprise Challenges) are duels against your closest rival in
+    coins. Both players play the same mini-game on their own dashboards, and the higher score wins 100 coins while
+    the loser pays 100. A Jackpot Challenge from a Lucky Loop ticket stays a solo reward.
+  - **Loop Battles:** after every 2nd round everyone plays the same mini-game. 1st +200, 2nd +100, 3rd and below
+    +50, last place pays 50. A FINAL BATTLE after the last round doubles everything.
+  - **Bumps:** landing on another player grabs 50 of their coins.
+  - Shields block duel, battle and bump losses. All amounts grow x1.5 from Loop 2.
+- In duels and battles LASER LOOP has no 5-target cap: the most hits wins.
+- The player list shows places (1st, 2nd...) and live duel and battle scores. MY STATUS shows how far ahead or
+  behind you are.
+- New *Competition* settings on `LoopLand/Game`: duel stake, battle frequency (0 = off), battle prizes, last-place
+  cost, bump amount and play time.
+- Players get 75 seconds to finish a duel or battle and must start within the first 50 or so. Anyone who doesn't
+  play scores 0.
+
 ## 2.0.0
 A new, simpler LoopLand: race around the Loop, win challenges, scratch tickets and finish with the most coins.
 - **New rules.** No more buying, rent, building, mortgages, jail or bankruptcy. There are seven tile types:
