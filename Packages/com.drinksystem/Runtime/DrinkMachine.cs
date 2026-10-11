@@ -2,7 +2,7 @@ using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
 
-namespace LoopLand.Drinks {
+namespace DrinkSystem {
 	/// <summary>
 	/// The drink machine manager (like ManagerBar). Finds the flavors, slots and cups under their parents, keeps the
 	/// local "which cup is locked in which slot" table, handles VR finger presses on the UI buttons, cup respawning

@@ -1,6 +1,6 @@
 // Soda stream from the nozzle: unlit, flowing bands in world space (so stretching the stream doesn't stretch them).
 // _Color is set per slot by DrinkSlot (MaterialPropertyBlock).
-Shader "LoopLand/Drinks/Stream"
+Shader "DrinkSystem/Stream"
 {
     Properties
     {

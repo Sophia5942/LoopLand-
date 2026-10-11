@@ -1,7 +1,7 @@
 using UdonSharp;
 using UnityEngine;
 
-namespace LoopLand.Drinks {
+namespace DrinkSystem {
 	/// <summary>
 	/// One drink type (like LiquidParticles): how the liquid looks, how fast it pours and its optional screen effects.
 	/// Put these under the machine's FlavorsParent. A DrinkSlot picks one by index.

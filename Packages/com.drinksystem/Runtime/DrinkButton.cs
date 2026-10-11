@@ -1,7 +1,7 @@
 using UdonSharp;
 using UnityEngine;
 
-namespace LoopLand.Drinks {
+namespace DrinkSystem {
 	/// <summary>
 	/// UI push button. A Unity UI Button calls Press() (laser pointer on PC VR / Quest, mouse on desktop),
 	/// and the DrinkMachine calls it when a VR index finger pokes the button. Plays the click, squashes the

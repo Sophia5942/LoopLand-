@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using LoopLand.Drinks;
+using DrinkSystem;
 using TMPro;
 using UdonSharp;
 using UdonSharpEditor;
@@ -17,20 +17,20 @@ using VRC.SDKBase;
 using VRC.Udon;
 using Object = UnityEngine.Object;
 
-namespace LoopLand.EditorTools
+namespace DrinkSystem.EditorTools
 {
     /// <summary>
-    /// One-click builder: LoopLand > Build Drink Machine In Scene.
+    /// One-click builder: Tools > Drink System > Build Drink Machine In Scene.
     /// Places the Drink_Machine_1 model on a counter, adds a cup slot + push-button UI under each of its 6 nozzles,
     /// a stack of cups, a respawn button, and generates the materials, meshes and sound effects into
-    /// Assets/LoopLand/Generated/Drinks.
+    /// Assets/DrinkSystem/Generated.
     /// </summary>
     public static class DrinkMachineBuilder
     {
-        private const string Root = "Assets/LoopLand";
-        private const string Gen = Root + "/Generated/Drinks";
-        private const string ModelPath = "Packages/com.loopland.game/Models/Drink_Machine_1.fbx";
-        private const string RootName = "LoopLand Drinks";
+        private const string Root = "Assets/DrinkSystem";
+        private const string Gen = Root + "/Generated";
+        private const string ModelPath = "Packages/com.drinksystem/Models/Drink_Machine_1.fbx";
+        private const string RootName = "Drink Machine";
 
         // Drink_Machine_1 is modeled about 2x real size: this brings the nozzles to ~13 cm apart.
         private const float MachineScale = 0.55f;
@@ -78,14 +78,14 @@ namespace LoopLand.EditorTools
         private static readonly List<UdonSharpBehaviour> made = new List<UdonSharpBehaviour>();
         private static readonly System.Random rng = new System.Random(11);
 
-        [MenuItem("LoopLand/Build Drink Machine In Scene", priority = 1)]
+        [MenuItem("Tools/Drink System/Build Drink Machine In Scene")]
         public static void Build()
         {
             font = TMP_Settings.instance != null ? TMP_Settings.defaultFontAsset : null;
             if (font == null) font = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
             if (font == null)
             {
-                if (EditorUtility.DisplayDialog("LoopLand Drinks", "TextMesh Pro Essential Resources are missing.\nImport them, then run LoopLand > Build Drink Machine In Scene again.", "Import now", "Cancel"))
+                if (EditorUtility.DisplayDialog("Drink System", "TextMesh Pro Essential Resources are missing.\nImport them, then run Tools > Drink System > Build Drink Machine In Scene again.", "Import now", "Cancel"))
                     EditorApplication.ExecuteMenuItem("Window/TextMeshPro/Import TMP Essential Resources");
                 return;
             }
@@ -93,25 +93,25 @@ namespace LoopLand.EditorTools
             GameObject old = GameObject.Find(RootName);
             if (old != null)
             {
-                if (!EditorUtility.DisplayDialog("LoopLand Drinks", "A '" + RootName + "' object already exists in this scene. Replace it?", "Replace", "Cancel")) return;
+                if (!EditorUtility.DisplayDialog("Drink System", "A '" + RootName + "' object already exists in this scene. Replace it?", "Replace", "Cancel")) return;
                 Undo.DestroyObjectImmediate(old);
             }
 
             made.Clear();
             try
             {
-                EditorUtility.DisplayProgressBar("LoopLand Drinks", "Preparing UdonSharp programs...", 0.1f);
+                EditorUtility.DisplayProgressBar("Drink System", "Preparing UdonSharp programs...", 0.1f);
                 EnsurePrograms();
-                EditorUtility.DisplayProgressBar("LoopLand Drinks", "Generating sounds, meshes and materials...", 0.3f);
+                EditorUtility.DisplayProgressBar("Drink System", "Generating sounds, meshes and materials...", 0.3f);
                 GameObject root = BuildAll();
-                EditorUtility.DisplayProgressBar("LoopLand Drinks", "Wiring Udon behaviours...", 0.85f);
+                EditorUtility.DisplayProgressBar("Drink System", "Wiring Udon behaviours...", 0.85f);
                 foreach (UdonSharpBehaviour b in made) UdonSharpEditorUtility.CopyProxyToUdon(b);
-                Undo.RegisterCreatedObjectUndo(root, "Build LoopLand Drinks");
+                Undo.RegisterCreatedObjectUndo(root, "Build Drink Machine");
                 EditorSceneManager.MarkSceneDirty(root.scene);
                 AssetDatabase.SaveAssets();
-                PrefabUtility.SaveAsPrefabAssetAndConnect(root, Root + "/LoopLand Drink Machine.prefab", InteractionMode.AutomatedAction);
+                PrefabUtility.SaveAsPrefabAssetAndConnect(root, Root + "/Drink Machine.prefab", InteractionMode.AutomatedAction);
                 Selection.activeGameObject = root;
-                Debug.Log("[LoopLand] Drink machine built! Prefab saved to " + Root + "/LoopLand Drink Machine.prefab.");
+                Debug.Log("[DrinkSystem] Drink machine built! Prefab saved to " + Root + "/Drink Machine.prefab.");
             }
             finally
             {
@@ -140,11 +140,11 @@ namespace LoopLand.EditorTools
                     var ms = AssetDatabase.LoadAssetAtPath<MonoScript>(AssetDatabase.GUIDToAssetPath(g));
                     if (ms != null && ms.GetClass() == t) { script = ms; break; }
                 }
-                if (script == null) throw new Exception("[LoopLand] Could not find the script for " + t.Name);
+                if (script == null) throw new Exception("[DrinkSystem] Could not find the script for " + t.Name);
                 var asset = ScriptableObject.CreateInstance<UdonSharpProgramAsset>();
                 asset.sourceCsScript = script;
-                Dir(Root + "/Generated/Programs");
-                AssetDatabase.CreateAsset(asset, Root + "/Generated/Programs/" + t.Name + ".asset");
+                Dir(Gen + "/Programs");
+                AssetDatabase.CreateAsset(asset, Gen + "/Programs/" + t.Name + ".asset");
                 created = true;
             }
             if (!created) return;
@@ -161,9 +161,9 @@ namespace LoopLand.EditorTools
             roundSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
             knobSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
 
-            Material liquidMat = ShaderMat("Drink_Liquid", "LoopLand/Drinks/Liquid");
-            Material cupMat = ShaderMat("Drink_Cup", "LoopLand/Drinks/Cup");
-            Material streamMat = ShaderMat("Drink_Stream", "LoopLand/Drinks/Stream");
+            Material liquidMat = ShaderMat("Drink_Liquid", "DrinkSystem/Liquid");
+            Material cupMat = ShaderMat("Drink_Cup", "DrinkSystem/Cup");
+            Material streamMat = ShaderMat("Drink_Stream", "DrinkSystem/Stream");
             Material sleeveMat = LitMat("Drink_CupSleeve", Hex("D83A2E"));
             Material counterMat = LitMat("Drink_Counter", Hex("2B2A33"));
             Material machineMat = LitMat("Drink_MachineFallback", Hex("B9BEC6"));
@@ -279,7 +279,7 @@ namespace LoopLand.EditorTools
             }
             if (prefab == null)
             {
-                Debug.LogWarning("[LoopLand] Drink_Machine_1.fbx not found, building a simple stand-in machine.");
+                Debug.LogWarning("[DrinkSystem] Drink_Machine_1.fbx not found, building a simple stand-in machine.");
                 return FallbackMachine(parent, fallbackMat, out b);
             }
 
@@ -635,7 +635,7 @@ namespace LoopLand.EditorTools
             Shader s = Shader.Find(shaderName);
             if (s == null)
             {
-                Debug.LogWarning("[LoopLand] Shader " + shaderName + " not found, using Standard for " + name);
+                Debug.LogWarning("[DrinkSystem] Shader " + shaderName + " not found, using Standard for " + name);
                 s = Shader.Find("Standard");
             }
             return SaveMat(name, s, m => { });

@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using VRC.SDKBase;
 
-namespace LoopLand.Drinks {
+namespace DrinkSystem {
 	/// <summary>
 	/// One nozzle of the machine: where a cup locks, the soda stream, the pour sounds and the push-button UI.
 	/// Nothing here is synced. The cup locked in the slot carries the state (locked / pouring / fill) and

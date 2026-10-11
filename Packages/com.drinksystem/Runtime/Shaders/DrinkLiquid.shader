@@ -2,7 +2,7 @@
 // Same property names as the LiquidGlass shader, so DrinkCup drives either one.
 // The script sets _FillHeight (world Y of the surface) and _GlassRemap (world min/max Y of the glass).
 // Everything above the surface is clipped. The inside faces are drawn in the foam color, which reads as the flat top.
-Shader "LoopLand/Drinks/Liquid"
+Shader "DrinkSystem/Liquid"
 {
     Properties
     {

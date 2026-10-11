@@ -2,7 +2,7 @@ using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
 
-namespace LoopLand.Drinks {
+namespace DrinkSystem {
 	/// <summary>
 	/// A cup (LiquidGlass + TransformSync in one). It locks into a machine slot when you drop it there, fills while
 	/// its slot pours, you drink it with Use, and it respawns when it is lost or left behind.

@@ -1,5 +1,5 @@
 // Clear plastic cup for VRChat PC + Quest: unlit tint with a fresnel rim and a soft fake highlight.
-Shader "LoopLand/Drinks/Cup"
+Shader "DrinkSystem/Cup"
 {
     Properties
     {
