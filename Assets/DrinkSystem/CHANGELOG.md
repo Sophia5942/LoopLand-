@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1
+- Now a regular `.unitypackage` that imports into `Assets/DrinkSystem`. There are no assembly definitions or UdonSharp
+  assembly files, so it compiles together with your own UdonSharp scripts. Fresh file IDs, so nothing clashes with
+  older installs.
+- Glass tint reset no longer uses `MaterialPropertyBlock.Clear`.
+
 ## 2.1.0
 - Clear step-by-step line, left to right: 1 glass rack, 2 place, 3 strength + froth + pour, 4 finishing station
   (straw, fruit, glass tint, logo, applied instantly to the glass on the pad), 5 drink. Numbered gold badges, a sign

@@ -20,7 +20,15 @@ plus automatic respawn).
 - Your **`Glasses2025`** prefab in the project. Without it, the builder makes simple glasses instead.
 
 ## Install
-Copy the `com.drinksystem` folder into your project's **`Packages/`** folder (not `Assets/`), then open the project.
+In Unity: **Assets > Import Package > Custom Package...** and pick `DrinkSystem.unitypackage`. It imports into
+`Assets/DrinkSystem` (no assembly definitions, just like your own scripts).
+
+**Upgrading from an older zip:** first close Unity and delete these if you have them:
+- `Packages/com.drinksystem`
+- `Packages/com.loopland.game`, if you installed the first zip
+- `Assets/DrinkSystem/Generated`
+
+Then open Unity and import.
 
 ## Build it (one click)
 1. **Select your bar counter** in the scene (optional). The station is placed on top of it.
@@ -79,7 +87,7 @@ stronger it gets, and it wears off over time.
 ## Customize
 - **Drinks:** edit them under `Drink Machine/Flavors` (the first 6 are the drink cards).
 - **Glasses:** change `GlassesPrefabName` / `CopiesPerGlass` at the top of `Editor/DrinkMachineBuilder.cs`.
-- **Logo:** replace `Runtime/Textures/FBT_Mayfair_Logo.png` (transparent PNG) and build again.
+- **Logo:** replace `Assets/DrinkSystem/Textures/FBT_Mayfair_Logo.png` (transparent PNG) and build again.
 - **Sounds:** the builder makes procedural stand-ins. Drop your own clips into the **Sounds** section of
   `DrinkMachine`.
 - **Liquid shader:** `DrinkCup` sets the same properties as `LiquidGlass` (`_FillHeight`, `_GlassRemap`, `_ColorMain`,

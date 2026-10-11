@@ -75,6 +75,7 @@ namespace DrinkSystem {
 		private int IdLogoColor;
 		private MaterialPropertyBlock BodyProps;
 		private MaterialPropertyBlock LogoProps;
+		private MaterialPropertyBlock EmptyProps;
 		private int AppliedLooks = -1;
 		private Vector3 LocalBottom;
 		private Vector3 LocalTop;
@@ -159,6 +160,7 @@ namespace DrinkSystem {
 			IdLogoColor = VRCShader.PropertyToID("_LogoColor");
 			BodyProps = new MaterialPropertyBlock();
 			LogoProps = new MaterialPropertyBlock();
+			EmptyProps = new MaterialPropertyBlock();
 			MeasureLiquid();
 			Transform home = SpawnPoint != null ? SpawnPoint : transform;
 			HomePos = home.position;
@@ -511,9 +513,11 @@ namespace DrinkSystem {
 			}
 			if(BodyRenderer != null) {
 				// Tint 0 = the glass material exactly as it is
-				BodyProps.Clear();
-				if(Tint > 0 && MB.CupTints != null && Tint < MB.CupTints.Length) BodyProps.SetColor(IdColor, MB.CupTints[Tint]);
-				BodyRenderer.SetPropertyBlock(BodyProps);
+				if(Tint > 0 && MB.CupTints != null && Tint < MB.CupTints.Length) {
+					BodyProps.SetColor(IdColor, MB.CupTints[Tint]);
+					BodyRenderer.SetPropertyBlock(BodyProps);
+				}
+				else BodyRenderer.SetPropertyBlock(EmptyProps);
 			}
 			if(LogoRenderer != null) {
 				bool on = MB.LogoColors != null && Logo < MB.LogoColors.Length && MB.LogoColors[Logo].a > 0f;

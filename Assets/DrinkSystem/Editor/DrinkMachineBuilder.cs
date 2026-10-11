@@ -33,7 +33,7 @@ namespace DrinkSystem.EditorTools
         // ---- easy to change
         private const string GlassesPrefabName = "Glasses2025";   // your glasses prefab (Glass_* children with a Liquid_* child)
         private const int CopiesPerGlass = 2;                      // how many of each glass on the rack
-        private const string LogoPath = "Packages/com.drinksystem/Runtime/Textures/FBT_Mayfair_Logo.png";
+        private const string LogoPath = "Assets/DrinkSystem/Textures/FBT_Mayfair_Logo.png";
 
         private const string Root = "Assets/DrinkSystem";
         private const string Gen = Root + "/Generated";
@@ -363,13 +363,8 @@ namespace DrinkSystem.EditorTools
 
         private static Sprite Logo()
         {
-            Dir(Gen + "/Textures");
-            string dst = Gen + "/Textures/FBT_Mayfair_Logo.png";
-            string src = Path.GetFullPath(LogoPath);
-            if (File.Exists(src)) File.Copy(src, dst, true);
-            AssetDatabase.ImportAsset(dst);
-            var imp = AssetImporter.GetAtPath(dst) as TextureImporter;
-            if (imp != null)
+            var imp = AssetImporter.GetAtPath(LogoPath) as TextureImporter;
+            if (imp != null && imp.textureType != TextureImporterType.Sprite)
             {
                 imp.textureType = TextureImporterType.Sprite;
                 imp.spriteImportMode = SpriteImportMode.Single;
@@ -378,7 +373,7 @@ namespace DrinkSystem.EditorTools
                 imp.wrapMode = TextureWrapMode.Clamp;
                 imp.SaveAndReimport();
             }
-            Sprite s = AssetDatabase.LoadAssetAtPath<Sprite>(dst);
+            Sprite s = AssetDatabase.LoadAssetAtPath<Sprite>(LogoPath);
             if (s == null) throw new Exception("[DrinkSystem] Could not load the FBT Mayfair logo at " + LogoPath);
             return s;
         }
