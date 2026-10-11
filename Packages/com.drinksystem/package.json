@@ -1,9 +1,9 @@
 {
   "name": "com.drinksystem",
-  "displayName": "Drink System - Bar Drink Station",
-  "version": "2.0.0",
+  "displayName": "Drink System - FBT Mayfair Drink Station",
+  "version": "2.1.0",
   "unity": "2022.3",
-  "description": "Networked black and gold bar drink station for VRChat worlds (PC + Quest): drink cards with pour buttons, cups that lock into place, froth / strength / spirit / fruit / straw options, a cup customizer kiosk, glowing logo glasses, pour / fizz / slurp sounds, drinking with optional screen effects and cup respawn. Lightweight manual sync. One-click builder: Tools > Drink System > Build Drink Machine In Scene.",
+  "description": "Networked FBT Mayfair bar drink station for VRChat worlds (PC + Quest), laid out as a clear line: 1 take a glass, 2 place it, 3 pick strength (drunk post-processing) + froth and pour, 4 finish it (straw, fruit, glass tint, logo), 5 drink. Uses your own glasses prefab, lightweight manual sync, glass respawn. One-click builder: Tools > Drink System > Build Drink Machine In Scene.",
   "author": {
     "name": "Sophia5942",
     "email": "itzsophbusiness@gmail.com",

@@ -21,18 +21,19 @@ namespace DrinkSystem.EditorTools
 {
     /// <summary>
     /// One-click builder: Tools > Drink System > Build Drink Machine In Scene.
-    /// Builds a black and gold bar drink station: drink cards with pour buttons, gold nozzles with warm light, a garnish
-    /// drawer, a shelf of glowing logo glasses, an options tower (froth / strength / spirit / fruit / straw), a cup
-    /// customizer kiosk and a neon sign. Everything (meshes, textures, icons, materials, sounds) is generated into
-    /// Assets/DrinkSystem/Generated. Select your bar counter first to put the station on top of it.
+    /// Builds the FBT Mayfair drink station as one clear line, left to right:
+    ///   1 TAKE A GLASS (glass rack)  >  2 PLACE IT under a drink  >  3 STRENGTH + FROTH, POUR  >  4 FINISH IT (straw,
+    ///   fruit, glass tint, logo)  >  5 HOLD USE TO DRINK.
+    /// The glasses come from your Glasses2025 prefab (your models and materials), turned into networked DrinkCups.
+    /// Everything else (meshes, icons, materials, sounds) is generated into Assets/DrinkSystem/Generated.
+    /// Select your bar counter first to put the station on top of it.
     /// </summary>
     public static class DrinkMachineBuilder
     {
         // ---- easy to change
-        private const string Brand = "GOLDEN HOUR";
-        private const string CupLogoText = "G";
-        private const string NeonText = "Fancy a\nDrink?";
-        private const int CupCount = 8;
+        private const string GlassesPrefabName = "Glasses2025";   // your glasses prefab (Glass_* children with a Liquid_* child)
+        private const int CopiesPerGlass = 2;                      // how many of each glass on the rack
+        private const string LogoPath = "Packages/com.drinksystem/Runtime/Textures/FBT_Mayfair_Logo.png";
 
         private const string Root = "Assets/DrinkSystem";
         private const string Gen = Root + "/Generated";
@@ -41,11 +42,13 @@ namespace DrinkSystem.EditorTools
 
         // ---- layout (meters, the bar top is y = 0, players stand on +Z)
         private const float MainW = 1.05f, Depth = 0.42f, Front = 0.21f, Back = -0.21f;
-        private const float BaseTop = 0.10f, GrateTop = 0.11f, BodyBottom = 0.38f, BodyTop = 0.64f;
+        private const float BaseTop = 0.10f, GrateTop = 0.11f;
         private const float NozzleZ = 0.055f, SlotSpacing = 0.175f;
-        private const float TowerX0 = 0.56f, TowerX1 = 1.30f, TowerTop = 0.66f;
-        private const float KioskX = -0.78f, KioskW = 0.40f;
+        private const float RackX0 = -1.34f, RackX1 = -0.60f;
+        private const float FinishX0 = 0.56f, FinishX1 = 1.30f;
         private const float CupH = 0.15f, CupRB = 0.028f, CupRT = 0.036f;
+        // set from the tallest glass, so every glass fits under the nozzles
+        private static float BodyBottom = 0.42f, BodyTop = 0.72f;
 
         private struct Drink
         {
@@ -57,11 +60,12 @@ namespace DrinkSystem.EditorTools
         // Glass: 0 highball, 1 goblet, 2 martini. Garnish: 0 orange, 1 berries, 2 lime + mint, 3 lemon, 4 coffee beans
         private static readonly Drink[] Drinks =
         {
-            new Drink("Golden Hour Spritz", 1, 0, "FF8A1E", "FFD9A0", "FFC060", 0.35f, 0.03f),
+            new Drink("Mayfair Spritz", 1, 0, "FF8A1E", "FFD9A0", "FFC060", 0.35f, 0.03f),
             new Drink("Berry Bliss", 0, 1, "B0102A", "F2A0B0", "FF5070", 0.25f, 0.03f),
             new Drink("Tropical Mule", 0, 2, "E8C25A", "FFF2C8", "FFE08A", 0.40f, 0.04f),
             new Drink("Citrus Smash", 0, 3, "C8D94A", "F4FFD0", "F0FF90", 0.45f, 0.03f),
             new Drink("Espresso Martini", 2, 4, "2A140A", "D9B98C", "6B3A1E", 0.05f, 0.16f),
+            new Drink("Rose Fizz", 1, 1, "F28AA0", "FFE0E8", "FFC0D0", 0.45f, 0.05f),
         };
 
         private struct Fruit
@@ -83,24 +87,26 @@ namespace DrinkSystem.EditorTools
         };
 
         private static readonly string[] StrawNames = { "Gold Metal", "Black Metal", "Glass", "Bamboo", "Paper", "Custom" };
-        private static readonly string[] TintNames = { "Clear", "Smoke", "Amber", "Rose", "Violet", "Emerald" };
+        private static readonly string[] TintNames = { "Original", "Smoke", "Amber", "Rose", "Violet", "Emerald" };
         private static readonly Color[] Tints =
         {
-            new Color(0.92f, 0.96f, 1f, 0.10f), new Color(0.25f, 0.25f, 0.28f, 0.40f), new Color(1f, 0.65f, 0.25f, 0.25f),
-            new Color(1f, 0.5f, 0.66f, 0.22f), new Color(0.6f, 0.42f, 1f, 0.25f), new Color(0.24f, 0.84f, 0.55f, 0.22f),
+            new Color(1f, 1f, 1f, 1f), new Color(0.25f, 0.25f, 0.28f, 0.45f), new Color(1f, 0.65f, 0.25f, 0.35f),
+            new Color(1f, 0.5f, 0.66f, 0.32f), new Color(0.6f, 0.42f, 1f, 0.35f), new Color(0.24f, 0.84f, 0.55f, 0.32f),
         };
-        private static readonly string[] LogoNames = { "GOLD", "SILVER", "NONE" };
-        private static readonly Color[] LogoColors = { new Color(1f, 0.76f, 0.29f, 1f), new Color(0.9f, 0.92f, 0.96f, 1f), new Color(1f, 1f, 1f, 0f) };
+        private static readonly string[] LogoNames = { "FBT GOLD", "FBT SILVER", "NO LOGO" };
+        private static readonly Color[] LogoColors = { new Color(1f, 1f, 1f, 1f), new Color(0.88f, 0.9f, 0.95f, 1f), new Color(1f, 1f, 1f, 0f) };
 
         private static readonly Color Gold = new Color(0.79f, 0.59f, 0.18f, 1f);
         private static readonly Color GoldText = new Color(0.93f, 0.74f, 0.38f, 1f);
         private static readonly Color Panel = new Color(0.07f, 0.065f, 0.085f, 0.97f);
         private static readonly Color Card = new Color(0.09f, 0.085f, 0.11f, 1f);
         private static readonly Color OptionOff = new Color(0.12f, 0.11f, 0.15f, 1f);
+        private static readonly Color Hint = new Color(1f, 1f, 1f, 0.6f);
 
         private static TMP_FontAsset font;
-        private static Sprite roundSprite, knobSprite, ringSprite;
+        private static Sprite roundSprite, knobSprite, logoSprite;
         private static readonly List<UdonSharpBehaviour> made = new List<UdonSharpBehaviour>();
+        private static readonly Dictionary<string, Mesh> logoMeshes = new Dictionary<string, Mesh>();
         private static readonly System.Random rng = new System.Random(11);
 
         [MenuItem("Tools/Drink System/Build Drink Machine In Scene")]
@@ -129,13 +135,14 @@ namespace DrinkSystem.EditorTools
             }
 
             made.Clear();
+            logoMeshes.Clear();
             try
             {
                 EditorUtility.DisplayProgressBar("Drink System", "Preparing UdonSharp programs...", 0.05f);
                 EnsurePrograms();
-                EditorUtility.DisplayProgressBar("Drink System", "Painting icons, building the station...", 0.3f);
+                EditorUtility.DisplayProgressBar("Drink System", "Building the station...", 0.3f);
                 GameObject root = BuildAll(!onTarget);
-                if (onTarget) root.transform.position = new Vector3(targetBounds.center.x - (TowerX1 + KioskX - KioskW * 0.5f) * 0.5f, targetBounds.max.y, targetBounds.center.z);
+                if (onTarget) root.transform.position = new Vector3(targetBounds.center.x - (RackX0 + FinishX1) * 0.5f, targetBounds.max.y, targetBounds.center.z);
                 else
                 {
                     Vector3 p = SceneView.lastActiveSceneView != null ? SceneView.lastActiveSceneView.pivot : new Vector3(0f, 0f, 3f);
@@ -148,7 +155,7 @@ namespace DrinkSystem.EditorTools
                 AssetDatabase.SaveAssets();
                 PrefabUtility.SaveAsPrefabAssetAndConnect(root, Root + "/Drink Machine.prefab", InteractionMode.AutomatedAction);
                 Selection.activeGameObject = root;
-                Debug.Log("[DrinkSystem] Drink machine built" + (onTarget ? " on top of '" + target.name + "'" : "") + ". Prefab: " + Root + "/Drink Machine.prefab");
+                Debug.Log("[DrinkSystem] FBT Mayfair drink station built" + (onTarget ? " on top of '" + target.name + "'" : "") + ". Prefab: " + Root + "/Drink Machine.prefab");
             }
             finally
             {
@@ -207,7 +214,7 @@ namespace DrinkSystem.EditorTools
         {
             roundSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
             knobSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-            ringSprite = SaveSprite("Gauge_Ring", RingTex());
+            logoSprite = Logo();
 
             // --- materials
             Material body = LitMat("Body_Black", Hex("0E0D11"), 0.4f, 0.9f, Color.black);
@@ -220,8 +227,14 @@ namespace DrinkSystem.EditorTools
             Material liquidMat = ShaderMat("Liquid", "DrinkSystem/Liquid");
             Material streamMat = ShaderMat("Stream", "DrinkSystem/Stream");
             Material cupMat = ShaderMat("Cup_Glass", "DrinkSystem/Cup");
-            Texture2D logo = TextTexture("Cup_Logo", CupLogoText, 256, 256);
-            cupMat.SetTexture("_LogoTex", logo);
+            cupMat.SetColor("_LogoColor", new Color(0f, 0f, 0f, 0f));
+            Material logoMat = ShaderMat("Glass_Logo", "DrinkSystem/Cup");
+            logoMat.SetColor("_Color", new Color(0f, 0f, 0f, 0f));
+            logoMat.SetColor("_RimColor", new Color(0f, 0f, 0f, 0f));
+            logoMat.SetFloat("_Highlight", 0f);
+            logoMat.SetTexture("_LogoTex", logoSprite.texture);
+            logoMat.SetVector("_LogoRect", new Vector4(0.5f, 0.5f, 1f, 1f));
+            logoMat.SetColor("_LogoColor", LogoColors[0]);
             Material darkGlass = ShaderMat("Drawer_Glass", "DrinkSystem/Cup");
             darkGlass.SetColor("_Color", new Color(0.06f, 0.05f, 0.04f, 0.28f));
             darkGlass.SetColor("_LogoColor", new Color(0f, 0f, 0f, 0f));
@@ -255,16 +268,13 @@ namespace DrinkSystem.EditorTools
             };
             strawMats[2].SetColor("_Color", new Color(0.9f, 0.95f, 1f, 0.3f));
             strawMats[2].SetColor("_LogoColor", new Color(0f, 0f, 0f, 0f));
-            foreach (Material m in new[] { grate, cupMat, darkGlass, strawMats[2] }) EditorUtility.SetDirty(m);
+            foreach (Material m in new[] { grate, cupMat, logoMat, darkGlass, strawMats[2] }) EditorUtility.SetDirty(m);
 
             // --- meshes
-            Mesh cupMesh = Frustum("Cup", CupRB, CupRT, 0f, CupH, 24, true, false);
-            Mesh liquidMesh = Frustum("Liquid", CupRB * 0.92f, CupRT * 0.93f, 0.012f, CupH - 0.006f, 24, true, true, 0f, CupH);
-            Mesh streamMesh = Tube("Stream", 0.0042f, 0.0034f, -1f, 10);
-            Mesh strawMesh = Tube("Straw", 0.0035f, 0.0035f, 0.19f, 10);
+            Mesh strawMesh = Tube("Straw", 0.0035f, 0.0035f, 1f, 10);
             Mesh discMesh = Frustum("Garnish", 0.021f, 0.021f, 0f, 0.005f, 20, true, true);
-            Mesh coneMesh = Tube("Light_Cone", 0.006f, 0.065f, -(BodyBottom - 0.035f - GrateTop), 16);
             Mesh sphereMesh = LowSphere("Low_Sphere", 10, 6);
+            Mesh streamMesh = Tube("Stream", 0.0042f, 0.0034f, -1f, 10);
 
             // --- root + machine brain
             var root = new GameObject(RootName);
@@ -272,70 +282,60 @@ namespace DrinkSystem.EditorTools
             var mb = UdonSharpUndo.AddComponent<DrinkMachine>(root);
             made.Add(mb);
             Sounds(mb);
+            WireDrunkEffect(mb);
+
+            // --- STEP 1: glasses (first, so the machine can be made tall enough for the tallest one)
+            var cupsParent = new GameObject("Glasses");
+            cupsParent.transform.SetParent(rt, false);
+            float tallest = Glasses(cupsParent.transform, cupMat, liquidMat, logoMat, strawMesh, discMesh);
+            BodyBottom = Mathf.Max(0.42f, GrateTop + tallest + 0.09f);
+            BodyTop = BodyBottom + 0.30f;
+            Mesh coneMesh = Tube("Light_Cone", 0.006f, 0.065f, -(BodyBottom - 0.035f - GrateTop), 16);
 
             var stat = new GameObject("Station");
             stat.transform.SetParent(rt, false);
             Transform st = stat.transform;
             if (withCounter)
             {
-                float cx = (KioskX - KioskW * 0.5f + TowerX1) * 0.5f;
-                Box(st, "Counter", new Vector3(cx, -0.5f, 0.02f), new Vector3(TowerX1 - KioskX + KioskW * 0.5f + 0.3f, 1f, 0.75f), counterMat, true);
-                Box(st, "Counter Trim", new Vector3(cx, -0.004f, 0.395f), new Vector3(TowerX1 - KioskX + KioskW * 0.5f + 0.3f, 0.008f, 0.006f), trim);
+                float cx = (RackX0 + FinishX1) * 0.5f, w = FinishX1 - RackX0 + 0.3f;
+                Box(st, "Counter", new Vector3(cx, -0.5f, 0.02f), new Vector3(w, 1f, 0.75f), counterMat, true);
+                Box(st, "Counter Trim", new Vector3(cx, -0.004f, 0.395f), new Vector3(w, 0.008f, 0.006f), trim);
             }
+            Rack(st, rt, body, trim, warm);
             MainUnit(st, body, trim, metal, warm, grate, darkGlass, coneMat, poolMat, coneMesh, sphereMesh, discMesh,
                 orangeMat, limeMat, garnishMats[0], berryMat, grapeMat, beanMat);
-            Tower(st, body, trim);
-            Kiosk(st, body, trim, metal, warm, grate, coneMat, poolMat, coneMesh);
-            Neon(rt);
+            FinishUnit(st, body, trim, warm, grate, coneMat, poolMat, coneMesh);
+            Sign(st, rt, body, trim, warm);
             foreach (Transform t in st.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = true;
 
-            // --- flavors: 5 drinks then the 6 fruits (FruitFlavorStart = 5)
+            // --- flavors: the 6 drinks, then the 6 fruits (slight fruit tint)
             var flavorsParent = new GameObject("Flavors");
             flavorsParent.transform.SetParent(rt, false);
             foreach (Drink d in Drinks) Flavor(flavorsParent.transform, d.Name, Hex(d.Main), Hex(d.Foam), Hex(d.Edge), d.Transparency, d.FoamHeight);
             foreach (Fruit f in Fruits) Flavor(flavorsParent.transform, f.Name, Hex(f.Liquid), Color.Lerp(Hex(f.Liquid), Color.white, 0.7f), Hex(f.Flesh), f.Transparency, 0.03f);
 
-            // --- slots: 6 nozzles with their cards, plus the customizer pad
+            // --- STEP 2 + 3: drink panel, cards, nozzles
             var slotsParent = new GameObject("Slots");
             slotsParent.transform.SetParent(rt, false);
-            RectTransform bg = Canvas(rt, "Drink Panel", new Vector3(0f, (BodyBottom + BodyTop) * 0.5f, Front + 0.0015f), new Vector2(2040f, 500f), false);
-            Img(bg, "Background", Vector2.zero, new Vector2(2040f, 500f), roundSprite, Panel, true);
-            Label(bg, "Brand", Brand, new Vector2(-800f, 210f), new Vector2(380f, 40f), 26f, GoldText, TextAlignmentOptions.Left);
-            Label(bg, "Title", "CHOOSE YOUR DRINK", new Vector2(0f, 210f), new Vector2(900f, 52f), 38f, Color.white);
-            Img(bg, "Line", new Vector2(0f, 180f), new Vector2(1960f, 2f), null, new Color(Gold.r, Gold.g, Gold.b, 0.5f), false);
-            for (int i = 0; i < 6; i++)
+            DrinkPanel(rt, mb);
+            for (int i = 0; i < Drinks.Length; i++)
             {
                 float x = -SlotSpacing * 2.5f + i * SlotSpacing;
-                bool custom = i == 5;
-                Sprite icon = custom ? SaveSprite("Icon_Custom", CustomIcon()) : SaveSprite("Icon_" + i, DrinkIcon(Drinks[i]));
-                NozzleSlot(slotsParent.transform, i, x, custom, icon, mb, guideMat, streamMat, streamMesh, splashMat);
-            }
-            DrinkSlot customizer = CustomizerSlot(slotsParent.transform, mb, guideMat);
-
-            // --- cups on the top shelf
-            var cupsParent = new GameObject("Cups");
-            cupsParent.transform.SetParent(rt, false);
-            float cupStep = (MainW - 0.14f) / (CupCount - 1);
-            for (int i = 0; i < CupCount; i++)
-            {
-                var pos = new Vector3(-MainW * 0.5f + 0.07f + i * cupStep, BodyTop + 0.004f, -0.02f);
-                Cup(cupsParent.transform, i, pos, cupMesh, liquidMesh, strawMesh, discMesh, cupMat, liquidMat);
+                NozzleSlot(slotsParent.transform, i, x, SaveSprite("Icon_" + i, DrinkIcon(Drinks[i])), mb, guideMat, streamMat, streamMesh, splashMat);
             }
 
-            // --- options + customizer UI
-            OptionsPanel(rt, mb, fruitSprites);
-            KioskPanel(rt, mb, customizer);
+            // --- STEP 4 + 5: finishing pad and its panel
+            DrinkSlot pad = FinishPad(slotsParent.transform, guideMat);
+            FinishPanel(rt, mb, pad, fruitSprites);
 
             mb.FlavorsParent = flavorsParent;
             mb.SlotsParent = slotsParent;
             mb.CupsParent = cupsParent;
             mb.SnapRadius = 0.09f;
             mb.FruitFlavorStart = Drinks.Length;
-            mb.FruitNames = Array.ConvertAll(Fruits, f => f.Name);
-            mb.StrawNames = StrawNames;
             mb.StrawMaterials = strawMats;
             mb.GarnishMaterials = garnishMats;
-            mb.CustomizerSlot = customizer;
+            mb.CustomizerSlot = pad;
             mb.CupTints = Tints;
             mb.LogoColors = LogoColors;
             mb.OptionOn = Gold;
@@ -361,13 +361,321 @@ namespace DrinkSystem.EditorTools
             made.Add(f);
         }
 
-        // ------------------------------------------------------------------ station geometry
+        private static Sprite Logo()
+        {
+            Dir(Gen + "/Textures");
+            string dst = Gen + "/Textures/FBT_Mayfair_Logo.png";
+            string src = Path.GetFullPath(LogoPath);
+            if (File.Exists(src)) File.Copy(src, dst, true);
+            AssetDatabase.ImportAsset(dst);
+            var imp = AssetImporter.GetAtPath(dst) as TextureImporter;
+            if (imp != null)
+            {
+                imp.textureType = TextureImporterType.Sprite;
+                imp.spriteImportMode = SpriteImportMode.Single;
+                imp.alphaIsTransparency = true;
+                imp.mipmapEnabled = true;
+                imp.wrapMode = TextureWrapMode.Clamp;
+                imp.SaveAndReimport();
+            }
+            Sprite s = AssetDatabase.LoadAssetAtPath<Sprite>(dst);
+            if (s == null) throw new Exception("[DrinkSystem] Could not load the FBT Mayfair logo at " + LogoPath);
+            return s;
+        }
+
+        /// <summary>Uses the drunk post-processing from an existing ManagerBar in the scene, so STRENGTH drives it.</summary>
+        private static void WireDrunkEffect(DrinkMachine mb)
+        {
+            foreach (MonoBehaviour c in Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (c == null || c.GetType().Name != "ManagerBar") continue;
+                SerializedProperty p = new SerializedObject(c).FindProperty("DrunkEffectTransform");
+                if (p != null && p.objectReferenceValue is Transform t)
+                {
+                    mb.DrunkEffectTransform = t;
+                    Debug.LogWarning("[DrinkSystem] Using the drunk effect '" + t.name + "' from your ManagerBar. Disable or remove that ManagerBar: " +
+                        "the drink station now drives the effect (two scripts setting it every frame would fight).", c);
+                    return;
+                }
+            }
+            Debug.LogWarning("[DrinkSystem] No drunk effect found. Assign your post-processing effect object to 'Drunk Effect Transform' on '" + RootName +
+                "' so STRENGTH controls how drunk people get.");
+        }
+
+        // ------------------------------------------------------------------ STEP 1: glasses
+
+        /// <summary>Builds the rack glasses from your Glasses2025 prefab (or simple glasses if it isn't in the project). Returns the tallest height.</summary>
+        private static float Glasses(Transform parent, Material cupMat, Material liquidMat, Material logoMat, Mesh strawMesh, Mesh discMesh)
+        {
+            var sources = new List<Transform>();
+            GameObject prefab = null;
+            foreach (string g in AssetDatabase.FindAssets(GlassesPrefabName + " t:Prefab"))
+            {
+                prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(g));
+                if (prefab != null) break;
+            }
+            if (prefab != null)
+            {
+                // Make the glass models readable: the liquid line is measured from the mesh
+                var paths = new HashSet<string>();
+                foreach (MeshFilter mf in prefab.GetComponentsInChildren<MeshFilter>(true))
+                    if (mf.sharedMesh != null) paths.Add(AssetDatabase.GetAssetPath(mf.sharedMesh));
+                foreach (string p in paths)
+                {
+                    if (AssetImporter.GetAtPath(p) is ModelImporter mi && !mi.isReadable)
+                    {
+                        mi.isReadable = true;
+                        mi.SaveAndReimport();
+                    }
+                }
+                prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GetAssetPath(prefab));
+                foreach (Transform t in prefab.transform)
+                {
+                    if (!t.name.StartsWith("Glass_") || t.GetComponent<MeshFilter>() == null) continue;
+                    foreach (Transform c in t)
+                        if (c.GetComponent<MeshFilter>() != null) { sources.Add(t); break; }
+                }
+            }
+            if (sources.Count == 0) Debug.LogWarning("[DrinkSystem] '" + GlassesPrefabName + "' prefab not found (or it has no Glass_* with a Liquid_* child). Using simple glasses.");
+
+            Mesh fbGlass = null, fbLiquid = null;
+            if (sources.Count == 0)
+            {
+                fbGlass = Frustum("Cup", CupRB, CupRT, 0f, CupH, 24, true, false);
+                fbLiquid = Frustum("Liquid", CupRB * 0.92f, CupRT * 0.93f, 0.012f, CupH - 0.006f, 24, true, true, 0f, CupH);
+            }
+            int types = sources.Count > 0 ? sources.Count : 5;
+            float step = (RackX1 - RackX0 - 0.12f) / Mathf.Max(1, types - 1);
+            float tallest = 0f;
+            int id = 0;
+            for (int copy = 0; copy < CopiesPerGlass; copy++)
+            {
+                // front tier, then the raised back tier
+                float y = copy == 0 ? 0.06f : 0.13f, z = copy == 0 ? 0.11f : -0.09f;
+                for (int k = 0; k < types; k++)
+                {
+                    var pos = new Vector3(RackX0 + 0.06f + k * step, y, z);
+                    float h;
+                    if (sources.Count > 0)
+                    {
+                        Transform src = sources[k];
+                        Transform liq = null;
+                        foreach (Transform c in src) if (c.GetComponent<MeshFilter>() != null) { liq = c; break; }
+                        h = MakeGlass(parent, src.name.Replace("Glass_", "") + " " + (copy + 1), pos, src.GetComponent<MeshFilter>().sharedMesh,
+                            src.GetComponent<MeshRenderer>().sharedMaterials, src.localRotation, src.localScale,
+                            liq.GetComponent<MeshFilter>().sharedMesh, liq.GetComponent<MeshRenderer>().sharedMaterials,
+                            liq.localPosition, liq.localRotation, liq.localScale, logoMat, strawMesh, discMesh, id);
+                    }
+                    else
+                    {
+                        h = MakeGlass(parent, "Glass " + (copy + 1) + "-" + (k + 1), pos, fbGlass, new[] { cupMat }, Quaternion.identity, Vector3.one,
+                            fbLiquid, new[] { liquidMat }, Vector3.zero, Quaternion.identity, Vector3.one, logoMat, strawMesh, discMesh, id);
+                    }
+                    tallest = Mathf.Max(tallest, h);
+                    id++;
+                }
+            }
+            return tallest;
+        }
+
+        private static float MakeGlass(Transform parent, string name, Vector3 pos, Mesh glassMesh, Material[] glassMats, Quaternion glassRot, Vector3 glassScale,
+            Mesh liquidMesh, Material[] liquidMats, Vector3 liqPos, Quaternion liqRot, Vector3 liqScale, Material logoMat, Mesh strawMesh, Mesh discMesh, int id)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = pos;
+
+            // the model sits so the bottom center of the glass is the pivot (that's where it locks onto a slot)
+            var model = new GameObject("Model");
+            model.transform.SetParent(go.transform, false);
+            model.transform.localRotation = glassRot;
+            model.transform.localScale = glassScale;
+            model.AddComponent<MeshFilter>().sharedMesh = glassMesh;
+            var bodyR = model.AddComponent<MeshRenderer>();
+            bodyR.sharedMaterials = glassMats;
+            Shadowless(bodyR);
+            var liquid = new GameObject("Liquid");
+            liquid.transform.SetParent(model.transform, false);
+            liquid.transform.localPosition = liqPos;
+            liquid.transform.localRotation = liqRot;
+            liquid.transform.localScale = liqScale;
+            liquid.AddComponent<MeshFilter>().sharedMesh = liquidMesh;
+            var liquidR = liquid.AddComponent<MeshRenderer>();
+            liquidR.sharedMaterials = liquidMats;
+            Shadowless(liquidR);
+
+            Bounds wb = bodyR.bounds;
+            Vector3 p = go.transform.position;
+            model.transform.position += new Vector3(p.x - wb.center.x, p.y - wb.min.y, p.z - wb.center.z);
+            float liquidBottom = go.transform.InverseTransformPoint(liquidR.bounds.min).y;
+            liquidR.enabled = false;
+
+            // radius profile of the glass (in the glass's own space), used for the collider, straw, garnish and logo
+            float[] prof = Profile(glassMesh, model.transform, go.transform, 32, out float height);
+            float maxR = 0f;
+            foreach (float r in prof) maxR = Mathf.Max(maxR, r);
+            float rimR = Mathf.Max(prof[prof.Length - 1], prof[prof.Length - 2]);
+
+            var box = go.AddComponent<BoxCollider>();
+            box.size = new Vector3(maxR * 2f, height, maxR * 2f);
+            box.center = new Vector3(0f, height * 0.5f, 0f);
+            var rb = go.AddComponent<Rigidbody>();
+            rb.mass = 0.3f;
+            rb.isKinematic = true;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            var pickup = go.AddComponent<VRCPickup>();
+            pickup.AutoHold = VRC_Pickup.AutoHoldMode.Yes;
+            pickup.UseText = "Drink";
+            pickup.InteractionText = "Glass";
+            pickup.proximity = 0.5f;
+            pickup.DisallowTheft = true;
+            pickup.orientation = VRC_Pickup.PickupOrientation.Any;
+
+            // straw: from near the bottom, leaning out over the rim
+            float strawLen = Mathf.Max(0.08f, height * 1.15f);
+            var straw = Part(go.transform, "Straw", strawMesh, glassMats[0], new Vector3(rimR * 0.1f, liquidBottom + 0.004f, -rimR * 0.1f), Quaternion.Euler(4f, 0f, 9f));
+            straw.transform.localScale = new Vector3(1f, strawLen, 1f);
+            straw.enabled = false;
+            // fruit wheel on the rim, front right
+            float gr = Mathf.Clamp(rimR * 0.55f, 0.012f, 0.022f);
+            float a = 40f * Mathf.Deg2Rad;
+            var garnish = Part(go.transform, "Garnish", discMesh, glassMats[0], new Vector3(Mathf.Cos(a) * rimR, height - gr * 0.6f, Mathf.Sin(a) * rimR), Quaternion.Euler(0f, 50f, 90f));
+            garnish.transform.localScale = Vector3.one * (gr / 0.021f);
+            garnish.enabled = false;
+            // FBT Mayfair logo decal, wrapped on the widest part of the glass
+            MeshRenderer logo = LogoDecal(go.transform, name, prof, height, logoMat);
+
+            var cup = UdonSharpUndo.AddComponent<DrinkCup>(go);
+            cup.LiquidRenderer = liquidR;
+            cup.BodyRenderer = bodyR;
+            cup.LogoRenderer = logo;
+            cup.StrawRenderer = straw;
+            cup.GarnishRenderer = garnish;
+            cup.OneShotSource = Audio(go, 0.9f, 6f);
+            cup.LoopSource = Audio(go, 0.6f, 4f);
+            made.Add(cup);
+            return height;
+        }
+
+        /// <summary>Max distance from the glass axis per height band, in the glass root's space (pivot = bottom center).</summary>
+        private static float[] Profile(Mesh mesh, Transform model, Transform root, int bins, out float height)
+        {
+            Vector3[] verts = mesh.vertices;
+            var pts = new Vector3[verts.Length];
+            height = 0f;
+            for (int i = 0; i < verts.Length; i++)
+            {
+                pts[i] = root.InverseTransformPoint(model.TransformPoint(verts[i]));
+                height = Mathf.Max(height, pts[i].y);
+            }
+            if (verts.Length == 0)
+            {
+                Bounds b = mesh.bounds;
+                height = b.size.y * model.lossyScale.y;
+                var flat = new float[bins];
+                for (int i = 0; i < bins; i++) flat[i] = Mathf.Max(b.extents.x, b.extents.z) * model.lossyScale.x;
+                return flat;
+            }
+            var prof = new float[bins];
+            foreach (Vector3 v in pts)
+            {
+                int k = Mathf.Clamp((int)(v.y / Mathf.Max(0.0001f, height) * bins), 0, bins - 1);
+                prof[k] = Mathf.Max(prof[k], new Vector2(v.x, v.z).magnitude);
+            }
+            // fill empty bands from their neighbours
+            for (int i = 1; i < bins; i++) if (prof[i] <= 0f) prof[i] = prof[i - 1];
+            for (int i = bins - 2; i >= 0; i--) if (prof[i] <= 0f) prof[i] = prof[i + 1];
+            return prof;
+        }
+
+        private static float ProfileAt(float[] prof, float height, float y)
+        {
+            float f = Mathf.Clamp(y / Mathf.Max(0.0001f, height) * prof.Length - 0.5f, 0f, prof.Length - 1f);
+            int i = Mathf.FloorToInt(f);
+            int j = Mathf.Min(i + 1, prof.Length - 1);
+            return Mathf.Lerp(prof[i], prof[j], f - i);
+        }
+
+        private static MeshRenderer LogoDecal(Transform glass, string name, float[] prof, float height, Material logoMat)
+        {
+            // the widest band between 35% and 90% of the height
+            int best = Mathf.FloorToInt(prof.Length * 0.35f);
+            for (int i = best; i < Mathf.CeilToInt(prof.Length * 0.9f); i++) if (prof[i] > prof[best]) best = i;
+            float y = (best + 0.5f) / prof.Length * height;
+            float r = prof[best];
+            float aspect = logoSprite.rect.width / logoSprite.rect.height;
+            float h = Mathf.Clamp(height * 0.16f, 0.008f, 0.024f);
+            float w = h * aspect;
+            float arc = w / Mathf.Max(0.005f, r);
+            if (arc > 1.7f) { arc = 1.7f; w = arc * r; h = w / aspect; }
+            y = Mathf.Clamp(y, h * 0.5f + 0.002f, height - h * 0.5f - 0.002f);
+
+            const int cols = 10;
+            var v = new List<Vector3>();
+            var n = new List<Vector3>();
+            var uv = new List<Vector2>();
+            var tri = new List<int>();
+            for (int j = 0; j <= cols; j++)
+            {
+                float u = j / (float)cols;
+                float ang = Mathf.PI * 0.5f + (u - 0.5f) * arc; // centered on +Z (the front), left to right as seen from the front
+                var dir = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                float y0 = y - h * 0.5f, y1 = y + h * 0.5f;
+                v.Add(dir * (ProfileAt(prof, height, y0) + 0.0012f) + Vector3.up * y0); n.Add(dir); uv.Add(new Vector2(u, 0f));
+                v.Add(dir * (ProfileAt(prof, height, y1) + 0.0012f) + Vector3.up * y1); n.Add(dir); uv.Add(new Vector2(u, 1f));
+            }
+            for (int j = 0; j < cols; j++)
+            {
+                int k = j * 2;
+                tri.AddRange(new[] { k, k + 1, k + 3, k, k + 3, k + 2 });
+            }
+            var mesh = new Mesh();
+            mesh.SetVertices(v);
+            mesh.SetNormals(n);
+            mesh.SetUVs(0, uv);
+            mesh.SetTriangles(tri, 0);
+            // every copy of the same glass shares one decal mesh
+            string key = "Logo_" + name.Substring(0, name.LastIndexOf(' ') > 0 ? name.LastIndexOf(' ') : name.Length).Replace(' ', '_');
+            if (!logoMeshes.TryGetValue(key, out Mesh shared))
+            {
+                shared = SaveMesh(key, mesh);
+                logoMeshes[key] = shared;
+            }
+            else Object.DestroyImmediate(mesh);
+            return Part(glass, "Logo", shared, logoMat, Vector3.zero, Quaternion.identity);
+        }
+
+        private static void Rack(Transform st, Transform rt, Material body, Material trim, Material warm)
+        {
+            var r = new GameObject("Glass Rack").transform;
+            r.SetParent(st, false);
+            float cx = (RackX0 + RackX1) * 0.5f, w = RackX1 - RackX0;
+            Box(r, "Front Tier", new Vector3(cx, 0.03f, 0.105f), new Vector3(w, 0.06f, 0.21f), body, true);
+            Box(r, "Back Tier", new Vector3(cx, 0.065f, -0.105f), new Vector3(w, 0.13f, 0.21f), body, true);
+            Box(r, "Front Glow", new Vector3(cx, 0.061f, 0.11f), new Vector3(w - 0.04f, 0.003f, 0.08f), warm);
+            Box(r, "Back Glow", new Vector3(cx, 0.131f, -0.09f), new Vector3(w - 0.04f, 0.003f, 0.08f), warm);
+            Box(r, "Trim Front", new Vector3(cx, 0.06f, Front + 0.002f), new Vector3(w + 0.004f, 0.004f, 0.006f), trim);
+            Box(r, "Trim Step", new Vector3(cx, 0.13f, 0.002f), new Vector3(w + 0.004f, 0.004f, 0.006f), trim);
+            Box(r, "Backboard", new Vector3(cx, (0.13f + BodyTop) * 0.5f, Back + 0.012f), new Vector3(w, BodyTop - 0.13f, 0.024f), body, true);
+            Box(r, "Trim Board", new Vector3(cx, BodyTop, Back + 0.026f), new Vector3(w + 0.004f, 0.005f, 0.006f), trim);
+
+            float top = BodyTop - 0.01f, bottom = Mathf.Max(0.40f, top - 0.26f);
+            RectTransform c = Canvas(rt, "Step 1 Panel", new Vector3(cx, (top + bottom) * 0.5f, Back + 0.0255f), new Vector2((w - 0.04f) / PxScale, (top - bottom) / PxScale), false);
+            Vector2 size = c.sizeDelta;
+            Img(c, "Background", Vector2.zero, size, roundSprite, Panel, true);
+            StepBadge(c, new Vector2(0f, size.y * 0.5f - 90f), 1, 110f);
+            Label(c, "Title", "TAKE A GLASS", new Vector2(0f, size.y * 0.5f - 200f), new Vector2(size.x - 60f, 70f), 56f, Color.white);
+            Label(c, "Hint", "Any glass works with any drink.\nTake it to the drink machine next.", new Vector2(0f, -size.y * 0.5f + 90f), new Vector2(size.x - 80f, 110f), 30f, Hint);
+        }
+
+        // ------------------------------------------------------------------ STEP 2 + 3: drink machine
 
         private static void MainUnit(Transform st, Material body, Material trim, Material metal, Material warm, Material grate, Material darkGlass,
             Material coneMat, Material poolMat, Mesh coneMesh, Mesh sphere, Mesh disc,
             Material orange, Material lime, Material lemon, Material berry, Material grape, Material bean)
         {
-            var m = new GameObject("Main Unit").transform;
+            var m = new GameObject("Drink Machine").transform;
             m.SetParent(st, false);
             float w = MainW;
             // base with a glass-front garnish drawer
@@ -390,19 +698,14 @@ namespace DrinkSystem.EditorTools
             Box(m, "Trim Left", new Vector3(-w * 0.5f - 0.002f, (BodyBottom + BodyTop) * 0.5f, Front + 0.002f), new Vector3(0.005f, BodyTop - BodyBottom, 0.006f), trim);
             Box(m, "Trim Right", new Vector3(w * 0.5f + 0.002f, (BodyBottom + BodyTop) * 0.5f, Front + 0.002f), new Vector3(0.005f, BodyTop - BodyBottom, 0.006f), trim);
             Box(m, "Under Light", new Vector3(0f, BodyBottom - 0.002f, Front - 0.015f), new Vector3(w - 0.02f, 0.003f, 0.006f), warm);
-            // glowing shelf for the glasses on top
-            Box(m, "Shelf Glow", new Vector3(0f, BodyTop + 0.002f, -0.02f), new Vector3(w - 0.04f, 0.003f, 0.07f), warm);
-            Box(m, "Shelf Rail", new Vector3(0f, BodyTop + 0.012f, 0.03f), new Vector3(w - 0.02f, 0.02f, 0.004f), trim);
 
             for (int i = 0; i < 6; i++)
             {
                 float x = -SlotSpacing * 2.5f + i * SlotSpacing;
-                // nozzle
                 Cyl(m, "Nozzle " + (i + 1), new Vector3(x, BodyBottom - 0.0175f, NozzleZ), 0.026f, 0.035f, metal);
                 Cyl(m, "Nozzle Ring", new Vector3(x, BodyBottom - 0.002f, NozzleZ), 0.036f, 0.004f, trim);
                 Cyl(m, "Nozzle Light", new Vector3(x, BodyBottom - 0.0355f, NozzleZ), 0.016f, 0.002f, warm);
                 LightCone(m, new Vector3(x, BodyBottom - 0.035f, NozzleZ), coneMesh, coneMat, poolMat);
-                // garnish drawer bin
                 float bx = -w * 0.5f + (i + 0.5f) * (w / 6f);
                 Vector3 bc = new Vector3(bx, 0.008f, (drawerBack + Front) * 0.5f);
                 switch (i)
@@ -417,33 +720,255 @@ namespace DrinkSystem.EditorTools
             }
         }
 
-        private static void Tower(Transform st, Material body, Material trim)
+        private static void DrinkPanel(Transform rt, DrinkMachine mb)
         {
-            var t = new GameObject("Options Tower").transform;
-            t.SetParent(st, false);
-            float cx = (TowerX0 + TowerX1) * 0.5f, w = TowerX1 - TowerX0;
-            Box(t, "Body", new Vector3(cx, TowerTop * 0.5f, Front - 0.15f), new Vector3(w, TowerTop, 0.30f), body, true);
-            Box(t, "Trim Top", new Vector3(cx, TowerTop, Front + 0.002f), new Vector3(w + 0.004f, 0.005f, 0.006f), trim);
-            Box(t, "Trim Left", new Vector3(TowerX0 - 0.002f, TowerTop * 0.5f, Front + 0.002f), new Vector3(0.005f, TowerTop, 0.006f), trim);
-            Box(t, "Trim Right", new Vector3(TowerX1 + 0.002f, TowerTop * 0.5f, Front + 0.002f), new Vector3(0.005f, TowerTop, 0.006f), trim);
-            Box(t, "Trim Base", new Vector3(cx, 0.003f, Front + 0.002f), new Vector3(w + 0.004f, 0.005f, 0.006f), trim);
+            float hPx = (BodyTop - BodyBottom) / PxScale;
+            RectTransform bg = Canvas(rt, "Drink Panel", new Vector3(0f, (BodyBottom + BodyTop) * 0.5f, Front + 0.0015f), new Vector2(2040f, hPx), true);
+            float top = hPx * 0.5f;
+            Img(bg, "Background", Vector2.zero, new Vector2(2040f, hPx), roundSprite, Panel, true);
+            Img(bg, "Logo", new Vector2(-880f, top - 45f), new Vector2(190f, 78f), logoSprite, Color.white, false).preserveAspect = true;
+            StepBadge(bg, new Vector2(-690f, top - 45f), 2, 54f);
+            Label(bg, "Step 2", "PLACE YOUR GLASS UNDER A DRINK", new Vector2(-400f, top - 45f), new Vector2(520f, 46f), 30f, Color.white, TextAlignmentOptions.Left);
+            StepBadge(bg, new Vector2(170f, top - 45f), 3, 54f);
+            Label(bg, "Step 3", "PICK STRENGTH + FROTH, THEN PRESS POUR", new Vector2(560f, top - 45f), new Vector2(720f, 46f), 30f, Color.white, TextAlignmentOptions.Left);
+            Img(bg, "Line", new Vector2(0f, top - 80f), new Vector2(1960f, 2f), null, new Color(Gold.r, Gold.g, Gold.b, 0.5f), false);
+
+            AudioSource click = Audio(bg.gameObject, 0.9f, 6f);
+            float rowY = top - 118f;
+            mb.StrengthButtons = OptionRow(bg, mb, click, "STRENGTH", "how drunk it gets", new[] { "LOW", "MED", "STRONG" }, "OptionStrength", -560f, rowY);
+            mb.FrothButtons = OptionRow(bg, mb, click, "FROTH", "foam on top", new[] { "LOW", "MED", "HIGH" }, "OptionFroth", 260f, rowY);
         }
 
-        private static void Kiosk(Transform st, Material body, Material trim, Material metal, Material warm, Material grate, Material coneMat, Material poolMat, Mesh coneMesh)
+        private static Image[] OptionRow(RectTransform c, DrinkMachine mb, AudioSource click, string title, string hint, string[] names, string evt, float x, float y)
         {
-            var k = new GameObject("Cup Kiosk").transform;
-            k.SetParent(st, false);
-            float w = KioskW;
-            Box(k, "Base", new Vector3(KioskX, BaseTop * 0.5f, 0f), new Vector3(w, BaseTop, Depth), body, true);
-            Box(k, "Pad", new Vector3(KioskX, (BaseTop + GrateTop) * 0.5f, NozzleZ + 0.01f), new Vector3(0.16f, GrateTop - BaseTop, 0.2f), grate, true);
-            Box(k, "Back", new Vector3(KioskX, (BaseTop + 0.40f) * 0.5f, Back + 0.06f), new Vector3(w, 0.40f - BaseTop, 0.12f), body, true);
-            Box(k, "Hood", new Vector3(KioskX, (0.40f + TowerTop) * 0.5f, 0f), new Vector3(w, TowerTop - 0.40f, Depth), body, true);
-            Box(k, "Trim Top", new Vector3(KioskX, TowerTop, Front + 0.002f), new Vector3(w + 0.004f, 0.005f, 0.006f), trim);
-            Box(k, "Trim Hood", new Vector3(KioskX, 0.40f, Front + 0.002f), new Vector3(w + 0.004f, 0.005f, 0.006f), trim);
-            Box(k, "Trim Base", new Vector3(KioskX, BaseTop + 0.001f, Front + 0.002f), new Vector3(w + 0.004f, 0.004f, 0.006f), trim);
-            Cyl(k, "Spot", new Vector3(KioskX, 0.398f, NozzleZ), 0.03f, 0.004f, warm);
-            LightCone(k, new Vector3(KioskX, 0.396f, NozzleZ), coneMesh, coneMat, poolMat);
+            Label(c, title, title, new Vector2(x - 150f, y + 10f), new Vector2(220f, 34f), 26f, GoldText, TextAlignmentOptions.Right);
+            Label(c, title + " Hint", hint, new Vector2(x - 150f, y - 20f), new Vector2(220f, 22f), 15f, Hint, TextAlignmentOptions.Right);
+            var buttons = new Image[names.Length];
+            for (int j = 0; j < names.Length; j++)
+            {
+                Image b = Img(c, title + " " + names[j], new Vector2(x + 30f + j * 130f, y), new Vector2(118f, 52f), roundSprite, OptionOff, true);
+                Label(b.rectTransform, "Label", names[j], Vector2.zero, new Vector2(108f, 34f), 20f, Color.white);
+                Button(b.gameObject, mb, evt, true, j, b.transform, click, mb.ClipButtonClick);
+                buttons[j] = b;
+            }
+            return buttons;
         }
+
+        private static void NozzleSlot(Transform parent, int i, float x, Sprite icon, DrinkMachine mb,
+            Material guideMat, Material streamMat, Mesh streamMesh, Material splashMat)
+        {
+            var go = new GameObject("Slot " + (i + 1) + " " + Drinks[i].Name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = new Vector3(x, GrateTop, NozzleZ);
+
+            var snap = new GameObject("SnapPoint").transform;
+            snap.SetParent(go.transform, false);
+            GameObject guide = Guide(go.transform, guideMat);
+
+            var nozzle = new GameObject("Nozzle").transform;
+            nozzle.SetParent(go.transform, false);
+            nozzle.localPosition = new Vector3(0f, BodyBottom - 0.036f - GrateTop, 0f);
+            var stream = new GameObject("Stream");
+            stream.transform.SetParent(nozzle, false);
+            stream.AddComponent<MeshFilter>().sharedMesh = streamMesh;
+            var streamR = stream.AddComponent<MeshRenderer>();
+            streamR.sharedMaterial = streamMat;
+            Shadowless(streamR);
+            streamR.enabled = false;
+
+            ParticleSystem splash = Splash(go.transform, splashMat);
+            AudioSource loop = Audio(nozzle.gameObject, 0.55f, 5f);
+            AudioSource shot = Audio(nozzle.gameObject, 0.9f, 6f);
+
+            var slot = UdonSharpUndo.AddComponent<DrinkSlot>(go);
+            slot.FlavorIndex = i;
+            slot.SnapPoint = snap;
+            slot.Highlight = guide;
+            slot.Nozzle = nozzle;
+            slot.Stream = streamR;
+            slot.Splash = splash;
+            slot.LoopSource = loop;
+            slot.OneShotSource = shot;
+            made.Add(slot);
+
+            // Drink card: icon, name, what to do next, pour button, fill bar
+            const float W = 310f, H = 400f;
+            float hPx = (BodyTop - BodyBottom) / PxScale;
+            float cardY = (BodyBottom + BodyTop) * 0.5f + (-hPx * 0.5f + 20f + H * 0.5f) * PxScale;
+            RectTransform card = Canvas(go.transform.parent.parent, "Card " + (i + 1), new Vector3(x, cardY, Front + 0.0035f), new Vector2(W, H), true);
+            card.SetParent(go.transform, true);
+            Img(card, "Background", Vector2.zero, new Vector2(W, H), roundSprite, Card, true);
+            Img(card, "Icon", new Vector2(0f, 88f), new Vector2(190f, 190f), icon, Color.white, false).preserveAspect = true;
+            Label(card, "Name", Drinks[i].Name, new Vector2(0f, -36f), new Vector2(W - 30f, 56f), 26f, Color.white);
+            slot.StatusText = Label(card, "Status", "PLACE A GLASS HERE", new Vector2(0f, -84f), new Vector2(W - 24f, 26f), 19f, new Color(0.85f, 0.79f, 0.66f));
+            slot.StatusLight = Img(card, "Status Light", new Vector2(W * 0.5f - 22f, H * 0.5f - 22f), new Vector2(14f, 14f), knobSprite, new Color(0.25f, 0.25f, 0.3f), false);
+
+            RectTransform hit = Img(card, "Pour Button", new Vector2(0f, -132f), new Vector2(230f, 104f), null, new Color(1f, 1f, 1f, 0f), false).rectTransform;
+            Image ring = Img(hit, "Ring", new Vector2(0f, -8f), new Vector2(76f, 76f), knobSprite, Gold, false);
+            Img(ring.rectTransform, "Face", Vector2.zero, new Vector2(64f, 64f), knobSprite, new Color(0.05f, 0.045f, 0.06f, 1f), false);
+            Label(ring.rectTransform, "Label", "POUR", Vector2.zero, new Vector2(56f, 24f), 15f, GoldText);
+            Button(hit.gameObject, slot, "Press", false, 0, ring.transform, shot, mb.ClipButtonClick);
+
+            Img(card, "Fill Back", new Vector2(0f, -186f), new Vector2(230f, 7f), roundSprite, new Color(1f, 1f, 1f, 0.1f), false);
+            Image fill = Img(card, "Fill", new Vector2(0f, -186f), new Vector2(230f, 7f), roundSprite, Color.white, false);
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillAmount = 0f;
+            slot.FillBar = fill;
+        }
+
+        // ------------------------------------------------------------------ STEP 4 + 5: finishing station
+
+        private static float FinishTop => BodyBottom + 0.42f;
+
+        private static void FinishUnit(Transform st, Material body, Material trim, Material warm, Material grate, Material coneMat, Material poolMat, Mesh coneMesh)
+        {
+            var f = new GameObject("Finishing Station").transform;
+            f.SetParent(st, false);
+            float cx = (FinishX0 + FinishX1) * 0.5f, w = FinishX1 - FinishX0;
+            Box(f, "Base", new Vector3(cx, BaseTop * 0.5f, 0f), new Vector3(w, BaseTop, Depth), body, true);
+            Box(f, "Pad", new Vector3(cx, (BaseTop + GrateTop) * 0.5f, NozzleZ + 0.01f), new Vector3(0.18f, GrateTop - BaseTop, 0.22f), grate, true);
+            Box(f, "Back", new Vector3(cx, (BaseTop + BodyBottom) * 0.5f, Back + 0.06f), new Vector3(w, BodyBottom - BaseTop, 0.12f), body, true);
+            Box(f, "Hood", new Vector3(cx, (BodyBottom + FinishTop) * 0.5f, 0f), new Vector3(w, FinishTop - BodyBottom, Depth), body, true);
+            Box(f, "Trim Top", new Vector3(cx, FinishTop, Front + 0.002f), new Vector3(w + 0.004f, 0.005f, 0.006f), trim);
+            Box(f, "Trim Hood", new Vector3(cx, BodyBottom, Front + 0.002f), new Vector3(w + 0.004f, 0.005f, 0.006f), trim);
+            Box(f, "Trim Base", new Vector3(cx, BaseTop + 0.001f, Front + 0.002f), new Vector3(w + 0.004f, 0.004f, 0.006f), trim);
+            Box(f, "Trim Left", new Vector3(FinishX0 - 0.002f, (BodyBottom + FinishTop) * 0.5f, Front + 0.002f), new Vector3(0.005f, FinishTop - BodyBottom, 0.006f), trim);
+            Box(f, "Trim Right", new Vector3(FinishX1 + 0.002f, (BodyBottom + FinishTop) * 0.5f, Front + 0.002f), new Vector3(0.005f, FinishTop - BodyBottom, 0.006f), trim);
+            Cyl(f, "Spot", new Vector3(cx, BodyBottom - 0.002f, NozzleZ), 0.03f, 0.004f, warm);
+            LightCone(f, new Vector3(cx, BodyBottom - 0.004f, NozzleZ), coneMesh, coneMat, poolMat);
+        }
+
+        private static DrinkSlot FinishPad(Transform parent, Material guideMat)
+        {
+            var go = new GameObject("Finishing Pad");
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = new Vector3((FinishX0 + FinishX1) * 0.5f, GrateTop, NozzleZ);
+            var snap = new GameObject("SnapPoint").transform;
+            snap.SetParent(go.transform, false);
+            var slot = UdonSharpUndo.AddComponent<DrinkSlot>(go);
+            slot.IsCustomizer = true;
+            slot.SnapPoint = snap;
+            slot.Highlight = Guide(go.transform, guideMat);
+            slot.OneShotSource = Audio(go, 0.9f, 6f);
+            made.Add(slot);
+            return slot;
+        }
+
+        private static void FinishPanel(Transform rt, DrinkMachine mb, DrinkSlot pad, Sprite[] fruitSprites)
+        {
+            float cx = (FinishX0 + FinishX1) * 0.5f;
+            float wPx = (FinishX1 - FinishX0 - 0.04f) / PxScale, hPx = (FinishTop - BodyBottom - 0.02f) / PxScale;
+            RectTransform c = Canvas(rt, "Step 4 Panel", new Vector3(cx, (BodyBottom + FinishTop) * 0.5f, Front + 0.0015f), new Vector2(wPx, hPx), true);
+            float top = hPx * 0.5f, left = -wPx * 0.5f;
+            AudioSource click = pad.OneShotSource;
+            Img(c, "Background", Vector2.zero, new Vector2(wPx, hPx), roundSprite, Panel, true);
+            StepBadge(c, new Vector2(left + 60f, top - 50f), 4, 60f);
+            Label(c, "Title", "FINISH YOUR DRINK", new Vector2(left + 110f + 330f, top - 50f), new Vector2(660f, 50f), 38f, Color.white, TextAlignmentOptions.Left);
+            pad.StatusText = Label(c, "Status", "PUT YOUR GLASS ON THE PAD", new Vector2(0f, top - 105f), new Vector2(wPx - 60f, 30f), 22f, GoldText);
+            pad.StatusLight = Img(c, "Status Light", new Vector2(-left - 30f, top - 30f), new Vector2(18f, 18f), knobSprite, new Color(0.25f, 0.25f, 0.3f), false);
+
+            float tileX0 = left + 260f, tileStep = (wPx - 300f) / 6f;
+            // STRAW
+            float y = top - 220f;
+            RowLabel(c, "STRAW", left, y);
+            var straws = new Image[StrawNames.Length];
+            for (int i = 0; i < StrawNames.Length; i++)
+            {
+                Image b = Img(c, "Straw " + StrawNames[i], new Vector2(tileX0 + i * tileStep, y), new Vector2(tileStep - 14f, 150f), roundSprite, OptionOff, true);
+                Img(b.rectTransform, "Swatch", new Vector2(0f, 14f), new Vector2(90f, 100f), SaveSprite("Straw_" + i, StrawSwatch(i)), Color.white, false).preserveAspect = true;
+                Label(b.rectTransform, "Label", StrawNames[i].ToUpperInvariant(), new Vector2(0f, -56f), new Vector2(tileStep - 24f, 24f), 15f, Color.white);
+                Button(b.gameObject, mb, "FinishStraw", true, i, b.transform, click, mb.ClipButtonClick);
+                straws[i] = b;
+            }
+            // FRUIT
+            y -= 165f;
+            RowLabel(c, "FRUIT", left, y);
+            var fruits = new Image[Fruits.Length];
+            for (int i = 0; i < Fruits.Length; i++)
+            {
+                Image b = Img(c, "Fruit " + Fruits[i].Name, new Vector2(tileX0 + i * tileStep, y), new Vector2(tileStep - 14f, 150f), roundSprite, OptionOff, true);
+                Img(b.rectTransform, "Icon", new Vector2(0f, 14f), new Vector2(84f, 84f), fruitSprites[i], Color.white, false);
+                Label(b.rectTransform, "Label", Fruits[i].Name.ToUpperInvariant(), new Vector2(0f, -56f), new Vector2(tileStep - 24f, 24f), 15f, Color.white);
+                Button(b.gameObject, mb, "FinishFruit", true, i, b.transform, click, mb.ClipButtonClick);
+                fruits[i] = b;
+            }
+            // GLASS tint
+            y -= 155f;
+            RowLabel(c, "GLASS", left, y);
+            var tints = new Image[Tints.Length];
+            for (int i = 0; i < Tints.Length; i++)
+            {
+                Image ring = Img(c, "Tint " + TintNames[i], new Vector2(tileX0 + i * tileStep, y + 12f), new Vector2(84f, 84f), knobSprite, OptionOff, false);
+                Color sw = Tints[i];
+                sw.a = 1f;
+                Img(ring.rectTransform, "Swatch", Vector2.zero, new Vector2(66f, 66f), knobSprite, i == 0 ? new Color(0.85f, 0.9f, 0.95f) : sw, false);
+                Label(ring.rectTransform, "Name", TintNames[i].ToUpperInvariant(), new Vector2(0f, -58f), new Vector2(130f, 22f), 14f, Hint);
+                Button(ring.gameObject, mb, "CupTint", true, i, ring.transform, click, mb.ClipButtonClick);
+                tints[i] = ring;
+            }
+            // LOGO
+            y -= 135f;
+            RowLabel(c, "LOGO", left, y);
+            var logos = new Image[LogoNames.Length];
+            float logoStep = (wPx - 300f) / 3f;
+            for (int i = 0; i < LogoNames.Length; i++)
+            {
+                Image b = Img(c, "Logo " + LogoNames[i], new Vector2(tileX0 - 85f + logoStep * (i + 0.5f), y), new Vector2(logoStep - 20f, 62f), roundSprite, OptionOff, true);
+                Label(b.rectTransform, "Label", LogoNames[i], Vector2.zero, new Vector2(logoStep - 40f, 34f), 20f, i == 0 ? GoldText : Color.white);
+                Button(b.gameObject, mb, "CupLogo", true, i, b.transform, click, mb.ClipButtonClick);
+                logos[i] = b;
+            }
+            // STEP 5
+            y -= 85f;
+            StepBadge(c, new Vector2(left + 60f, y), 5, 52f);
+            Label(c, "Step 5", "PICK UP YOUR GLASS AND HOLD USE (TRIGGER / LEFT CLICK) TO DRINK. ENJOY!", new Vector2(left + 100f + 530f, y), new Vector2(1060f, 40f), 22f, Color.white, TextAlignmentOptions.Left);
+            Image respawn = Img(c, "Respawn Glasses", new Vector2(-left - 110f, y), new Vector2(190f, 52f), roundSprite, new Color(0.2f, 0.17f, 0.1f, 1f), true);
+            Label(respawn.rectTransform, "Label", "RESET GLASSES", Vector2.zero, new Vector2(176f, 30f), 16f, GoldText);
+            Button(respawn.gameObject, mb, "RespawnAllCups", false, 0, respawn.transform, click, mb.ClipButtonClick);
+
+            mb.StrawButtons = straws;
+            mb.FruitButtons = fruits;
+            mb.TintButtons = tints;
+            mb.LogoButtons = logos;
+        }
+
+        private static void RowLabel(RectTransform c, string text, float left, float y)
+        {
+            Label(c, text, text, new Vector2(left + 120f, y), new Vector2(200f, 40f), 28f, GoldText, TextAlignmentOptions.Left);
+        }
+
+        // ------------------------------------------------------------------ sign: logo + the whole line of steps
+
+        private static void Sign(Transform st, Transform rt, Material body, Material trim, Material warm)
+        {
+            float y0 = BodyTop + 0.06f, h = 0.46f, w = 1.15f;
+            Box(st, "Sign Board", new Vector3(0f, y0 + h * 0.5f, Back + 0.012f), new Vector3(w, h, 0.024f), body, true);
+            Box(st, "Sign Trim Top", new Vector3(0f, y0 + h, Back + 0.026f), new Vector3(w + 0.004f, 0.005f, 0.006f), trim);
+            Box(st, "Sign Trim Bottom", new Vector3(0f, y0, Back + 0.026f), new Vector3(w + 0.004f, 0.005f, 0.006f), trim);
+            Box(st, "Sign Post", new Vector3(0f, (BodyTop + y0) * 0.5f, Back + 0.012f), new Vector3(0.06f, y0 - BodyTop, 0.02f), trim);
+            Box(st, "Sign Glow", new Vector3(0f, y0 + 0.004f, Back + 0.03f), new Vector3(w - 0.04f, 0.003f, 0.004f), warm);
+            Vector2 size = new Vector2((w - 0.03f) / PxScale, (h - 0.03f) / PxScale);
+            RectTransform c = Canvas(rt, "Sign", new Vector3(0f, y0 + h * 0.5f, Back + 0.0255f), size, false);
+            Img(c, "Logo", new Vector2(0f, 120f), new Vector2(size.x * 0.62f, 400f), logoSprite, Color.white, false).preserveAspect = true;
+            string[] steps = { "TAKE A GLASS", "PLACE IT", "POUR", "FINISH IT", "DRINK" };
+            float stepW = (size.x - 120f) / steps.Length;
+            for (int i = 0; i < steps.Length; i++)
+            {
+                float x = -size.x * 0.5f + 60f + stepW * (i + 0.5f);
+                StepBadge(c, new Vector2(x - stepW * 0.5f + 40f, -290f), i + 1, 56f);
+                Label(c, "Step " + (i + 1), steps[i], new Vector2(x + 30f, -290f), new Vector2(stepW - 90f, 40f), 26f, Color.white, TextAlignmentOptions.Left);
+                if (i < steps.Length - 1) Label(c, "Next", ">", new Vector2(x + stepW * 0.5f - 6f, -290f), new Vector2(30f, 40f), 30f, GoldText);
+            }
+        }
+
+        private static void StepBadge(RectTransform parent, Vector2 pos, int n, float size)
+        {
+            Image b = Img(parent, "Badge " + n, pos, new Vector2(size, size), knobSprite, Gold, false);
+            Label(b.rectTransform, "Number", n.ToString(), Vector2.zero, new Vector2(size * 0.8f, size * 0.8f), size * 0.62f, new Color(0.06f, 0.05f, 0.04f, 1f));
+        }
+
+        // ------------------------------------------------------------------ shared pieces
 
         private static void LightCone(Transform parent, Vector3 top, Mesh coneMesh, Material coneMat, Material poolMat)
         {
@@ -487,164 +1012,13 @@ namespace DrinkSystem.EditorTools
             }
         }
 
-        private static void Neon(Transform rt)
-        {
-            var go = new GameObject("Neon Sign", typeof(RectTransform));
-            go.transform.SetParent(rt, false);
-            go.transform.localPosition = new Vector3(KioskX, 0.98f, -0.1f);
-            var t = go.AddComponent<TextMeshPro>();
-            t.font = font;
-            t.text = NeonText;
-            t.fontStyle = FontStyles.Italic | FontStyles.Bold;
-            t.alignment = TextAlignmentOptions.Center;
-            t.color = new Color(1f, 0.78f, 0.45f, 1f);
-            t.enableAutoSizing = true;
-            t.fontSizeMin = 0.2f;
-            t.fontSizeMax = 2.4f;
-            t.rectTransform.sizeDelta = new Vector2(0.55f, 0.4f);
-            Shader s = Shader.Find("TextMeshPro/Mobile/Distance Field");
-            if (s != null && font.material != null)
-            {
-                Material m = SaveMat("Neon_Text", s, mat =>
-                {
-                    mat.CopyPropertiesFromMaterial(font.material);
-                    mat.EnableKeyword("UNDERLAY_ON");
-                    mat.SetColor("_UnderlayColor", new Color(1f, 0.45f, 0.08f, 0.85f));
-                    mat.SetFloat("_UnderlaySoftness", 1f);
-                    mat.SetFloat("_UnderlayDilate", 0.6f);
-                    mat.SetFloat("_FaceDilate", 0.15f);
-                });
-                t.fontSharedMaterial = m;
-            }
-        }
-
-        // ------------------------------------------------------------------ slots
-
-        private static void NozzleSlot(Transform parent, int i, float x, bool custom, Sprite icon, DrinkMachine mb,
-            Material guideMat, Material streamMat, Mesh streamMesh, Material splashMat)
-        {
-            var go = new GameObject("Slot " + (i + 1) + (custom ? " (Custom)" : ""));
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = new Vector3(x, GrateTop, NozzleZ);
-
-            var snap = new GameObject("SnapPoint").transform;
-            snap.SetParent(go.transform, false);
-            GameObject guide = Guide(go.transform, guideMat);
-
-            var nozzle = new GameObject("Nozzle").transform;
-            nozzle.SetParent(go.transform, false);
-            nozzle.localPosition = new Vector3(0f, BodyBottom - 0.036f - GrateTop, 0f);
-            var stream = new GameObject("Stream");
-            stream.transform.SetParent(nozzle, false);
-            stream.AddComponent<MeshFilter>().sharedMesh = streamMesh;
-            var streamR = stream.AddComponent<MeshRenderer>();
-            streamR.sharedMaterial = streamMat;
-            Shadowless(streamR);
-            streamR.enabled = false;
-
-            ParticleSystem splash = Splash(go.transform, splashMat);
-            AudioSource loop = Audio(nozzle.gameObject, 0.55f, 5f);
-            AudioSource shot = Audio(nozzle.gameObject, 0.9f, 6f);
-
-            var slot = UdonSharpUndo.AddComponent<DrinkSlot>(go);
-            slot.FlavorIndex = custom ? Drinks.Length : i;
-            slot.UseFruitFlavor = custom;
-            slot.SnapPoint = snap;
-            slot.Highlight = guide;
-            slot.Nozzle = nozzle;
-            slot.Stream = streamR;
-            slot.Splash = splash;
-            slot.LoopSource = loop;
-            slot.OneShotSource = shot;
-            made.Add(slot);
-
-            // Drink card: icon, name, status, pour button, fill bar
-            const float W = 310f, H = 400f;
-            RectTransform card = Canvas(go.transform.parent.parent, "Card " + (i + 1), new Vector3(x, (BodyBottom + BodyTop) * 0.5f - 0.016f, Front + 0.0035f), new Vector2(W, H), true);
-            card.SetParent(go.transform, true);
-            Img(card, "Background", Vector2.zero, new Vector2(W, H), roundSprite, custom ? new Color(0.17f, 0.08f, 0.26f, 1f) : Card, true);
-            Img(card, "Icon", new Vector2(0f, 88f), new Vector2(190f, 190f), icon, Color.white, false).preserveAspect = true;
-            Label(card, "Name", custom ? "Custom Drink" : Drinks[i].Name, new Vector2(0f, -36f), new Vector2(W - 30f, 56f), 26f, Color.white);
-            slot.StatusText = Label(card, "Status", "POUR", new Vector2(0f, -84f), new Vector2(W - 30f, 26f), 19f, new Color(0.85f, 0.79f, 0.66f));
-            slot.StatusLight = Img(card, "Status Light", new Vector2(W * 0.5f - 22f, H * 0.5f - 22f), new Vector2(14f, 14f), knobSprite, new Color(0.25f, 0.25f, 0.3f), false);
-
-            RectTransform hit = Img(card, "Pour Button", new Vector2(0f, -132f), new Vector2(230f, 104f), null, new Color(1f, 1f, 1f, 0f), false).rectTransform;
-            Image ring = Img(hit, "Ring", new Vector2(0f, -8f), new Vector2(76f, 76f), knobSprite, Gold, false);
-            Img(ring.rectTransform, "Face", Vector2.zero, new Vector2(64f, 64f), knobSprite, new Color(0.05f, 0.045f, 0.06f, 1f), false);
-            Img(ring.rectTransform, "Glow", new Vector2(0f, 0f), new Vector2(22f, 22f), knobSprite, new Color(1f, 0.75f, 0.35f, 0.9f), false);
-            Button(hit.gameObject, slot, "Press", false, 0, ring.transform, shot, mb.ClipButtonClick);
-
-            Img(card, "Fill Back", new Vector2(0f, -186f), new Vector2(230f, 7f), roundSprite, new Color(1f, 1f, 1f, 0.1f), false);
-            Image fill = Img(card, "Fill", new Vector2(0f, -186f), new Vector2(230f, 7f), roundSprite, Color.white, false);
-            fill.type = Image.Type.Filled;
-            fill.fillMethod = Image.FillMethod.Horizontal;
-            fill.fillAmount = 0f;
-            slot.FillBar = fill;
-        }
-
-        private static DrinkSlot CustomizerSlot(Transform parent, DrinkMachine mb, Material guideMat)
-        {
-            var go = new GameObject("Customizer Pad");
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = new Vector3(KioskX, GrateTop, NozzleZ);
-            var snap = new GameObject("SnapPoint").transform;
-            snap.SetParent(go.transform, false);
-            var slot = UdonSharpUndo.AddComponent<DrinkSlot>(go);
-            slot.IsCustomizer = true;
-            slot.SnapPoint = snap;
-            slot.Highlight = Guide(go.transform, guideMat);
-            slot.OneShotSource = Audio(go, 0.9f, 6f);
-            made.Add(slot);
-            return slot;
-        }
-
         private static GameObject Guide(Transform parent, Material mat)
         {
-            var guide = Prim(PrimitiveType.Quad, "Placement Guide", parent, new Vector3(0f, 0.002f, 0f), Vector3.one * (CupRT * 3f), mat);
+            var guide = Prim(PrimitiveType.Quad, "Placement Guide", parent, new Vector3(0f, 0.002f, 0f), Vector3.one * 0.11f, mat);
             guide.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             Shadowless(guide.GetComponent<Renderer>());
             guide.SetActive(false);
             return guide;
-        }
-
-        private static void Cup(Transform parent, int i, Vector3 pos, Mesh cupMesh, Mesh liquidMesh, Mesh strawMesh, Mesh discMesh, Material cupMat, Material liquidMat)
-        {
-            var go = new GameObject("Cup " + (i + 1));
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = pos;
-
-            var col = go.AddComponent<MeshCollider>();
-            col.sharedMesh = cupMesh;
-            col.convex = true;
-            var rb = go.AddComponent<Rigidbody>();
-            rb.mass = 0.3f;
-            rb.isKinematic = true;
-            rb.interpolation = RigidbodyInterpolation.Interpolate;
-            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-            var pickup = go.AddComponent<VRCPickup>();
-            pickup.AutoHold = VRC_Pickup.AutoHoldMode.Yes;
-            pickup.UseText = "Drink";
-            pickup.InteractionText = "Glass";
-            pickup.proximity = 0.4f;
-            pickup.DisallowTheft = true;
-            pickup.orientation = VRC_Pickup.PickupOrientation.Any;
-
-            var liquid = Part(go.transform, "Liquid", liquidMesh, liquidMat, Vector3.zero, Quaternion.identity);
-            liquid.enabled = false;
-            var body = Part(go.transform, "Glass", cupMesh, cupMat, Vector3.zero, Quaternion.identity);
-            var straw = Part(go.transform, "Straw", strawMesh, cupMat, new Vector3(0.004f, 0.014f, -0.004f), Quaternion.Euler(4f, 0f, 8f));
-            straw.enabled = false;
-            var garnish = Part(go.transform, "Garnish", discMesh, cupMat, new Vector3(0.026f, CupH - 0.012f, 0.022f), Quaternion.Euler(0f, 50f, 90f));
-            garnish.enabled = false;
-
-            var cup = UdonSharpUndo.AddComponent<DrinkCup>(go);
-            cup.LiquidRenderer = liquid;
-            cup.BodyRenderer = body;
-            cup.StrawRenderer = straw;
-            cup.GarnishRenderer = garnish;
-            cup.OneShotSource = Audio(go, 0.9f, 6f);
-            cup.LoopSource = Audio(go, 0.6f, 4f);
-            made.Add(cup);
         }
 
         private static MeshRenderer Part(Transform parent, string name, Mesh mesh, Material mat, Vector3 pos, Quaternion rot)
@@ -658,141 +1032,6 @@ namespace DrinkSystem.EditorTools
             r.sharedMaterial = mat;
             Shadowless(r);
             return r;
-        }
-
-        // ------------------------------------------------------------------ options + kiosk UI
-
-        private static void OptionsPanel(Transform rt, DrinkMachine mb, Sprite[] fruitSprites)
-        {
-            const float W = 1400f, H = 1080f;
-            float cx = (TowerX0 + TowerX1) * 0.5f;
-            RectTransform c = Canvas(rt, "Options Panel", new Vector3(cx, 0.355f, Front + 0.0015f), new Vector2(W, H), true);
-            AudioSource click = Audio(c.gameObject, 0.9f, 6f);
-            Img(c, "Background", Vector2.zero, new Vector2(W, H), roundSprite, Panel, true);
-
-            string[] titles = { "FROTH", "STRENGTH", "SPIRIT" };
-            string[] subs = { "ADJUST FROTH", "ADJUST STRENGTH", "CHOOSE STRENGTH" };
-            string[] lows = { "LIGHT", "LIGHT", "LIGHT" };
-            string[] highs = { "THICK", "STRONG", "STRONG" };
-            string[] sections = { "HEIGHT", "STRENGTH", "STRENGTH" };
-            string[] events = { "OptionFroth", "OptionStrength", "OptionSpirit" };
-            var gauges = new Image[3];
-            var groups = new Image[3][];
-            for (int k = 0; k < 3; k++)
-            {
-                float x = -570f + k * 225f;
-                Img(c, titles[k] + " Panel", new Vector2(x, 250f), new Vector2(210f, 580f), roundSprite, Card, true);
-                Label(c, titles[k], titles[k], new Vector2(x, 500f), new Vector2(200f, 40f), 32f, GoldText);
-                Label(c, titles[k] + " Sub", subs[k], new Vector2(x, 462f), new Vector2(200f, 22f), 15f, new Color(1f, 1f, 1f, 0.55f));
-                Image track = Img(c, titles[k] + " Track", new Vector2(x, 345f), new Vector2(160f, 160f), ringSprite, new Color(1f, 1f, 1f, 0.12f), false);
-                Gauge(track, 0.75f);
-                gauges[k] = Img(c, titles[k] + " Gauge", new Vector2(x, 345f), new Vector2(160f, 160f), ringSprite, Gold, false);
-                Gauge(gauges[k], 0.5f);
-                Label(c, "Low", lows[k], new Vector2(x - 52f, 250f), new Vector2(80f, 20f), 13f, new Color(1f, 1f, 1f, 0.5f));
-                Label(c, "High", highs[k], new Vector2(x + 52f, 250f), new Vector2(80f, 20f), 13f, new Color(1f, 1f, 1f, 0.5f));
-                Label(c, "Section", sections[k], new Vector2(x, 192f), new Vector2(200f, 24f), 17f, Color.white);
-                string[] names = { "LOW", "MED", k == 0 ? "HIGH" : "STRONG" };
-                groups[k] = new Image[3];
-                for (int j = 0; j < 3; j++)
-                {
-                    Image b = Img(c, names[j], new Vector2(x - 64f + j * 64f, 128f), new Vector2(58f, 44f), roundSprite, OptionOff, true);
-                    Label(b.rectTransform, "Label", names[j], Vector2.zero, new Vector2(54f, 30f), 13f, Color.white);
-                    Button(b.gameObject, mb, events[k], true, j, b.transform, click, mb.ClipButtonClick);
-                    groups[k][j] = b;
-                }
-            }
-            mb.FrothGauge = gauges[0];
-            mb.StrengthGauge = gauges[1];
-            mb.SpiritGauge = gauges[2];
-            mb.FrothButtons = groups[0];
-            mb.StrengthButtons = groups[1];
-            mb.SpiritButtons = groups[2];
-
-            Img(c, "Summary Panel", new Vector2(-345f, -300f), new Vector2(660f, 440f), roundSprite, Card, true);
-            Label(c, "Summary Title", "YOUR DRINK", new Vector2(-345f, -125f), new Vector2(600f, 40f), 30f, GoldText);
-            Label(c, "Summary Hint", "These are added to the next drink you pour", new Vector2(-345f, -165f), new Vector2(600f, 24f), 16f, new Color(1f, 1f, 1f, 0.5f));
-            mb.SummaryText = Label(c, "Summary", "", new Vector2(-345f, -315f), new Vector2(560f, 230f), 30f, Color.white);
-            Image respawn = Img(c, "Respawn Glasses", new Vector2(-345f, -478f), new Vector2(340f, 56f), roundSprite, new Color(0.2f, 0.17f, 0.1f, 1f), true);
-            Label(respawn.rectTransform, "Label", "RESPAWN GLASSES", Vector2.zero, new Vector2(320f, 34f), 20f, GoldText);
-            Button(respawn.gameObject, mb, "RespawnAllCups", false, 0, respawn.transform, click, mb.ClipButtonClick);
-
-            // FRUIT
-            Img(c, "Fruit Panel", new Vector2(140f, 0f), new Vector2(230f, 1060f), roundSprite, Card, true);
-            Label(c, "Fruit", "FRUIT", new Vector2(140f, 500f), new Vector2(220f, 40f), 32f, GoldText);
-            Label(c, "Fruit Sub", "CHOOSE YOUR FLAVOUR", new Vector2(140f, 462f), new Vector2(220f, 22f), 14f, new Color(1f, 1f, 1f, 0.55f));
-            var fruitButtons = new Image[Fruits.Length];
-            for (int i = 0; i < Fruits.Length; i++)
-            {
-                Image b = Img(c, Fruits[i].Name, new Vector2(140f, 360f - i * 148f), new Vector2(210f, 132f), roundSprite, OptionOff, true);
-                Img(b.rectTransform, "Icon", new Vector2(-58f, 0f), new Vector2(84f, 84f), fruitSprites[i], Color.white, false);
-                Label(b.rectTransform, "Label", Fruits[i].Name.ToUpperInvariant(), new Vector2(36f, 0f), new Vector2(110f, 30f), 18f, Color.white, TextAlignmentOptions.Left);
-                Button(b.gameObject, mb, "OptionFruit", true, i, b.transform, click, mb.ClipButtonClick);
-                fruitButtons[i] = b;
-            }
-            mb.FruitButtons = fruitButtons;
-
-            // STRAW
-            Img(c, "Straw Panel", new Vector2(470f, 0f), new Vector2(420f, 1060f), roundSprite, Card, true);
-            Label(c, "Straw", "STRAW", new Vector2(470f, 500f), new Vector2(400f, 40f), 32f, GoldText);
-            Label(c, "Straw Sub", "CHOOSE YOUR STYLE", new Vector2(470f, 462f), new Vector2(400f, 22f), 14f, new Color(1f, 1f, 1f, 0.55f));
-            var strawButtons = new Image[StrawNames.Length];
-            for (int i = 0; i < StrawNames.Length; i++)
-            {
-                Vector2 pos = new Vector2(470f + (i % 2 == 0 ? -100f : 100f), 290f - (i / 2) * 285f);
-                Image b = Img(c, StrawNames[i], pos, new Vector2(192f, 270f), roundSprite, OptionOff, true);
-                Img(b.rectTransform, "Swatch", new Vector2(0f, 22f), new Vector2(170f, 190f), SaveSprite("Straw_" + i, StrawSwatch(i)), Color.white, false);
-                Label(b.rectTransform, "Label", StrawNames[i].ToUpperInvariant(), new Vector2(0f, -106f), new Vector2(180f, 26f), 16f, Color.white);
-                Button(b.gameObject, mb, "OptionStraw", true, i, b.transform, click, mb.ClipButtonClick);
-                strawButtons[i] = b;
-            }
-            mb.StrawButtons = strawButtons;
-        }
-
-        private static void KioskPanel(Transform rt, DrinkMachine mb, DrinkSlot slot)
-        {
-            const float W = 720f, H = 440f;
-            RectTransform c = Canvas(rt, "Customize Cup Panel", new Vector3(KioskX, (0.40f + TowerTop) * 0.5f, Front + 0.0015f), new Vector2(W, H), true);
-            Img(c, "Background", Vector2.zero, new Vector2(W, H), roundSprite, new Color(0.13f, 0.07f, 0.2f, 0.98f), true);
-            Label(c, "Title", "CUSTOMIZE CUP", new Vector2(0f, 175f), new Vector2(600f, 44f), 34f, Color.white);
-            slot.StatusText = Label(c, "Status", "PLACE A CUP BELOW", new Vector2(0f, 133f), new Vector2(600f, 26f), 18f, GoldText);
-            slot.StatusLight = Img(c, "Status Light", new Vector2(W * 0.5f - 26f, H * 0.5f - 26f), new Vector2(16f, 16f), knobSprite, new Color(0.25f, 0.25f, 0.3f), false);
-            AudioSource click = slot.OneShotSource;
-
-            Label(c, "Glass", "GLASS", new Vector2(-300f, 90f), new Vector2(120f, 24f), 16f, new Color(1f, 1f, 1f, 0.6f), TextAlignmentOptions.Left);
-            var tintButtons = new Image[Tints.Length];
-            for (int i = 0; i < Tints.Length; i++)
-            {
-                var pos = new Vector2(-265f + i * 106f, 30f);
-                Image ring = Img(c, TintNames[i], pos, new Vector2(84f, 84f), knobSprite, OptionOff, false);
-                Color sw = Tints[i];
-                sw.a = 1f;
-                Img(ring.rectTransform, "Swatch", Vector2.zero, new Vector2(68f, 68f), knobSprite, i == 0 ? new Color(0.85f, 0.9f, 0.95f) : sw, false);
-                Label(ring.rectTransform, "Name", TintNames[i].ToUpperInvariant(), new Vector2(0f, -56f), new Vector2(100f, 20f), 12f, new Color(1f, 1f, 1f, 0.7f));
-                Button(ring.gameObject, mb, "CupTint", true, i, ring.transform, click, mb.ClipButtonClick);
-                tintButtons[i] = ring;
-            }
-            Label(c, "Logo", "LOGO", new Vector2(-300f, -100f), new Vector2(120f, 24f), 16f, new Color(1f, 1f, 1f, 0.6f), TextAlignmentOptions.Left);
-            var logoButtons = new Image[LogoNames.Length];
-            for (int i = 0; i < LogoNames.Length; i++)
-            {
-                Image b = Img(c, LogoNames[i], new Vector2(-210f + i * 210f, -160f), new Vector2(190f, 64f), roundSprite, OptionOff, true);
-                Label(b.rectTransform, "Label", LogoNames[i], Vector2.zero, new Vector2(170f, 34f), 20f, i == 0 ? GoldText : Color.white);
-                Button(b.gameObject, mb, "CupLogo", true, i, b.transform, click, mb.ClipButtonClick);
-                logoButtons[i] = b;
-            }
-            mb.TintButtons = tintButtons;
-            mb.LogoButtons = logoButtons;
-        }
-
-        private static void Gauge(Image img, float fill)
-        {
-            img.type = Image.Type.Filled;
-            img.fillMethod = Image.FillMethod.Radial360;
-            img.fillOrigin = (int)Image.Origin360.Bottom;
-            img.fillClockwise = true;
-            img.fillAmount = fill;
-            // start at bottom-left, sweep 270 degrees over the top
-            img.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -45f);
         }
 
         // ------------------------------------------------------------------ helpers: UI
@@ -1061,57 +1300,6 @@ namespace DrinkSystem.EditorTools
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
 
-        /// <summary>Renders text with TextMesh Pro into a transparent texture (used for the glass logo).</summary>
-        private static Texture2D TextTexture(string name, string text, int w, int h)
-        {
-            const int layer = 31;
-            var holder = new GameObject("TextRender") { hideFlags = HideFlags.HideAndDontSave };
-            holder.transform.position = new Vector3(0f, -5000f, 0f);
-            var tgo = new GameObject("Text", typeof(RectTransform)) { hideFlags = HideFlags.HideAndDontSave };
-            tgo.transform.SetParent(holder.transform, false);
-            tgo.layer = layer;
-            var t = tgo.AddComponent<TextMeshPro>();
-            t.font = font;
-            t.text = text;
-            t.fontStyle = FontStyles.Bold;
-            t.alignment = TextAlignmentOptions.Center;
-            t.color = Color.white;
-            t.enableAutoSizing = true;
-            t.fontSizeMin = 1f;
-            t.fontSizeMax = 100f;
-            t.rectTransform.sizeDelta = new Vector2(1f, 1f);
-            t.ForceMeshUpdate();
-            var cgo = new GameObject("Cam") { hideFlags = HideFlags.HideAndDontSave };
-            cgo.transform.SetParent(holder.transform, false);
-            cgo.transform.localPosition = new Vector3(0f, 0f, -5f);
-            var cam = cgo.AddComponent<Camera>();
-            cam.orthographic = true;
-            cam.orthographicSize = 0.5f;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(1f, 1f, 1f, 0f);
-            cam.cullingMask = 1 << layer;
-            cam.nearClipPlane = 0.1f;
-            cam.farClipPlane = 20f;
-            var rtex = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32);
-            cam.targetTexture = rtex;
-            cam.Render();
-            var prev = RenderTexture.active;
-            RenderTexture.active = rtex;
-            var tex = new Texture2D(w, h, TextureFormat.RGBA32, true);
-            tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
-            tex.Apply();
-            RenderTexture.active = prev;
-            cam.targetTexture = null;
-            Object.DestroyImmediate(rtex);
-            Object.DestroyImmediate(holder);
-            // keep the shape in alpha, colour comes from the shader
-            Color[] px = tex.GetPixels();
-            for (int i = 0; i < px.Length; i++) px[i] = new Color(1f, 1f, 1f, px[i].a);
-            tex.SetPixels(px);
-            tex.Apply();
-            return SavePng(name, tex);
-        }
-
         // ------------------------------------------------------------------ painted textures
 
         private sealed class Painter
@@ -1366,17 +1554,6 @@ namespace DrinkSystem.EditorTools
                 float r = 1.5f + (float)rng.NextDouble() * 2f;
                 pt.Stroke(p => Circle(p, c, r), 1.2f, new Color(1f, 1f, 1f, 0.5f));
             }
-        }
-
-        private static Texture2D CustomIcon()
-        {
-            var pt = new Painter(256, 256);
-            var c = new Vector2(128f, 128f);
-            Glow(pt, c, 118f, new Color(0.7f, 0.4f, 1f, 0.3f));
-            pt.Stroke(p => Circle(p, c, 70f), 5f, Hex("E8C27A"));
-            pt.Fill(p => RBox(p, c, new Vector2(34f, 3f), 2f), Hex("E8C27A"));
-            pt.Fill(p => RBox(p, c, new Vector2(3f, 34f), 2f), Hex("E8C27A"));
-            return pt.Texture();
         }
 
         private static Texture2D StrawSwatch(int style)

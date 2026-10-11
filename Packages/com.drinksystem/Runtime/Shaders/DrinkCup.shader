@@ -1,4 +1,5 @@
-// Clear glass cup for VRChat PC + Quest: unlit tint with a fresnel rim, a soft fake highlight and a glowing logo.
+// Clear glass for VRChat PC + Quest: unlit tint with a fresnel rim, a soft fake highlight and a logo.
+// Also used as the logo decal on your own glasses (tint and rim alpha 0, logo rect = the whole decal).
 // _Color (tint) and _LogoColor are set per cup by DrinkCup (MaterialPropertyBlock). Logo alpha 0 = no logo.
 Shader "DrinkSystem/Cup"
 {
@@ -8,8 +9,8 @@ Shader "DrinkSystem/Cup"
         _RimColor ("Rim (alpha = rim opacity)", Color) = (1, 1, 1, 0.65)
         _RimPower ("Rim Power", Range(0.5, 8)) = 2.5
         _Highlight ("Highlight", Range(0, 1)) = 0.35
-        _LogoTex ("Logo (white on transparent)", 2D) = "black" {}
-        _LogoColor ("Logo Color", Color) = (1, 0.76, 0.29, 1)
+        _LogoTex ("Logo (transparent background)", 2D) = "black" {}
+        _LogoColor ("Logo Color (white = original colours)", Color) = (1, 1, 1, 1)
         _LogoRect ("Logo Rect on the cup (U center, V center, U size, V size)", Vector) = (0.25, 0.5, 0.16, 0.42)
     }
     SubShader
@@ -60,8 +61,13 @@ Shader "DrinkSystem/Cup"
                 c.rgb += _RimColor.rgb * rim * 0.5 + spec;
                 c.a = saturate(_Color.a + rim * _RimColor.a + spec);
                 float inside = step(0.0, i.luv.x) * step(i.luv.x, 1.0) * step(0.0, i.luv.y) * step(i.luv.y, 1.0);
-                float logo = tex2D(_LogoTex, saturate(i.luv)).a * inside * _LogoColor.a;
-                c.rgb = lerp(c.rgb, _LogoColor.rgb * 1.2, logo);
+                fixed4 t = tex2D(_LogoTex, saturate(i.luv));
+                float logo = t.a * inside * _LogoColor.a;
+                // white _LogoColor = the logo's own colours; any other colour tints its shading (gold -> silver)
+                float lum = dot(t.rgb, float3(0.3, 0.59, 0.11));
+                float tintAmount = saturate(distance(_LogoColor.rgb, float3(1, 1, 1)) * 4.0);
+                float3 logoRgb = lerp(t.rgb, lum * 1.35 * _LogoColor.rgb, tintAmount);
+                c.rgb = lerp(c.rgb, logoRgb, logo);
                 c.a = max(c.a, logo);
                 return c;
             }

@@ -15,9 +15,9 @@ namespace DrinkSystem {
 		[Header("Drink")]
 		[Tooltip("Index of the DrinkFlavor this nozzle pours (child order under the machine's FlavorsParent).")]
 		public int FlavorIndex;
-		[Tooltip("Custom drink: pours the FRUIT picked on the options panel instead of FlavorIndex.")]
+		[Tooltip("Custom drink: pours the fruit flavor of the glass's FRUIT (picked on the finishing pad) instead of FlavorIndex.")]
 		public bool UseFruitFlavor;
-		[Tooltip("Cup customizer pad: no nozzle, the kiosk buttons restyle the cup locked here.")]
+		[Tooltip("Finishing pad: no nozzle, the finishing buttons change the glass locked here (straw, fruit, tint, logo).")]
 		public bool IsCustomizer;
 		[Header("Placement")]
 		[Tooltip("Where a locked cup sits. The cup's pivot is the bottom of the cup.")]
@@ -76,10 +76,10 @@ namespace DrinkSystem {
 		// Button (UI / finger poke)
 		public void Press() {
 			if(IsCustomizer) return;
-			if(Cup == null) { _Deny("PLACE CUP"); return; }
+			if(Cup == null) { _Deny("PUT A GLASS HERE FIRST"); return; }
 			if(!Cup.Pouring) {
-				if(Cup.FillAmount >= 0.999f) { _Deny("FULL"); return; }
-				if(UseFruitFlavor && MB.Fruit < 0) { _Deny("PICK A FRUIT"); return; }
+				if(Cup.FillAmount >= 0.999f) { _Deny("FULL! GO TO STEP 4"); return; }
+				if(UseFruitFlavor && Cup.Fruit < 0) { _Deny("PICK A FRUIT FIRST"); return; }
 			}
 			Cup._TogglePour();
 		}
@@ -136,18 +136,18 @@ namespace DrinkSystem {
 			if(Time.time < DenyUntil) return;
 			Color light;
 			if(Cup == null) {
-				SetLabel(IsCustomizer ? "PLACE A CUP BELOW" : "PLACE CUP");
+				SetLabel(IsCustomizer ? "PUT YOUR GLASS ON THE PAD" : "PLACE A GLASS HERE");
 				light = new Color(0.25f, 0.25f, 0.3f, 1f);
 				SetBar(0f);
 			}
 			else if(IsCustomizer) {
-				SetLabel("TAP A STYLE");
+				SetLabel("TAP A STRAW, FRUIT & GLASS STYLE");
 				light = new Color(1f, 0.78f, 0.3f, 1f);
 			}
 			else {
-				if(Cup.Pouring) { SetLabel("POURING"); light = new Color(1f, 0.6f, 0.15f, 1f); }
-				else if(Cup.FillAmount >= 0.999f) { SetLabel("FULL"); light = new Color(0.3f, 1f, 0.45f, 1f); }
-				else { SetLabel("POUR"); light = new Color(1f, 0.78f, 0.3f, 1f); }
+				if(Cup.Pouring) { SetLabel("POURING... (PRESS TO STOP)"); light = new Color(1f, 0.6f, 0.15f, 1f); }
+				else if(Cup.FillAmount >= 0.999f) { SetLabel("FULL! GO TO STEP 4"); light = new Color(0.3f, 1f, 0.45f, 1f); }
+				else { SetLabel("PRESS POUR"); light = new Color(1f, 0.78f, 0.3f, 1f); }
 				SetBar(Cup.VisualFill);
 			}
 			if(StatusLight != null) StatusLight.color = light;

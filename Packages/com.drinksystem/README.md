@@ -1,25 +1,26 @@
-# Drink System - Bar Drink Station for VRChat
+# Drink System - FBT Mayfair Drink Station for VRChat
 
-A networked black and gold bar drink station for VRChat worlds (desktop, PC VR and **Quest**):
-- **Choose your drink:** 5 drink cards plus a Custom Drink. Each card has a painted drink icon and its own **POUR**
-  button above a gold nozzle with a warm light.
-- **Cups lock into place** with a click when you set them down under a nozzle. A glowing ring shows where it'll lock.
-- **Options tower:** FROTH, STRENGTH and SPIRIT dials (LOW / MED / HIGH), FRUIT (Citrus, Berry, Tropical, Exotic,
-  Apple, Grape) and STRAW (Gold Metal, Black Metal, Glass, Bamboo, Paper, Custom). The next drink you pour takes these
-  options: foam height, color strength, drink effects, a fruit wheel on the rim and your straw. Custom Drink pours
-  the fruit you picked.
-- **Customize Cup kiosk:** set a glass on the pad, then pick a glass tint (Clear, Smoke, Amber, Rose, Violet, Emerald)
-  and logo (Gold, Silver, None).
-- **Glowing logo glasses** on the shelf on top, a garnish drawer with fruit, and a neon sign.
-- Pour, fizz, slurp, click and lock **sounds**, drinking with Use, mixing, and **cup respawn** (button + automatic).
+A networked black and gold bar drink station for VRChat worlds (desktop, PC VR and **Quest**), laid out as one clear
+line, left to right. Each step has a big gold number, and the sign on top shows the whole line:
+
+| Step | Where | What you do |
+|------|-------|-------------|
+| **1 TAKE A GLASS** | Glass rack (left) | Grab any glass: wine, champagne, martini or shot (your `Glasses2025` glasses). |
+| **2 PLACE IT** | Drink machine | Set it under the drink you want. It **locks into place** with a click, and a gold ring shows where it'll lock. |
+| **3 POUR** | Drink machine | Pick **STRENGTH** (LOW / MED / STRONG = how drunk it gets) and **FROTH**, then press **POUR** on the card. The card always says what to do next. |
+| **4 FINISH IT** | Finishing station (right) | Put the glass on the pad, then tap a **STRAW**, a **FRUIT** garnish, a **GLASS** tint and the **FBT logo** (gold, silver or none). It changes right away. |
+| **5 DRINK** | Anywhere | Hold **Use** (trigger / left click) with the glass at your mouth. |
+
+There are also pour / fizz / slurp / click / lock **sounds**, mixing, and **glass respawn** (a RESET GLASSES button,
+plus automatic respawn).
 
 ## Requirements
 - A VRChat **world** project (Unity 2022.3) with VRChat Worlds SDK **3.8.1 or newer** (includes UdonSharp).
 - TextMesh Pro Essential Resources. The builder offers to import them if they're missing.
+- Your **`Glasses2025`** prefab in the project. Without it, the builder makes simple glasses instead.
 
 ## Install
 Copy the `com.drinksystem` folder into your project's **`Packages/`** folder (not `Assets/`), then open the project.
-It shows up as "Drink System - Bar Drink Station".
 
 ## Build it (one click)
 1. **Select your bar counter** in the scene (optional). The station is placed on top of it.
@@ -27,58 +28,62 @@ It shows up as "Drink System - Bar Drink Station".
 2. Click **Tools > Drink System > Build Drink Machine In Scene**.
 3. Press Play (ClientSim) or **Build & Test**.
 
-Everything is generated into `Assets/DrinkSystem/Generated` (meshes, painted icons, materials, sounds), and a
-prefab is saved at `Assets/DrinkSystem/Drink Machine.prefab`. Run it again any time to rebuild.
+What the builder does with your glasses:
+- It takes every `Glass_*` in `Glasses2025` (with its `Liquid_*` child, your models and materials) and builds
+  `CopiesPerGlass` (2) of each onto the rack as networked `DrinkCup`s.
+- It turns on **Read/Write** for the glasses' model, since the liquid line is measured from the mesh.
+- It doesn't use the old `LiquidGlass` / `TransformSync` scripts on these. Your prefab itself isn't changed.
+- Each glass gets a box collider, a pickup, a straw, a fruit wheel and an **FBT Mayfair logo** wrapped around its
+  widest part.
+- The machine is made tall enough for your tallest glass.
 
-To change the brand name, the logo letter, the neon text or the number of glasses, edit the constants at the top of
-`Editor/DrinkMachineBuilder.cs` (`Brand`, `CupLogoText`, `NeonText`, `CupCount`) and build again.
+Everything else is generated into `Assets/DrinkSystem/Generated`, and a prefab is saved at
+`Assets/DrinkSystem/Drink Machine.prefab`. Run it again any time to rebuild.
 
-## Scripts
-| Script | Like your... | What it does |
-|--------|--------------|--------------|
-| `DrinkMachine` | `ManagerBar` | Finds flavors / slots / cups under `FlavorsParent` / `SlotsParent` / `CupsParent`. Handles the options panel, the cup customizer, VR finger presses, cup respawn, sounds and the optional drunk effect (same `UpdatePP` material properties). |
-| `DrinkFlavor` | `LiquidParticles` | A drink: colors, foam, edge, transparency, pour speed, effect intensities. |
-| `DrinkCup` | `LiquidGlass` + `TransformSync` | Locking, filling, drinking, mixing, options, style, respawn and all of the glass's networking. |
-| `DrinkSlot` | (new) | One nozzle (snap point, stream, splash, pour sounds, its card), or the customizer pad. |
-| `DrinkButton` | (new) | UI push button: click sound, press animation, sends an event (with a choice number for options). |
+## Strength = drunk post-processing
+STRENGTH decides how hard a drink hits. While you drink, it pushes your drunk post-processing up: chromatic
+aberration, distortion and neon, the same material properties as `ManagerBar.UpdatePP`. The more you drink, the
+stronger it gets, and it wears off over time.
+- The builder finds your **ManagerBar** in the scene and reuses its `Drunk Effect Transform`. **Disable that
+  ManagerBar** afterwards, because the station now drives the effect.
+- If it isn't found, drag your effect object into `Drunk Effect Transform` on `Drink Machine`.
+- Tune it with `Strength Levels` (LOW / MED / STRONG), `Intoxication Factor` and `Detoxication Speed`.
 
-## Networking (optimized)
-Manual sync everywhere. Nothing is sent while nothing changes:
-- **Options panel:** 5 bytes on the machine, sent only when someone taps an option. Everyone sees the same choices.
-- **Locked in a slot:** no position is sent. Every client puts the glass on the slot.
-- **Held:** the glass's offset to the holder's hand bone is sent once. Everyone attaches it to that hand locally.
-- **Dropped:** a few position updates per second while it falls, then a final one when it settles.
-- **Pouring / drinking:** only start and stop are sent. Every client simulates the fill, and the final value fixes
-  any drift.
-- **Drink mix:** one byte per flavor. Options and style are a handful of bytes. Late joiners get the current state.
+## Networking and performance
+- Manual sync everywhere. Nothing is sent while nothing changes.
+- **Machine:** 2 bytes (strength, froth), sent only when someone taps them.
+- **Glass in a slot or on the pad:** no position is sent. Every client puts it there itself.
+- **Held glass:** the offset to the holder's hand bone is sent once. Everyone attaches it to that hand locally.
+- **Dropped glass:** a few position updates per second while it falls, then a final one when it settles.
+- **Pouring / drinking:** only start and stop are sent. Every client simulates the fill in between.
+- **Mix and look:** one byte per flavor, plus a handful of bytes for strength, froth, straw, fruit, tint and logo.
+- **Drunk effect:** the full-screen effect is **switched off when sober**. While active, its material is updated at
+  most 10 times a second, and only the values that actually changed.
+- Idle glasses skip all their per-frame work. Liquid is hidden when empty.
+- The station parts are static (batched). Shaders are single pass, Quest-safe, and have no real-time lights.
+- Each card has its own canvas, so a filling bar only redraws its own card.
+- VR finger presses are only checked when you're near the station.
 
 ## VR and Quest
 - Every panel is a world-space UI canvas with `VRC Ui Shape`, so the **laser pointer** (PC VR and Quest) and the
   desktop mouse work. In VR you can also **press buttons with your index finger**, with haptics.
 - In VR you drink when the glass is at your mouth (`Mouth Distance`). Desktop drinks right away.
-- Shaders (`DrinkSystem/Liquid`, `Cup`, `Stream`) are single pass, with no GrabPass or geometry shaders, and work
-  with single-pass stereo. There are no real-time lights: the warm glow is emissive materials and soft additive
-  light cones. The station parts are marked static for batching. Empty glasses hide their liquid, and the drunk
-  effect is switched off when sober.
 
-## Cup respawn
-- A cup left alone is respawned after `Respawn Idle Seconds` (default 5 min), or `Respawn Empty Seconds` if it's empty
-  and not in a slot (default 20 s). A respawned cup is empty, with no straw or garnish, and back to the default style.
-- A cup that falls `Fall Respawn Distance` below its spawn is respawned right away.
-- `Keep Cup Ready`: when someone takes the last glass from the shelf, the glass abandoned the longest is recycled onto it.
-- To respawn somewhere else, set a cup's `Spawn Point`.
-- **RESPAWN GLASSES** (on the options panel) puts every glass nobody is holding back on the shelf.
+## Glass respawn
+- **RESET GLASSES** (on the finishing panel) puts every glass nobody is holding back on the rack.
+- A glass left alone is respawned after `Respawn Idle Seconds` (default 5 min), or `Respawn Empty Seconds` if it's empty
+  and not in a slot (default 20 s). A respawned glass is empty, with no straw or fruit, and back to its original look.
+- A glass that falls `Fall Respawn Distance` below its spot is respawned right away.
+- `Keep Cup Ready`: when someone takes the last glass from the rack, the glass abandoned the longest is recycled onto it.
 
 ## Customize
-- **Drinks and fruits:** edit them under `Drink Machine/Flavors`. The first 5 are the drink cards, and the 6 after
-  them are the fruits (`Fruit Flavor Start` = 5). Card names and icons are made by the builder.
-- **Option strength:** `Froth Levels` (foam multiplier) and `Spirit Levels` (extra drink effect) on `DrinkMachine`.
-- **Sounds:** the builder makes procedural stand-ins (button click, deny buzz, glass lock clack, unlock, valve open,
-  pour loop, valve close + drips, full ding, fizz, slurp loop, respawn pop). Drop your own clips into the **Sounds**
-  section of `DrinkMachine`.
-- **Your own liquid shader:** `DrinkCup` sets the same properties as `LiquidGlass` (`_FillHeight`, `_GlassRemap`,
-  `_ColorMain`, `_FoamColor`, `_EdgeColor`, `_Transparency`, `_FoamHeight`, `_FoamLineSmoothness`, `_EdgeStrength`,
-  `_EdgePower`), plus `_WobbleX` / `_WobbleZ`. Put your material on the glass's `Liquid` renderer.
-- **Your own glass model:** the cup's pivot must be at its bottom center, and its `Liquid` child's mesh must sit on
-  the cup's axis. Enable Read/Write on imported liquid meshes, or the liquid's bounds are used instead.
+- **Drinks:** edit them under `Drink Machine/Flavors` (the first 6 are the drink cards).
+- **Glasses:** change `GlassesPrefabName` / `CopiesPerGlass` at the top of `Editor/DrinkMachineBuilder.cs`.
+- **Logo:** replace `Runtime/Textures/FBT_Mayfair_Logo.png` (transparent PNG) and build again.
+- **Sounds:** the builder makes procedural stand-ins. Drop your own clips into the **Sounds** section of
+  `DrinkMachine`.
+- **Liquid shader:** `DrinkCup` sets the same properties as `LiquidGlass` (`_FillHeight`, `_GlassRemap`, `_ColorMain`,
+  `_FoamColor`, `_EdgeColor`, `_Transparency`, `_FoamHeight`, `_FoamLineSmoothness`, `_EdgeStrength`, `_EdgePower`),
+  so your own liquid material on `Liquid_*` keeps working.
+- **Glass tint:** sets `_Color` on the glass material. "Original" leaves it exactly as it is.
 - Don't move the station at runtime (slot positions are cached at start).

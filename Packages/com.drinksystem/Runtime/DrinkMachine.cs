@@ -1,4 +1,15 @@
-using TMPro;
+		public void UpdatePP(float value1, float value2, float value3) {
+			// Toggles only change when an effect switches on/off; amounts only when they visibly change
+			bool on1 = value1 > 0f;
+			bool on2 = value2 > 0f;
+			bool on3 = value3 > 0f;
+			if(on1 != PPOn1 || !IdsReady) { PPOn1 = on1; DrunkEffectMaterial.SetFloat("Chromatic_Aberration", on1 ? 2 : 0); }
+			if(on2 != PPOn2 || !IdsReady) { PPOn2 = on2; DrunkEffectMaterial.SetFloat("Distorsion", on2 ? 1 : 0); }
+			if(on3 != PPOn3 || !IdsReady) { PPOn3 = on3; DrunkEffectMaterial.SetFloat("Neon", on3 ? 1 : 0); }
+			if(Mathf.Abs(value1 - PPLast1) > 0.005f || !on1) { PPLast1 = value1; DrunkEffectMaterial.SetFloat("_CA_amplitude", value1 * 0.4f); }
+			if(Mathf.Abs(value2 - PPLast2) > 0.005f || !on2) { PPLast2 = value2; DrunkEffectMaterial.SetVector("_DistorsionWave", new Vector4(value2 * 0.02f, value2 * 0.02f, 1, 0)); }
+			if(Mathf.Abs(value3 - PPLast3) > 0.005f || !on3) { PPLast3 = value3; DrunkEffectMaterial.SetFloat("_NeonColorAlpha", value3 * 0.4f); }
+		}
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,8 +19,8 @@ namespace DrinkSystem {
 	/// <summary>
 	/// The drink machine manager (like ManagerBar). Finds the flavors, slots and cups under their parents, keeps the
 	/// local "which cup is locked in which slot" table, handles VR finger presses on the UI buttons, cup respawning,
-	/// the drink options panel and the cup customizer, and the optional drunk screen effect.
-	/// Synced: only the 5 option bytes (sent when someone taps an option). Every cup syncs its own small state.
+	/// the pour options (froth / strength), the finishing pad (straw, fruit, glass style) and the drunk screen effect.
+	/// Synced: only the 2 option bytes (sent when someone taps an option). Every glass syncs its own small state.
 	/// Don't move the machine at runtime (slot positions are cached).
 	/// </summary>
 	[UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
@@ -65,42 +76,31 @@ namespace DrinkSystem {
 		public AudioClip ClipSlurpLoop;
 		public AudioClip ClipCupRespawn;
 
-		[Header("Drink options (synced, picked on the options panel)")]
+		[Header("Step 3: pour options (synced, picked on the drink panel)")]
 		[UdonSynced] public byte Froth = 1;
 		[UdonSynced] public byte Strength = 1;
-		[UdonSynced] public byte Spirit;
-		[UdonSynced] public sbyte Fruit = -1;
-		[UdonSynced] public sbyte Straw = -1;
-		[Tooltip("Index of the first fruit flavor under FlavorsParent (the fruits follow in FRUIT order).")]
-		public int FruitFlavorStart = 5;
 		[Tooltip("Foam height multiplier for LOW / MEDIUM / HIGH froth.")]
 		public float[] FrothLevels = new float[] { 0.35f, 1f, 2.4f };
-		[Tooltip("Extra effect intensity for LOW / MEDIUM / STRONG spirit.")]
-		public float[] SpiritLevels = new float[] { 0f, 0.3f, 0.7f };
-		public string[] FruitNames;
-		public string[] StrawNames;
+		[Tooltip("How hard the drink hits (drunk post-processing intensity) for LOW / MEDIUM / STRONG.")]
+		public float[] StrengthLevels = new float[] { 0.15f, 0.45f, 0.9f };
+		public Image[] FrothButtons;
+		public Image[] StrengthButtons;
+		public Color OptionOn = new Color(0.79f, 0.59f, 0.18f, 1f);
+		public Color OptionOff = new Color(0.12f, 0.11f, 0.15f, 1f);
+
+		[Header("Step 4: finishing pad (straw, fruit, glass style)")]
+		public DrinkSlot CustomizerSlot;
+		[Tooltip("Index of the first fruit flavor under FlavorsParent (used for a slight fruit tint).")]
+		public int FruitFlavorStart = 6;
 		[Tooltip("Straw look per STRAW option.")]
 		public Material[] StrawMaterials;
 		[Tooltip("Rim garnish per FRUIT option.")]
 		public Material[] GarnishMaterials;
-
-		[Header("Options panel UI")]
-		public Image[] FrothButtons;
-		public Image[] StrengthButtons;
-		public Image[] SpiritButtons;
-		public Image[] FruitButtons;
-		public Image[] StrawButtons;
-		public Image FrothGauge;
-		public Image StrengthGauge;
-		public Image SpiritGauge;
-		public TextMeshProUGUI SummaryText;
-		public Color OptionOn = new Color(0.79f, 0.59f, 0.18f, 1f);
-		public Color OptionOff = new Color(0.12f, 0.11f, 0.15f, 1f);
-
-		[Header("Cup customizer")]
-		public DrinkSlot CustomizerSlot;
+		[Tooltip("Glass tint per GLASS option. The first one means: leave the glass material as it is.")]
 		public Color[] CupTints;
 		public Color[] LogoColors;
+		public Image[] StrawButtons;
+		public Image[] FruitButtons;
 		public Image[] TintButtons;
 		public Image[] LogoButtons;
 
@@ -143,6 +143,14 @@ namespace DrinkSystem {
 		private Material DrunkEffectMaterial;
 		private Renderer DrunkEffectRenderer;
 		private bool IntoxicationActive;
+		private bool IdsReady;
+		private float NextPPUpdate;
+		private bool PPOn1;
+		private bool PPOn2;
+		private bool PPOn3;
+		private float PPLast1 = -1f;
+		private float PPLast2 = -1f;
+		private float PPLast3 = -1f;
 
 		private void Start() {
 			Local = Networking.LocalPlayer;
@@ -211,6 +219,7 @@ namespace DrinkSystem {
 			}
 			RefreshOptionsUI();
 			_RefreshCustomizerUI();
+			IdsReady = true;
 			// Effect (hidden until someone actually drinks something with effects)
 			if(DrunkEffectTransform != null) {
 				DrunkEffectRenderer = DrunkEffectTransform.GetComponent<Renderer>();
@@ -228,38 +237,32 @@ namespace DrinkSystem {
 		public override void OnDeserialization() {
 			RefreshOptionsUI();
 		}
-		// Option buttons (PressedArg = which choice)
+		// Step 3 buttons (PressedArg = which choice)
 		public void OptionFroth() { TakeOwnership(); Froth = (byte)Mathf.Clamp(PressedArg, 0, 2); CommitOptions(); }
 		public void OptionStrength() { TakeOwnership(); Strength = (byte)Mathf.Clamp(PressedArg, 0, 2); CommitOptions(); }
-		public void OptionSpirit() { TakeOwnership(); Spirit = (byte)Mathf.Clamp(PressedArg, 0, 2); CommitOptions(); }
-		public void OptionFruit() {
-			TakeOwnership();
-			// Tap the picked one again to clear it
-			Fruit = Fruit == PressedArg ? (sbyte)-1 : (sbyte)PressedArg;
-			CommitOptions();
+		// Step 4 buttons: change the glass on the finishing pad right away (tap the picked straw / fruit again to remove it)
+		public void FinishStraw() {
+			DrinkCup cup = PadCup();
+			if(cup != null) cup._SetFinish(cup.Straw == PressedArg ? -1 : PressedArg, cup.Fruit, cup.Tint, cup.Logo);
 		}
-		public void OptionStraw() {
-			TakeOwnership();
-			Straw = Straw == PressedArg ? (sbyte)-1 : (sbyte)PressedArg;
-			CommitOptions();
+		public void FinishFruit() {
+			DrinkCup cup = PadCup();
+			if(cup != null) cup._SetFinish(cup.Straw, cup.Fruit == PressedArg ? -1 : PressedArg, cup.Tint, cup.Logo);
 		}
-		// Cup customizer buttons (PressedArg = which tint / logo)
 		public void CupTint() {
-			DrinkCup cup = CustomizerSlot != null ? CustomizerSlot.Cup : null;
-			if(cup == null) { if(CustomizerSlot != null) CustomizerSlot._Deny("PLACE A CUP BELOW"); return; }
-			cup._SetStyle(PressedArg, cup.Logo);
+			DrinkCup cup = PadCup();
+			if(cup != null) cup._SetFinish(cup.Straw, cup.Fruit, PressedArg, cup.Logo);
 		}
 		public void CupLogo() {
-			DrinkCup cup = CustomizerSlot != null ? CustomizerSlot.Cup : null;
-			if(cup == null) { if(CustomizerSlot != null) CustomizerSlot._Deny("PLACE A CUP BELOW"); return; }
-			cup._SetStyle(cup.Tint, PressedArg);
+			DrinkCup cup = PadCup();
+			if(cup != null) cup._SetFinish(cup.Straw, cup.Fruit, cup.Tint, PressedArg);
 		}
 		public void _RefreshCustomizerUI() {
 			DrinkCup cup = CustomizerSlot != null ? CustomizerSlot.Cup : null;
-			int tint = cup != null ? cup.Tint : -1;
-			int logo = cup != null ? cup.Logo : -1;
-			if(TintButtons != null) for(int i = 0; i < TintButtons.Length; i++) if(TintButtons[i] != null) TintButtons[i].color = i == tint ? OptionOn : OptionOff;
-			if(LogoButtons != null) for(int i = 0; i < LogoButtons.Length; i++) if(LogoButtons[i] != null) LogoButtons[i].color = i == logo ? OptionOn : OptionOff;
+			SetChoice(StrawButtons, cup != null ? cup.Straw : -1);
+			SetChoice(FruitButtons, cup != null ? cup.Fruit : -1);
+			SetChoice(TintButtons, cup != null ? cup.Tint : -1);
+			SetChoice(LogoButtons, cup != null ? cup.Logo : -1);
 		}
 		// Interfaces: slots
 		public int FindSnapSlot(DrinkCup cup) {
@@ -358,19 +361,11 @@ namespace DrinkSystem {
 		private void RefreshOptionsUI() {
 			SetChoice(FrothButtons, Froth);
 			SetChoice(StrengthButtons, Strength);
-			SetChoice(SpiritButtons, Spirit);
-			SetChoice(FruitButtons, Fruit);
-			SetChoice(StrawButtons, Straw);
-			// Gauges are 270 degree rings
-			if(FrothGauge != null) FrothGauge.fillAmount = (Froth + 1) / 3f * 0.75f;
-			if(StrengthGauge != null) StrengthGauge.fillAmount = (Strength + 1) / 3f * 0.75f;
-			if(SpiritGauge != null) SpiritGauge.fillAmount = (Spirit + 1) / 3f * 0.75f;
-			if(SummaryText != null) {
-				string[] levels = new string[] { "Light", "Medium", "Strong" };
-				string fruit = Fruit >= 0 && FruitNames != null && Fruit < FruitNames.Length ? FruitNames[Fruit] : "No fruit";
-				string straw = Straw >= 0 && StrawNames != null && Straw < StrawNames.Length ? StrawNames[Straw] + " straw" : "No straw";
-				SummaryText.text = levels[Froth] + " froth\n" + levels[Strength] + " strength\n" + levels[Spirit] + " spirit\n" + fruit + "\n" + straw;
-			}
+		}
+		private DrinkCup PadCup() {
+			if(CustomizerSlot == null) return null;
+			if(CustomizerSlot.Cup == null) CustomizerSlot._Deny("PUT YOUR GLASS ON THE PAD FIRST");
+			return CustomizerSlot.Cup;
 		}
 		private void SetChoice(Image[] buttons, int choice) {
 			if(buttons == null) return;
@@ -387,7 +382,11 @@ namespace DrinkSystem {
 				CurrentIntoxication[i] = Mathf.Clamp(CurrentIntoxication[i] - DetoxicationSpeed * dt, 0.0f, 1.0f);
 				if(CurrentIntoxication[i] > 0f) any = true;
 			}
-			UpdatePP(CurrentIntoxication[0], CurrentIntoxication[1], CurrentIntoxication[2]);
+			// The material only needs ~10 updates a second (the position follows the head every frame)
+			if(!any || Time.time >= NextPPUpdate) {
+				NextPPUpdate = Time.time + 0.1f;
+				UpdatePP(CurrentIntoxication[0], CurrentIntoxication[1], CurrentIntoxication[2]);
+			}
 			// Sober again: switch the full-screen effect off (it is expensive, especially on Quest)
 			if(!any) {
 				IntoxicationActive = false;
