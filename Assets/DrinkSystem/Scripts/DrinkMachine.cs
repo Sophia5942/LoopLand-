@@ -1,15 +1,3 @@
-		public void UpdatePP(float value1, float value2, float value3) {
-			// Toggles only change when an effect switches on/off; amounts only when they visibly change
-			bool on1 = value1 > 0f;
-			bool on2 = value2 > 0f;
-			bool on3 = value3 > 0f;
-			if(on1 != PPOn1 || !IdsReady) { PPOn1 = on1; DrunkEffectMaterial.SetFloat("Chromatic_Aberration", on1 ? 2 : 0); }
-			if(on2 != PPOn2 || !IdsReady) { PPOn2 = on2; DrunkEffectMaterial.SetFloat("Distorsion", on2 ? 1 : 0); }
-			if(on3 != PPOn3 || !IdsReady) { PPOn3 = on3; DrunkEffectMaterial.SetFloat("Neon", on3 ? 1 : 0); }
-			if(Mathf.Abs(value1 - PPLast1) > 0.005f || !on1) { PPLast1 = value1; DrunkEffectMaterial.SetFloat("_CA_amplitude", value1 * 0.4f); }
-			if(Mathf.Abs(value2 - PPLast2) > 0.005f || !on2) { PPLast2 = value2; DrunkEffectMaterial.SetVector("_DistorsionWave", new Vector4(value2 * 0.02f, value2 * 0.02f, 1, 0)); }
-			if(Mathf.Abs(value3 - PPLast3) > 0.005f || !on3) { PPLast3 = value3; DrunkEffectMaterial.SetFloat("_NeonColorAlpha", value3 * 0.4f); }
-		}
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
@@ -341,14 +329,16 @@ namespace DrinkSystem {
 			}
 		}
 		public void UpdatePP(float value1, float value2, float value3) {
-			DrunkEffectMaterial.SetFloat("Chromatic_Aberration", value1 > 0 ? 2 : 0);
-			DrunkEffectMaterial.SetFloat("_CA_amplitude", value1 * 0.4f);
-
-			DrunkEffectMaterial.SetFloat("Distorsion", value2 > 0 ? 1 : 0);
-			DrunkEffectMaterial.SetVector("_DistorsionWave", new Vector4(value2 * 0.02f, value2 * 0.02f, 1, 0));
-
-			DrunkEffectMaterial.SetFloat("Neon", value3 > 0 ? 1 : 0);
-			DrunkEffectMaterial.SetFloat("_NeonColorAlpha", value3 * 0.4f);
+			// Toggles only change when an effect switches on/off; amounts only when they visibly change
+			bool on1 = value1 > 0f;
+			bool on2 = value2 > 0f;
+			bool on3 = value3 > 0f;
+			if(on1 != PPOn1 || !IdsReady) { PPOn1 = on1; DrunkEffectMaterial.SetFloat("Chromatic_Aberration", on1 ? 2 : 0); }
+			if(on2 != PPOn2 || !IdsReady) { PPOn2 = on2; DrunkEffectMaterial.SetFloat("Distorsion", on2 ? 1 : 0); }
+			if(on3 != PPOn3 || !IdsReady) { PPOn3 = on3; DrunkEffectMaterial.SetFloat("Neon", on3 ? 1 : 0); }
+			if(Mathf.Abs(value1 - PPLast1) > 0.005f || !on1) { PPLast1 = value1; DrunkEffectMaterial.SetFloat("_CA_amplitude", value1 * 0.4f); }
+			if(Mathf.Abs(value2 - PPLast2) > 0.005f || !on2) { PPLast2 = value2; DrunkEffectMaterial.SetVector("_DistorsionWave", new Vector4(value2 * 0.02f, value2 * 0.02f, 1, 0)); }
+			if(Mathf.Abs(value3 - PPLast3) > 0.005f || !on3) { PPLast3 = value3; DrunkEffectMaterial.SetFloat("_NeonColorAlpha", value3 * 0.4f); }
 		}
 		// Internal
 		private void TakeOwnership() {
