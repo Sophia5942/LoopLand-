@@ -109,6 +109,7 @@ namespace DrinkSystem.EditorTools
         private static readonly Dictionary<string, Mesh> logoMeshes = new Dictionary<string, Mesh>();
         private static readonly System.Random rng = new System.Random(11);
 
+        [MenuItem("Drink System/Build Drink Machine In Scene", priority = 0)]
         [MenuItem("Tools/Drink System/Build Drink Machine In Scene")]
         public static void Build()
         {

@@ -33,7 +33,7 @@ Then open Unity and import.
 ## Build it (one click)
 1. **Select your bar counter** in the scene (optional). The station is placed on top of it.
    With nothing selected, it comes with its own counter where your Scene view is looking.
-2. Click **Tools > Drink System > Build Drink Machine In Scene**.
+2. Click **Drink System > Build Drink Machine In Scene** in the top menu (also under Tools). Right after importing, a pop-up offers to build it for you.
 3. Press Play (ClientSim) or **Build & Test**.
 
 What the builder does with your glasses:
