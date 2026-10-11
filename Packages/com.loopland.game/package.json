@@ -1,15 +1,24 @@
 {
   "name": "com.loopland.game",
   "displayName": "LoopLand - Premium Board Game",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "unity": "2022.3",
-  "description": "LoopLand: a premium Monopoly-style board game for VRChat worlds. Networked 2-6 player game, animated particle tokens, 3D dice, persistent Loop Coins, an in-game cosmetics store and VRChat Creator Economy (Udon Products) integration. One-click scene builder: LoopLand > Build Game In Scene.",
+  "description": "LoopLand: a premium Monopoly-style board game for VRChat worlds. Networked 2-6 player game, animated particle tokens, 3D dice, persistent Loop Coins, an in-game cosmetics store and VRChat Creator Economy (Udon Products) integration. One-click scene builder: LoopLand > Build Game In Scene. Also includes a networked soda fountain (LoopLand > Build Drink Machine In Scene): cups lock into the machine, push-button UI with VR finger presses, pour / fizz / slurp sounds and cup respawning.",
   "author": {
     "name": "LoopLand",
     "email": "itzsophbusiness@gmail.com",
     "url": "https://github.com/Sophia5942/LoopLand-"
   },
-  "keywords": ["vrchat", "udon", "udonsharp", "board game", "creator economy", "persistence"],
+  "keywords": [
+    "vrchat",
+    "udon",
+    "udonsharp",
+    "board game",
+    "creator economy",
+    "persistence",
+    "drinks",
+    "soda"
+  ],
   "vpmDependencies": {
     "com.vrchat.worlds": ">=3.8.1"
   },
