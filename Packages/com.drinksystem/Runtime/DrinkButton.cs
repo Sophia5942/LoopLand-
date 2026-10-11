@@ -11,6 +11,9 @@ namespace DrinkSystem {
 	public class DrinkButton : UdonSharpBehaviour {
 		public UdonSharpBehaviour Target;
 		public string EventName = "Press";
+		[Tooltip("When on, Arg is written to the target's PressedArg before the event (option buttons).")]
+		public bool SendArg;
+		public int Arg;
 		[Tooltip("Scaled down while pressed (usually the round button image).")]
 		public Transform PressVisual;
 		public AudioSource Audio;
@@ -30,7 +33,9 @@ namespace DrinkSystem {
 				PressVisual.localScale = RestScale * 0.86f;
 				SendCustomEventDelayedSeconds(nameof(_Release), 0.11f);
 			}
-			if(Target != null) Target.SendCustomEvent(EventName);
+			if(Target == null) return;
+			if(SendArg) Target.SetProgramVariable("PressedArg", Arg);
+			Target.SendCustomEvent(EventName);
 		}
 		public void _Release() {
 			if(HasRest) PressVisual.localScale = RestScale;

@@ -6,15 +6,19 @@ using VRC.SDKBase;
 
 namespace DrinkSystem {
 	/// <summary>
-	/// One nozzle of the machine: where a cup locks, the soda stream, the pour sounds and the push-button UI.
-	/// Nothing here is synced. The cup locked in the slot carries the state (locked / pouring / fill) and
+	/// One place a cup locks into: a nozzle with its drink card (pour button), or the cup customizer pad.
+	/// Nothing here is synced. The cup locked in the slot carries the state (locked / pouring / fill / style) and
 	/// drives these visuals on every client.
 	/// </summary>
 	[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 	public class DrinkSlot : UdonSharpBehaviour {
 		[Header("Drink")]
-		[Tooltip("Index of the DrinkFlavor (child order under the machine's FlavorsParent).")]
+		[Tooltip("Index of the DrinkFlavor this nozzle pours (child order under the machine's FlavorsParent).")]
 		public int FlavorIndex;
+		[Tooltip("Custom drink: pours the FRUIT picked on the options panel instead of FlavorIndex.")]
+		public bool UseFruitFlavor;
+		[Tooltip("Cup customizer pad: no nozzle, the kiosk buttons restyle the cup locked here.")]
+		public bool IsCustomizer;
 		[Header("Placement")]
 		[Tooltip("Where a locked cup sits. The cup's pivot is the bottom of the cup.")]
 		public Transform SnapPoint;
@@ -29,9 +33,7 @@ namespace DrinkSystem {
 		public AudioSource LoopSource;
 		public AudioSource OneShotSource;
 		[Header("UI")]
-		public TextMeshProUGUI NameText;
 		public TextMeshProUGUI StatusText;
-		public Image ButtonImage;
 		public Image FillBar;
 		public Image StatusLight;
 
@@ -39,7 +41,8 @@ namespace DrinkSystem {
 		[HideInInspector()] public DrinkCup Cup;
 		// Internal
 		private DrinkMachine MB;
-		private Color FlavorColor;
+		private MaterialPropertyBlock StreamProps;
+		private int IdColor;
 		private Transform StreamTransform;
 		private Transform SplashTransform;
 		private float StreamParentScale = 1f;
@@ -53,25 +56,17 @@ namespace DrinkSystem {
 			MB = mb;
 			Index = index;
 			FlavorIndex = Mathf.Clamp(FlavorIndex, 0, MB.FlavorCount - 1);
-			FlavorColor = MB.FColorMain[FlavorIndex];
-			if(NameText != null) NameText.text = MB.FName[FlavorIndex];
-			if(ButtonImage != null) ButtonImage.color = Color.Lerp(FlavorColor, Color.white, 0.15f);
-			if(FillBar != null) FillBar.color = Color.Lerp(FlavorColor, Color.white, 0.3f);
+			if(FillBar != null) FillBar.color = Color.Lerp(MB.FColorMain[FlavorIndex], Color.white, 0.3f);
 			if(Nozzle != null) NozzlePos = Nozzle.position;
+			IdColor = VRCShader.PropertyToID("_Color");
 			if(Stream != null) {
+				StreamProps = new MaterialPropertyBlock();
 				StreamTransform = Stream.transform;
 				if(StreamTransform.parent != null) StreamParentScale = Mathf.Max(0.0001f, StreamTransform.parent.lossyScale.y);
-				MaterialPropertyBlock mpb = new MaterialPropertyBlock();
-				Color c = FlavorColor;
-				c.a = Mathf.Lerp(0.95f, 0.55f, MB.FTransparency[FlavorIndex]);
-				mpb.SetColor(VRCShader.PropertyToID("_Color"), c);
-				Stream.SetPropertyBlock(mpb);
 				Stream.enabled = false;
 			}
 			if(Splash != null) {
 				SplashTransform = Splash.transform;
-				ParticleSystem.MainModule mm = Splash.main;
-				mm.startColor = Color.Lerp(FlavorColor, Color.white, 0.55f);
 				Splash.Stop();
 			}
 			if(Highlight != null) Highlight.SetActive(false);
@@ -80,15 +75,34 @@ namespace DrinkSystem {
 		}
 		// Button (UI / finger poke)
 		public void Press() {
-			if(Cup == null) { Deny("PLACE CUP"); return; }
-			if(!Cup.Pouring && Cup.FillAmount >= 0.999f) { Deny("FULL"); return; }
+			if(IsCustomizer) return;
+			if(Cup == null) { _Deny("PLACE CUP"); return; }
+			if(!Cup.Pouring) {
+				if(Cup.FillAmount >= 0.999f) { _Deny("FULL"); return; }
+				if(UseFruitFlavor && MB.Fruit < 0) { _Deny("PICK A FRUIT"); return; }
+			}
 			Cup._TogglePour();
 		}
+		public int GetPourFlavor(int fruit) {
+			if(UseFruitFlavor) return Mathf.Clamp(MB.FruitFlavorStart + Mathf.Max(0, fruit), 0, MB.FlavorCount - 1);
+			return FlavorIndex;
+		}
 		// Called by the cup on every client
-		public void _StartPour(bool effects) {
+		public void _StartPour(bool effects, int flavor) {
 			Pouring = true;
-			if(Stream != null) Stream.enabled = true;
-			if(Splash != null) Splash.Play();
+			Color c = MB.FColorMain[flavor];
+			if(Stream != null) {
+				c.a = Mathf.Lerp(0.95f, 0.55f, MB.FTransparency[flavor]);
+				StreamProps.SetColor(IdColor, c);
+				Stream.SetPropertyBlock(StreamProps);
+				Stream.enabled = true;
+			}
+			if(Splash != null) {
+				ParticleSystem.MainModule mm = Splash.main;
+				mm.startColor = Color.Lerp(MB.FColorMain[flavor], Color.white, 0.55f);
+				Splash.Play();
+			}
+			if(FillBar != null) FillBar.color = Color.Lerp(MB.FColorMain[flavor], Color.white, 0.3f);
 			if(LoopSource != null && MB.ClipPourLoop != null) {
 				LoopSource.clip = MB.ClipPourLoop;
 				LoopSource.loop = true;
@@ -118,30 +132,35 @@ namespace DrinkSystem {
 			SetBar(fill);
 		}
 		public void RefreshUI() {
+			if(IsCustomizer) MB._RefreshCustomizerUI();
 			if(Time.time < DenyUntil) return;
 			Color light;
 			if(Cup == null) {
-				SetLabel("PLACE CUP");
+				SetLabel(IsCustomizer ? "PLACE A CUP BELOW" : "PLACE CUP");
 				light = new Color(0.25f, 0.25f, 0.3f, 1f);
 				SetBar(0f);
 			}
+			else if(IsCustomizer) {
+				SetLabel("TAP A STYLE");
+				light = new Color(1f, 0.78f, 0.3f, 1f);
+			}
 			else {
-				if(Cup.Pouring) { SetLabel("STOP"); light = FlavorColor; }
+				if(Cup.Pouring) { SetLabel("POURING"); light = new Color(1f, 0.6f, 0.15f, 1f); }
 				else if(Cup.FillAmount >= 0.999f) { SetLabel("FULL"); light = new Color(0.3f, 1f, 0.45f, 1f); }
-				else { SetLabel("PUSH TO POUR"); light = new Color(1f, 0.85f, 0.25f, 1f); }
+				else { SetLabel("POUR"); light = new Color(1f, 0.78f, 0.3f, 1f); }
 				SetBar(Cup.VisualFill);
 			}
 			if(StatusLight != null) StatusLight.color = light;
 		}
-		public void _EndDeny() { RefreshUI(); }
-		// Internal
-		private void Deny(string msg) {
+		public void _Deny(string msg) {
 			PlayOneShot(MB.ClipButtonDeny);
 			SetLabel(msg);
 			if(StatusLight != null) StatusLight.color = new Color(1f, 0.2f, 0.2f, 1f);
 			DenyUntil = Time.time + 0.9f;
 			SendCustomEventDelayedSeconds(nameof(_EndDeny), 0.95f);
 		}
+		public void _EndDeny() { RefreshUI(); }
+		// Internal
 		private void SetLabel(string label) {
 			if(StatusText == null || label == LastLabel) return;
 			LastLabel = label;

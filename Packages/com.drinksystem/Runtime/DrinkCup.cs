@@ -4,7 +4,8 @@ using VRC.SDKBase;
 
 namespace DrinkSystem {
 	/// <summary>
-	/// A cup (LiquidGlass + TransformSync in one). It locks into a machine slot when you drop it there, fills while
+	/// A cup (LiquidGlass + TransformSync in one). It remembers the options it was poured with (froth, strength,
+	/// spirit, fruit garnish, straw) and its customizer style (glass tint, logo). It locks into a machine slot when you drop it there, fills while
 	/// its slot pours, you drink it with Use, and it respawns when it is lost or left behind.
 	///
 	/// Networking (manual sync, the owner writes, nobody sends anything while nothing changes):
@@ -25,12 +26,23 @@ namespace DrinkSystem {
 		public Transform SpawnPoint;
 		public AudioSource OneShotSource;
 		public AudioSource LoopSource;
+		[Tooltip("The glass itself (tint and logo are set on it).")]
+		public Renderer BodyRenderer;
+		public Renderer StrawRenderer;
+		public Renderer GarnishRenderer;
 		// Synced state
 		[HideInInspector(), UdonSynced] public float FillAmount;
 		[HideInInspector(), UdonSynced] public sbyte SlotIndex = -1;
 		[HideInInspector(), UdonSynced] public bool Pouring;
 		[HideInInspector(), UdonSynced] public bool Drinking;
 		[HideInInspector(), UdonSynced] public byte HeldHand; // 0 = not held, 1 = left, 2 = right
+		[HideInInspector(), UdonSynced] public byte Froth = 1;
+		[HideInInspector(), UdonSynced] public byte Strength = 1;
+		[HideInInspector(), UdonSynced] public byte Spirit;
+		[HideInInspector(), UdonSynced] public sbyte Fruit = -1;
+		[HideInInspector(), UdonSynced] public sbyte Straw = -1;
+		[HideInInspector(), UdonSynced] public byte Tint;
+		[HideInInspector(), UdonSynced] public byte Logo;
 		[UdonSynced] private byte RespawnCount;
 		[UdonSynced] private byte[] Mix = new byte[0];
 		[UdonSynced] private Vector3 SyncPos;                  // world pose, or the hand offset while held
@@ -58,6 +70,10 @@ namespace DrinkSystem {
 		private int IdEdgePower;
 		private int IdWobbleX;
 		private int IdWobbleZ;
+		private int IdColor;
+		private int IdLogoColor;
+		private MaterialPropertyBlock BodyProps;
+		private int AppliedLooks = -1;
 		private Vector3 LocalBottom;
 		private Vector3 LocalTop;
 		private float RadiusBottom;
@@ -137,6 +153,9 @@ namespace DrinkSystem {
 			IdEdgePower = VRCShader.PropertyToID("_EdgePower");
 			IdWobbleX = VRCShader.PropertyToID("_WobbleX");
 			IdWobbleZ = VRCShader.PropertyToID("_WobbleZ");
+			IdColor = VRCShader.PropertyToID("_Color");
+			IdLogoColor = VRCShader.PropertyToID("_LogoColor");
+			BodyProps = new MaterialPropertyBlock();
 			MeasureLiquid();
 			Transform home = SpawnPoint != null ? SpawnPoint : transform;
 			HomePos = home.position;
@@ -155,6 +174,7 @@ namespace DrinkSystem {
 			else {
 				MixDirty = true;
 				RefreshLiquid(false, 0f);
+				ApplyState(false);
 			}
 			return this;
 		}
@@ -315,6 +335,12 @@ namespace DrinkSystem {
 			else {
 				if(FillAmount >= 0.999f) return;
 				Pouring = true;
+				// The cup takes the options picked on the panel right now
+				Froth = MB.Froth;
+				Strength = MB.Strength;
+				Spirit = MB.Spirit;
+				Fruit = MB.Fruit;
+				Straw = MB.Straw;
 			}
 			Commit();
 		}
@@ -323,6 +349,13 @@ namespace DrinkSystem {
 			if(IsAtHome() && FillAmount <= 0f) return;
 			TakeOwnership();
 			_Respawn();
+		}
+		public void _SetStyle(int tint, int logo) {
+			TakeOwnership();
+			Tint = (byte)Mathf.Clamp(tint, 0, 255);
+			Logo = (byte)Mathf.Clamp(logo, 0, 255);
+			Commit();
+			PlayOneShot(MB.ClipCupLock);
 		}
 		public bool IsAtHome() {
 			return SlotIndex < 0 && HeldHand == 0 && !PhysicsOn && (transform.position - HomePos).sqrMagnitude < 0.0004f;
@@ -376,6 +409,13 @@ namespace DrinkSystem {
 			Drinking = false;
 			HeldHand = 0;
 			FillAmount = 0f;
+			Froth = 1;
+			Strength = 1;
+			Spirit = 0;
+			Fruit = -1;
+			Straw = -1;
+			Tint = 0;
+			Logo = 0;
 			int n = Amounts.Length;
 			for(int i = 0; i < n; i++) Amounts[i] = 0f;
 			MixDirty = true;
@@ -418,9 +458,9 @@ namespace DrinkSystem {
 			if(Pouring && !AppliedPouring && AppliedSlot >= 0) {
 				AppliedPouring = true;
 				DrinkSlot slot = MB.Slots[AppliedSlot];
-				PourFlavor = slot.FlavorIndex;
+				PourFlavor = slot.GetPourFlavor(Fruit);
 				PourRate = MB.FFillSpeed[PourFlavor] * MB.FillSpeedMultiplier;
-				slot._StartPour(effects);
+				slot._StartPour(effects, PourFlavor);
 			}
 			// Held / released
 			if(HeldHand != AppliedHand) {
@@ -448,7 +488,30 @@ namespace DrinkSystem {
 				LastVisual = -1f;
 				if(effects) PlayOneShot(MB.ClipCupRespawn);
 			}
+			int looks = Froth | (Strength << 2) | (Spirit << 4) | ((Fruit + 1) << 6) | ((Straw + 1) << 11) | (Tint << 16) | (Logo << 24);
+			if(looks != AppliedLooks) {
+				AppliedLooks = looks;
+				ApplyLooks();
+			}
 			if(AppliedSlot >= 0) MB.Slots[AppliedSlot].RefreshUI();
+		}
+		private void ApplyLooks() {
+			if(StrawRenderer != null) {
+				bool on = Straw >= 0 && MB.StrawMaterials != null && Straw < MB.StrawMaterials.Length;
+				if(on) StrawRenderer.sharedMaterial = MB.StrawMaterials[Straw];
+				StrawRenderer.enabled = on;
+			}
+			if(GarnishRenderer != null) {
+				bool on = Fruit >= 0 && MB.GarnishMaterials != null && Fruit < MB.GarnishMaterials.Length;
+				if(on) GarnishRenderer.sharedMaterial = MB.GarnishMaterials[Fruit];
+				GarnishRenderer.enabled = on;
+			}
+			if(BodyRenderer != null) {
+				if(MB.CupTints != null && Tint < MB.CupTints.Length) BodyProps.SetColor(IdColor, MB.CupTints[Tint]);
+				if(MB.LogoColors != null && Logo < MB.LogoColors.Length) BodyProps.SetColor(IdLogoColor, MB.LogoColors[Logo]);
+				BodyRenderer.SetPropertyBlock(BodyProps);
+			}
+			MixDirty = true;
 		}
 		private void TakeOwnership() {
 			if(IsOwner) return;
@@ -696,6 +759,28 @@ namespace DrinkSystem {
 				e1 += fE1[i] * w;
 				e2 += fE2[i] * w;
 				e3 += fE3[i] * w;
+			}
+			// Options the cup was poured with
+			float[] frothLevels = MB.FrothLevels;
+			if(frothLevels != null && Froth < frothLevels.Length) foamHeight *= frothLevels[Froth];
+			if(Strength == 0) {
+				main = Color.Lerp(main, Color.white, 0.25f);
+				transparency = Mathf.Lerp(transparency, 1f, 0.3f);
+			}
+			else if(Strength == 2) {
+				main *= 0.72f;
+				transparency *= 0.5f;
+			}
+			if(Fruit >= 0) {
+				int fruitFlavor = Mathf.Clamp(MB.FruitFlavorStart + Fruit, 0, n - 1);
+				main = Color.Lerp(main, fMain[fruitFlavor], 0.12f);
+			}
+			float[] spiritLevels = MB.SpiritLevels;
+			if(spiritLevels != null && Spirit < spiritLevels.Length) {
+				float spirit = spiritLevels[Spirit];
+				e1 = Mathf.Clamp01(e1 + spirit);
+				e2 = Mathf.Clamp01(e2 + spirit * 0.6f);
+				e3 = Mathf.Clamp01(e3 + spirit * 0.4f);
 			}
 			main.a = 1f;
 			foam.a = 1f;

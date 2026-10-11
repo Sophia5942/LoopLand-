@@ -1,15 +1,22 @@
 {
   "name": "com.drinksystem",
-  "displayName": "Drink System - Soda Machine",
-  "version": "1.0.0",
+  "displayName": "Drink System - Bar Drink Station",
+  "version": "2.0.0",
   "unity": "2022.3",
-  "description": "Networked soda fountain for VRChat worlds (PC + Quest). Cups lock into the machine when you set them down, push-button UI with laser and VR finger presses, pour / fizz / slurp sounds, mixable drinks, drinking with optional screen effects, and cup respawning. Lightweight manual sync. One-click builder: Tools > Drink System > Build Drink Machine In Scene.",
+  "description": "Networked black and gold bar drink station for VRChat worlds (PC + Quest): drink cards with pour buttons, cups that lock into place, froth / strength / spirit / fruit / straw options, a cup customizer kiosk, glowing logo glasses, pour / fizz / slurp sounds, drinking with optional screen effects and cup respawn. Lightweight manual sync. One-click builder: Tools > Drink System > Build Drink Machine In Scene.",
   "author": {
     "name": "Sophia5942",
     "email": "itzsophbusiness@gmail.com",
     "url": "https://github.com/Sophia5942/LoopLand-"
   },
-  "keywords": ["vrchat", "udon", "udonsharp", "drinks", "soda", "quest"],
+  "keywords": [
+    "vrchat",
+    "udon",
+    "udonsharp",
+    "drinks",
+    "soda",
+    "quest"
+  ],
   "vpmDependencies": {
     "com.vrchat.worlds": ">=3.8.1"
   },

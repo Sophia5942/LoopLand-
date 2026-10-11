@@ -1,15 +1,18 @@
+using TMPro;
 using UdonSharp;
 using UnityEngine;
+using UnityEngine.UI;
 using VRC.SDKBase;
 
 namespace DrinkSystem {
 	/// <summary>
 	/// The drink machine manager (like ManagerBar). Finds the flavors, slots and cups under their parents, keeps the
-	/// local "which cup is locked in which slot" table, handles VR finger presses on the UI buttons, cup respawning
-	/// and the optional drunk screen effect. It has no synced variables: every cup syncs its own small state.
+	/// local "which cup is locked in which slot" table, handles VR finger presses on the UI buttons, cup respawning,
+	/// the drink options panel and the cup customizer, and the optional drunk screen effect.
+	/// Synced: only the 5 option bytes (sent when someone taps an option). Every cup syncs its own small state.
 	/// Don't move the machine at runtime (slot positions are cached).
 	/// </summary>
-	[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
+	[UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 	public class DrinkMachine : UdonSharpBehaviour {
 		[Header("Parents (filled from their children)")]
 		public GameObject FlavorsParent;
@@ -62,6 +65,45 @@ namespace DrinkSystem {
 		public AudioClip ClipSlurpLoop;
 		public AudioClip ClipCupRespawn;
 
+		[Header("Drink options (synced, picked on the options panel)")]
+		[UdonSynced] public byte Froth = 1;
+		[UdonSynced] public byte Strength = 1;
+		[UdonSynced] public byte Spirit;
+		[UdonSynced] public sbyte Fruit = -1;
+		[UdonSynced] public sbyte Straw = -1;
+		[Tooltip("Index of the first fruit flavor under FlavorsParent (the fruits follow in FRUIT order).")]
+		public int FruitFlavorStart = 5;
+		[Tooltip("Foam height multiplier for LOW / MEDIUM / HIGH froth.")]
+		public float[] FrothLevels = new float[] { 0.35f, 1f, 2.4f };
+		[Tooltip("Extra effect intensity for LOW / MEDIUM / STRONG spirit.")]
+		public float[] SpiritLevels = new float[] { 0f, 0.3f, 0.7f };
+		public string[] FruitNames;
+		public string[] StrawNames;
+		[Tooltip("Straw look per STRAW option.")]
+		public Material[] StrawMaterials;
+		[Tooltip("Rim garnish per FRUIT option.")]
+		public Material[] GarnishMaterials;
+
+		[Header("Options panel UI")]
+		public Image[] FrothButtons;
+		public Image[] StrengthButtons;
+		public Image[] SpiritButtons;
+		public Image[] FruitButtons;
+		public Image[] StrawButtons;
+		public Image FrothGauge;
+		public Image StrengthGauge;
+		public Image SpiritGauge;
+		public TextMeshProUGUI SummaryText;
+		public Color OptionOn = new Color(0.79f, 0.59f, 0.18f, 1f);
+		public Color OptionOff = new Color(0.12f, 0.11f, 0.15f, 1f);
+
+		[Header("Cup customizer")]
+		public DrinkSlot CustomizerSlot;
+		public Color[] CupTints;
+		public Color[] LogoColors;
+		public Image[] TintButtons;
+		public Image[] LogoButtons;
+
 		[Header("Drunk effects (optional, same as ManagerBar)")]
 		public Transform DrunkEffectTransform;
 		[Range(0.0f, 1.0f)] public float[] CurrentIntoxication = new float[3];
@@ -73,6 +115,7 @@ namespace DrinkSystem {
 		[HideInInspector()] public DrinkCup[] Cups;
 		[HideInInspector()] public int FlavorCount;
 		[HideInInspector()] public bool IsVR;
+		[HideInInspector()] public int PressedArg;
 		[HideInInspector()] public string[] FName;
 		[HideInInspector()] public float[] FFillSpeed;
 		[HideInInspector()] public float[] FTransparency;
@@ -166,6 +209,8 @@ namespace DrinkSystem {
 				}
 				ButtonDepths[i] = PokeDepth / Mathf.Max(0.00001f, ButtonTransforms[i].lossyScale.z);
 			}
+			RefreshOptionsUI();
+			_RefreshCustomizerUI();
 			// Effect (hidden until someone actually drinks something with effects)
 			if(DrunkEffectTransform != null) {
 				DrunkEffectRenderer = DrunkEffectTransform.GetComponent<Renderer>();
@@ -179,6 +224,42 @@ namespace DrinkSystem {
 			if(!Utilities.IsValid(Local)) return;
 			if(IsVR && EnableFingerPoke) PokeTick();
 			if(IntoxicationActive) IntoxicationTick();
+		}
+		public override void OnDeserialization() {
+			RefreshOptionsUI();
+		}
+		// Option buttons (PressedArg = which choice)
+		public void OptionFroth() { TakeOwnership(); Froth = (byte)Mathf.Clamp(PressedArg, 0, 2); CommitOptions(); }
+		public void OptionStrength() { TakeOwnership(); Strength = (byte)Mathf.Clamp(PressedArg, 0, 2); CommitOptions(); }
+		public void OptionSpirit() { TakeOwnership(); Spirit = (byte)Mathf.Clamp(PressedArg, 0, 2); CommitOptions(); }
+		public void OptionFruit() {
+			TakeOwnership();
+			// Tap the picked one again to clear it
+			Fruit = Fruit == PressedArg ? (sbyte)-1 : (sbyte)PressedArg;
+			CommitOptions();
+		}
+		public void OptionStraw() {
+			TakeOwnership();
+			Straw = Straw == PressedArg ? (sbyte)-1 : (sbyte)PressedArg;
+			CommitOptions();
+		}
+		// Cup customizer buttons (PressedArg = which tint / logo)
+		public void CupTint() {
+			DrinkCup cup = CustomizerSlot != null ? CustomizerSlot.Cup : null;
+			if(cup == null) { if(CustomizerSlot != null) CustomizerSlot._Deny("PLACE A CUP BELOW"); return; }
+			cup._SetStyle(PressedArg, cup.Logo);
+		}
+		public void CupLogo() {
+			DrinkCup cup = CustomizerSlot != null ? CustomizerSlot.Cup : null;
+			if(cup == null) { if(CustomizerSlot != null) CustomizerSlot._Deny("PLACE A CUP BELOW"); return; }
+			cup._SetStyle(cup.Tint, PressedArg);
+		}
+		public void _RefreshCustomizerUI() {
+			DrinkCup cup = CustomizerSlot != null ? CustomizerSlot.Cup : null;
+			int tint = cup != null ? cup.Tint : -1;
+			int logo = cup != null ? cup.Logo : -1;
+			if(TintButtons != null) for(int i = 0; i < TintButtons.Length; i++) if(TintButtons[i] != null) TintButtons[i].color = i == tint ? OptionOn : OptionOff;
+			if(LogoButtons != null) for(int i = 0; i < LogoButtons.Length; i++) if(LogoButtons[i] != null) LogoButtons[i].color = i == logo ? OptionOn : OptionOff;
 		}
 		// Interfaces: slots
 		public int FindSnapSlot(DrinkCup cup) {
@@ -267,6 +348,36 @@ namespace DrinkSystem {
 			DrunkEffectMaterial.SetFloat("_NeonColorAlpha", value3 * 0.4f);
 		}
 		// Internal
+		private void TakeOwnership() {
+			if(!Networking.IsOwner(gameObject)) Networking.SetOwner(Local, gameObject);
+		}
+		private void CommitOptions() {
+			RequestSerialization();
+			RefreshOptionsUI();
+		}
+		private void RefreshOptionsUI() {
+			SetChoice(FrothButtons, Froth);
+			SetChoice(StrengthButtons, Strength);
+			SetChoice(SpiritButtons, Spirit);
+			SetChoice(FruitButtons, Fruit);
+			SetChoice(StrawButtons, Straw);
+			// Gauges are 270 degree rings
+			if(FrothGauge != null) FrothGauge.fillAmount = (Froth + 1) / 3f * 0.75f;
+			if(StrengthGauge != null) StrengthGauge.fillAmount = (Strength + 1) / 3f * 0.75f;
+			if(SpiritGauge != null) SpiritGauge.fillAmount = (Spirit + 1) / 3f * 0.75f;
+			if(SummaryText != null) {
+				string[] levels = new string[] { "Light", "Medium", "Strong" };
+				string fruit = Fruit >= 0 && FruitNames != null && Fruit < FruitNames.Length ? FruitNames[Fruit] : "No fruit";
+				string straw = Straw >= 0 && StrawNames != null && Straw < StrawNames.Length ? StrawNames[Straw] + " straw" : "No straw";
+				SummaryText.text = levels[Froth] + " froth\n" + levels[Strength] + " strength\n" + levels[Spirit] + " spirit\n" + fruit + "\n" + straw;
+			}
+		}
+		private void SetChoice(Image[] buttons, int choice) {
+			if(buttons == null) return;
+			for(int i = 0; i < buttons.Length; i++) {
+				if(buttons[i] != null) buttons[i].color = i == choice ? OptionOn : OptionOff;
+			}
+		}
 		private void IntoxicationTick() {
 			VRCPlayerApi.TrackingData head = Local.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
 			DrunkEffectTransform.position = head.position;
