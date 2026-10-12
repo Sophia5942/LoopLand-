@@ -33,7 +33,7 @@ Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a
   1. The ring-pull lifts and the can gives a little jolt.
   2. The hole opens in the lid.
   3. The tab settles back down.
-- Press **Use** again to **swish** it: the can swirls round in your hand with a liquid slosh. Everyone sees it.
+- Press **Use** again to **swish** it: the can swirls round in your hand with the sound of the can being squished. Everyone sees it.
 - **Drop it on the floor** and it lands with a drink-can clunk.
 - **Throw it in the bin** to clean it up. It lands with a muffled thunk.
 - A can left lying around cleans itself up after 5 minutes.
