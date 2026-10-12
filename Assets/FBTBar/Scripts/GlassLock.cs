@@ -1,0 +1,47 @@
+using UdonSharp;
+using UnityEngine;
+
+/// <summary>
+/// Put this next to LiquidGlass + TransformSync on a glass. When you let go of the glass near a spout, it locks
+/// upright onto the drip tray right under the spout (with a click), so the pour lands in it.
+/// TransformSync then sends the new position to everyone, as usual.
+/// </summary>
+[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
+public class GlassLock : UdonSharpBehaviour {
+	[Tooltip("Parent of the spot under each spout (its children are the lock points).")]
+	public Transform SnapPointsParent;
+	[Tooltip("How close (meters, sideways) the glass must be to a spot to lock into it.")]
+	public float SnapRadius = 0.12f;
+	[Tooltip("Height of the glass pivot above the bottom of the glass (set by the builder).")]
+	public float BottomOffset;
+	public AudioSource Sound;
+	public AudioClip LockClip;
+	public AudioClip UnlockClip;
+	// Internal
+	private Transform[] Points;
+	private bool Locked;
+
+	private void Start() {
+		int n = SnapPointsParent != null ? SnapPointsParent.childCount : 0;
+		Points = new Transform[n];
+		for(int i = 0; i < n; i++) Points[i] = SnapPointsParent.GetChild(i);
+	}
+	public override void OnDrop() {
+		Vector3 bottom = transform.position - Vector3.up * BottomOffset;
+		float best = SnapRadius * SnapRadius;
+		int bestIndex = -1;
+		for(int i = 0; i < Points.Length; i++) {
+			Vector3 d = Points[i].position - bottom;
+			float sideways = d.x * d.x + d.z * d.z;
+			if(Mathf.Abs(d.y) < 0.35f && sideways < best) { best = sideways; bestIndex = i; }
+		}
+		if(bestIndex < 0) { Locked = false; return; }
+		transform.SetPositionAndRotation(Points[bestIndex].position + Vector3.up * BottomOffset, Points[bestIndex].rotation);
+		Locked = true;
+		if(Sound != null && LockClip != null) Sound.PlayOneShot(LockClip);
+	}
+	public override void OnPickup() {
+		if(Locked && Sound != null && UnlockClip != null) Sound.PlayOneShot(UnlockClip);
+		Locked = false;
+	}
+}
