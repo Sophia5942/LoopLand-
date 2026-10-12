@@ -4,7 +4,8 @@ using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
 /// <summary>
-/// A drink can. The fridge puts it on the shelf (it stays put there until someone grabs it), the first Use opens it (the tab lifts, "pssht"), holding Use after that sips,
+/// A drink can. The fridge puts it on the shelf (it stays put there until someone grabs it), Use opens it (animated: the ring-pull lifts, the can jolts,
+/// the hole punches open, the tab settles back down, "pssht"),
 /// dropping it on the floor clanks, and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
 /// fridge needs it again.
 /// Anti-abuse (hacked clients): ownership of a can is only handed over when the current owner agrees. They refuse if
@@ -21,10 +22,11 @@ public class FBTCan : UdonSharpBehaviour {
 	public CanFridge Fridge;
 	public GameObject Visual;
 	public Transform Tab;
+	[Tooltip("The dark opening on the lid, shown once the can is open.")]
+	public GameObject Mouth;
 	public Collider CanCollider;
 	public Transform HideSpot;
 	public AudioSource Sound;
-	public AudioSource SipSound;
 	public AudioClip OpenClip;
 	public AudioClip TrashClip;
 	public AudioClip SpawnClip;
@@ -47,6 +49,8 @@ public class FBTCan : UdonSharpBehaviour {
 	private bool AppliedOpened;
 	private bool Ready;
 	private float TabT;
+	// opening animation length (seconds)
+	private const float OpenTime = 0.75f;
 	private float CleanupDue;
 	private float NextClank;
 	private bool Parked;
@@ -101,12 +105,7 @@ public class FBTCan : UdonSharpBehaviour {
 			Opened = true;
 			RequestSerialization();
 			ApplyState(true);
-			return;
 		}
-		if(SipSound != null) SipSound.Play();
-	}
-	public override void OnPickupUseUp() {
-		if(SipSound != null) SipSound.Stop();
 	}
 	// Hitting the floor (only the owner simulates the can, so only the owner hears the hit and tells everyone)
 	private void OnCollisionEnter(Collision collision) {
@@ -148,7 +147,7 @@ public class FBTCan : UdonSharpBehaviour {
 		Despawn(false);
 	}
 	public void _TabStep() {
-		TabT = Mathf.Clamp01(TabT + Time.deltaTime / 0.25f);
+		TabT = Mathf.Clamp01(TabT + Time.deltaTime / OpenTime);
 		SetTab(TabT);
 		if(TabT < 1f) SendCustomEventDelayedFrames(nameof(_TabStep), 1);
 	}
@@ -173,7 +172,6 @@ public class FBTCan : UdonSharpBehaviour {
 		if(Visual != null && Visual.activeSelf != Active) Visual.SetActive(Active);
 		if(CanCollider != null) CanCollider.enabled = Active;
 		if(Pickup != null) Pickup.pickupable = Active;
-		if(!Active && SipSound != null) SipSound.Stop();
 		if(Opened != AppliedOpened) {
 			AppliedOpened = Opened;
 			if(Opened && effects) {
@@ -189,11 +187,25 @@ public class FBTCan : UdonSharpBehaviour {
 		// only the owner simulates; everyone else follows TransformSync. A can waiting in the fridge doesn't move.
 		if(RB != null) RB.isKinematic = !Active || Parked || !Networking.IsOwner(gameObject);
 	}
+	/// <summary>Opening animation, t = 0..1: pull the ring up, the can jolts, the hole opens, the tab settles back down.</summary>
 	private void SetTab(float t) {
-		if(Tab == null) return;
-		float e = 1f - (1f - t) * (1f - t);
-		Tab.localRotation = Quaternion.Euler(-75f * e, 0f, 0f);
+		float sec = t * OpenTime;
+		float angle;
+		if(sec < 0.2f) angle = -80f * Ease(sec / 0.2f);                       // finger lifts the ring
+		else if(sec < 0.35f) angle = -80f;                                     // hold: the lid gives way
+		else angle = -80f + 65f * Ease(Mathf.Clamp01((sec - 0.35f) / 0.35f)); // push it back down
+		if(Tab != null) Tab.localRotation = Quaternion.Euler(angle, 0f, 0f);
+		if(Mouth != null) {
+			bool show = t > 0f && sec >= 0.17f;
+			if(Mouth.activeSelf != show) Mouth.SetActive(show);
+		}
+		if(Visual != null) {
+			// small jolt when the seal breaks
+			float j = sec > 0.15f && sec < 0.45f ? Mathf.Sin((sec - 0.15f) * 70f) * 4f * (1f - (sec - 0.15f) / 0.3f) : 0f;
+			Visual.transform.localRotation = Quaternion.Euler(j * 0.5f, 0f, j);
+		}
 	}
+	private float Ease(float x) { return x * x * (3f - 2f * x); }
 	private void ScheduleCleanup() {
 		if(CleanupAfterSeconds <= 0f) return;
 		CleanupDue = Time.time + CleanupAfterSeconds;

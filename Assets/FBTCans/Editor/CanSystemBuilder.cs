@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 
 /// <summary>
 /// FBT Mayfair > Build Can Fridge + Bin.
-/// A mini fridge ("Get a new can"), a pool of cans (Use opens them, Use again sips) and your trash can as the bin.
+/// A mini fridge ("Get a new can"), a pool of cans (Use opens them with an animation) and your trash can as the bin.
 /// It's built where your Scene view is looking; move the "FBT Can Fridge + Bin" object wherever you like.
 /// </summary>
 public static class CanSystemBuilder
@@ -39,6 +39,9 @@ public static class CanSystemBuilder
         new Design("Energy", "1E3A8C", "C9CED6", "D8202E", "FFFFFF"),
         new Design("Lime", "3FAE4A", "F5E04A", "1F5E26", "FFFFFF"),
     };
+
+    private static Mesh mouthMesh;
+    private static Material mouthMat;
 
     private static readonly List<UdonSharpBehaviour> made = new List<UdonSharpBehaviour>();
 
@@ -112,9 +115,11 @@ public static class CanSystemBuilder
         Mesh neck = Tube("Can_Neck", CanR, NeckR, CanBody, CanH, 20);
         Mesh bottom = Tube("Can_Bottom", CanR * 0.85f, CanR, 0f, 0.006f, 20);
         Mesh top = Disc("Can_Lid", NeckR, CanH - 0.0015f, 20);
+        mouthMesh = Disc("Can_Mouth", 0.009f, CanH - 0.0011f, 14);
+        mouthMat = LitMat("Can_Mouth", Hex("101010"), 0f, 0.9f, Color.black);
         Mesh hull = Hull("Can_Collider", CanR, CanH, 12);
 
-        AudioClip open = Clip("Can_Open"), sip = Clip("Can_Sip"), trash = Clip("Can_Trash"), drop = Clip("Can_Drop");
+        AudioClip open = Clip("Can_Open"), trash = Clip("Can_Trash"), drop = Clip("Can_Drop");
 
         var root = new GameObject(RootName);
         Transform rt = root.transform;
@@ -158,24 +163,21 @@ public static class CanSystemBuilder
             col.convex = true;
             var pickup = go.AddComponent<VRCPickup>();
             pickup.AutoHold = VRC_Pickup.AutoHoldMode.Yes;
-            pickup.UseText = "Open / Sip";
+            pickup.UseText = "Open";
             pickup.InteractionText = "Can";
             pickup.proximity = 0.5f;
             pickup.orientation = VRC_Pickup.PickupOrientation.Any;
             pickup.DisallowTheft = true; // nobody can snatch a can out of your hand
             GameObject vis = CanVisual(go.transform, "Visual", Vector3.zero, body, neck, bottom, top, labels[i % labels.Length], alu, aluDark, true);
             var sound = AudioOn(go, 0.9f, 6f);
-            var sipSrc = AudioOn(go, 0.5f, 4f);
-            sipSrc.clip = sip;
-            sipSrc.loop = true;
             made.Add(Add<TransformSync>(go));
             var can = Add<FBTCan>(go);
             can.Visual = vis;
             can.Tab = vis.transform.Find("Tab Pivot");
+            can.Mouth = vis.transform.Find("Mouth").gameObject;
             can.CanCollider = col;
             can.HideSpot = hide;
             can.Sound = sound;
-            can.SipSound = sipSrc;
             can.OpenClip = open;
             can.TrashClip = trash;
             can.SpawnClip = null; // no sound when it appears, like a real fridge
@@ -220,9 +222,18 @@ public static class CanSystemBuilder
         Object.DestroyImmediate(tab.GetComponent<Collider>());
         tab.transform.SetParent(pivot, false);
         tab.transform.localPosition = new Vector3(0f, 0.001f, 0.011f);
-        tab.transform.localScale = new Vector3(0.012f, 0.0015f, 0.024f);
+        tab.transform.localScale = new Vector3(0.013f, 0.002f, 0.026f);
         tab.GetComponent<Renderer>().sharedMaterial = alu;
         if (!withTab) pivot.name = "Tab";
+        else
+        {
+            // the hole in the lid, behind the rivet; hidden until the can is opened
+            Part(v.transform, "Mouth", mouthMesh, mouthMat);
+            Transform mouth = v.transform.Find("Mouth");
+            mouth.localPosition = new Vector3(0f, 0f, -0.015f);
+            mouth.localScale = new Vector3(1f, 1f, 0.75f);
+            mouth.gameObject.SetActive(false);
+        }
         return v;
     }
 

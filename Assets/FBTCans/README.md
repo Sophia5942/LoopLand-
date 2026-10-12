@@ -1,6 +1,6 @@
 # FBT Mayfair – Can Fridge + Bin
 
-Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a can appears in front on the shelf, you grab it, open it, drink, and bin it.
+Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a can appears in front on the shelf, you grab it, open it, and bin it.
 
 ## Setup
 1. Drag the **FBTCans** folder into your project's **Assets** folder.
@@ -21,8 +21,10 @@ Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a
 ## In game
 - **Click inside the fridge** ("Get A New Can"). A can appears on the shelf. Each player can get one every 10 seconds.
   - It stays put until someone grabs it, so it can't fall through the fridge.
-- **Grab it** and press **Use** (trigger / left click) to open it. The tab flips up, with a real can-opening snap and fizz.
-- **Hold Use** to drink. You hear quiet gulps.
+- **Grab it** and press **Use** (trigger / left click) to open it. Everyone sees the opening animation, with a can-opening snap and fizz:
+  1. The ring-pull lifts and the can gives a little jolt.
+  2. The hole opens in the lid.
+  3. The tab settles back down.
 - **Drop it on the floor** and it clanks.
 - **Drop it in the bin** to clean it up.
 - A can left lying around cleans itself up after 5 minutes.
@@ -48,6 +50,6 @@ Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a
 - Each can syncs 3 bools and a spawn counter (Manual sync), and only when something changes. Movement uses your TransformSync.
 - The floor clank is one small network event, at most about 3 per second per can.
 - The spawner and bin don't sync anything.
-- There's no Update loop. The tab animation only runs for a quarter of a second when a can opens.
+- There's no Update loop. The opening animation only runs for under a second when a can opens.
 - It uses mobile shaders and small meshes, so it's fine on Quest.
 - Your scripts are not changed.
