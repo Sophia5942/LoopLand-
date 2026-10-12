@@ -16,18 +16,25 @@ public class CanFridge : UdonSharpBehaviour {
 	public Transform SpawnPoint;
 	[Tooltip("Seconds before the same player can get another can.")]
 	public float CooldownSeconds = 10f;
+	[Tooltip("Optional admin panel that can lock this row and clear its cans.")]
+	public DrinksAdmin Admin;
 	// Internal: who spawned a can recently (filled from what everyone sees, not just this player)
 	private const int Slots = 32;
 	private int[] RecentIds;
 	private float[] RecentTimes;
 	private int RecentNext;
 	private int Spread;
+	private Collider ClickBox;
 
-	private void Start() { InitRecent(); }
+	private void Start() {
+		InitRecent();
+		ClickBox = GetComponent<Collider>();
+	}
 
 	public override void Interact() {
 		VRCPlayerApi me = Networking.LocalPlayer;
 		if(me == null || Cans == null || Cans.Length == 0 || SpawnPoint == null) return;
+		if(Admin != null && Admin.IsLocked()) return;
 		if(_SpawnedWithin(me.playerId, CooldownSeconds)) return;
 		FBTCan can = null;
 		for(int i = 0; i < Cans.Length; i++) {
@@ -46,6 +53,21 @@ public class CanFridge : UdonSharpBehaviour {
 		Spread = (Spread + 1) % 3;
 		Vector3 pos = SpawnPoint.position + SpawnPoint.right * ((Spread - 1) * 0.08f);
 		can.Spawn(pos, SpawnPoint.rotation);
+	}
+
+	// Admin panel
+	public void _SetLocked(bool locked) {
+		// locked: the row can't be clicked at all
+		if(ClickBox == null) ClickBox = GetComponent<Collider>();
+		if(ClickBox != null) ClickBox.enabled = !locked;
+	}
+	public void _AdminClear() {
+		if(Cans == null) return;
+		for(int i = 0; i < Cans.Length; i++) if(Cans[i] != null) Cans[i]._AdminClear();
+	}
+	public bool _BlocksSpawnBy(VRCPlayerApi p) {
+		// while locked, only admins may take a free can
+		return Admin != null && Admin.IsLocked() && !Admin._IsAdmin(p);
 	}
 
 	// Called by the cans whenever anyone spawns one (locally or seen over the network)

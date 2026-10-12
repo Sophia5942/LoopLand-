@@ -46,6 +46,20 @@ All six use **your can model** with a label painted to match the club: dark, war
 - **Throw it in the bin** to clean it up.
 - A can left lying around cleans itself up after 5 minutes.
 
+## Admin panel
+"Drinks Admin Panel" is a dark plaque with gold trim. It has two buttons:
+- **LOCK / UNLOCK**: while locked, nobody can get new drinks. The rows can't be clicked, and the status shows **DRINKS LOCKED**. Drinks people already have still work.
+- **RESET ALL**: clears every drink out of the world, including ones people are holding.
+
+**Who can use it:** the **instance owner**. To add more admins, select the panel and type their VRChat display names into **Admin Names**. Untick **Instance Owner Is Admin** if you only want the named people.
+- Everyone else can't click the buttons at all.
+- In public or group instances there's no instance owner, so add names if you want the panel to work there.
+
+**Safe from hacked clients:**
+- Only an admin can take control of the panel. Whoever has it refuses everyone else.
+- Every player only accepts a lock or reset that came from an admin.
+- While locked, the owners of the cans refuse to hand a free can to non-admins.
+
 ## Settings
 - **Each drink row** (CanFridge on "Get ..."):
   - **Cooldown Seconds**: 10 per player.

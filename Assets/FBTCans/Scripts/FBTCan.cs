@@ -91,6 +91,12 @@ public class FBTCan : UdonSharpBehaviour {
 		ApplyState(true);
 		ScheduleCleanup();
 	}
+	// Admin panel: clear this can away if it's ours (each player clears their own)
+	public void _AdminClear() {
+		if(!Active || !Networking.IsOwner(gameObject)) return;
+		if(Pickup != null && Pickup.IsHeld) Pickup.Drop();
+		Despawn(false);
+	}
 	// Bin
 	public void _Trash() {
 		if(!Active || !Networking.IsOwner(gameObject) || IsHeld()) return;
@@ -159,6 +165,8 @@ public class FBTCan : UdonSharpBehaviour {
 		if(Networking.IsOwner(gameObject) && Pickup != null && Pickup.IsHeld) return false;
 		// taking a can nobody is using = spawning it: only once per cooldown (with some slack for network lag)
 		if(!Active && Fridge != null && Fridge._SpawnedWithin(requestingPlayer.playerId, Fridge.CooldownSeconds * 0.7f)) return false;
+		// drinks locked by an admin: no new cans
+		if(!Active && Fridge != null && Fridge._BlocksSpawnBy(requestingPlayer)) return false;
 		return true;
 	}
 	public override void OnOwnershipTransferred(VRCPlayerApi player) { UpdatePhysics(); }

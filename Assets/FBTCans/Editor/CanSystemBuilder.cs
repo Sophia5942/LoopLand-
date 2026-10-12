@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using TMPro;
 using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
@@ -54,6 +55,8 @@ public static class CanSystemBuilder
     private static float modelTop, modelRadius;
 
     private static readonly List<UdonSharpBehaviour> made = new List<UdonSharpBehaviour>();
+    private static readonly List<CanFridge> rows = new List<CanFridge>();
+    private static TMP_FontAsset font;
 
     [MenuItem("FBT Mayfair/Build Can Fridge + Bin", priority = 30)]
     public static void Build()
@@ -63,6 +66,15 @@ public static class CanSystemBuilder
             EditorUtility.DisplayDialog("FBT Mayfair", "Unity is still compiling or importing. Wait until it finishes, then try again.", "OK");
             return;
         }
+        // the admin panel's text uses TextMesh Pro (same as the bar)
+        font = TMP_Settings.instance != null ? TMP_Settings.defaultFontAsset : null;
+        if (font == null) font = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        if (font == null)
+        {
+            if (EditorUtility.DisplayDialog("FBT Mayfair", "TextMesh Pro Essential Resources are missing.\nImport them, then click Build again.", "Import now", "Cancel"))
+                EditorApplication.ExecuteMenuItem("Window/TextMeshPro/Import TMP Essential Resources");
+            return;
+        }
         GameObject old = GameObject.Find(RootName);
         if (old != null)
         {
@@ -70,6 +82,7 @@ public static class CanSystemBuilder
             Undo.DestroyObjectImmediate(old);
         }
         made.Clear();
+        rows.Clear();
         try
         {
             EditorUtility.DisplayProgressBar("FBT Mayfair", "Compiling UdonSharp programs...", 0.1f);
@@ -87,6 +100,7 @@ public static class CanSystemBuilder
             GameObject root = BuildAll();
             root.transform.position = p;
             Bin(root.transform, p);
+            AdminPanel(root.transform, p);
             Wire();
             Undo.RegisterCreatedObjectUndo(root, "Build Can Fridge + Bin");
             EditorSceneManager.MarkSceneDirty(root.scene);
@@ -98,7 +112,8 @@ public static class CanSystemBuilder
                 "1. There are 6 drink rows ('Get Mayfair Energy', 'Get Velvet Rouge', ...). Move each one onto a shelf inside your fridge,\n" +
                 "   with its blue arrow pointing out of the fridge (towards the glass).\n" +
                 "   The see-through box is the click area and the see-through can shows where the new drink appears. Both are invisible in game.\n" +
-                "2. Move 'Trash Bin' where you want it.\n3. Save the scene (Ctrl+S).", "OK");
+                "2. Move 'Trash Bin' and 'Drinks Admin Panel' where you want them.\n" +
+                "   The panel works for the instance owner; add more admins in its Admin Names list.\n3. Save the scene (Ctrl+S).", "OK");
         }
         catch (Exception e)
         {
@@ -220,6 +235,7 @@ public static class CanSystemBuilder
             fridgeScript.CooldownSeconds = 10f;
             foreach (FBTCan c in cans) c.Fridge = fridgeScript;
             made.Add(fridgeScript);
+            rows.Add(fridgeScript);
             var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(fridgeScript);
             if (ub != null)
             {
@@ -278,6 +294,88 @@ public static class CanSystemBuilder
         v.transform.localPosition = Vector3.zero;
         v.transform.localRotation = Quaternion.identity;
         return v;
+    }
+
+    /// <summary>Wall panel for admins: lock / unlock drinks and reset all drinks. Front faces +Z.</summary>
+    private static void AdminPanel(Transform rt, Vector3 near)
+    {
+        Material plate = LitMat("Admin_Plate", Hex("16100E"), 0.2f, 0.6f, Color.black);
+        Material goldMat = LitMat("Admin_Gold", Hex("C9A04A"), 1f, 0.8f, new Color(0.12f, 0.08f, 0.02f));
+        Material capMat = LitMat("Admin_Button", Hex("5A1424"), 0.3f, 0.7f, Color.black);
+        var panel = new GameObject("Drinks Admin Panel");
+        panel.transform.SetParent(rt, false);
+        panel.transform.position = near + new Vector3(-1f, 1.3f, 0f);
+        Transform pt = panel.transform;
+        Box(pt, "Plate", new Vector3(0f, 0f, 0f), new Vector3(0.46f, 0.3f, 0.02f), plate);
+        // gold frame
+        Box(pt, "Trim Top", new Vector3(0f, 0.145f, 0.011f), new Vector3(0.46f, 0.01f, 0.006f), goldMat);
+        Box(pt, "Trim Bottom", new Vector3(0f, -0.145f, 0.011f), new Vector3(0.46f, 0.01f, 0.006f), goldMat);
+        Box(pt, "Trim Left", new Vector3(-0.225f, 0f, 0.011f), new Vector3(0.01f, 0.3f, 0.006f), goldMat);
+        Box(pt, "Trim Right", new Vector3(0.225f, 0f, 0.011f), new Vector3(0.01f, 0.3f, 0.006f), goldMat);
+        Label3D(pt, "Title", "FBT  MAYFAIR", new Vector3(0f, 0.105f, 0.012f), new Vector2(0.38f, 0.045f), Hex("D9B867"));
+        Label3D(pt, "Subtitle", "DRINKS  ADMIN", new Vector3(0f, 0.07f, 0.012f), new Vector2(0.3f, 0.025f), Hex("BFA88A"));
+        TextMeshPro status = Label3D(pt, "Status", "DRINKS  OPEN", new Vector3(0f, 0.025f, 0.012f), new Vector2(0.36f, 0.035f), Hex("E6C780"));
+        Label3D(pt, "Footer", "INSTANCE OWNER & ADMINS ONLY", new Vector3(0f, -0.122f, 0.012f), new Vector2(0.36f, 0.018f), Hex("8F7A5E"));
+
+        var admin = Add<DrinksAdmin>(panel);
+        TextMeshPro lockLabel;
+        Collider lockCol = AdminBtn(pt, admin, 0, "Lock Button", "LOCK", new Vector3(-0.1f, -0.06f, 0f), capMat, out lockLabel);
+        TextMeshPro resetLabel;
+        Collider resetCol = AdminBtn(pt, admin, 1, "Reset Button", "RESET ALL", new Vector3(0.1f, -0.06f, 0f), capMat, out resetLabel);
+        admin.Fridges = rows.ToArray();
+        admin.InstanceOwnerIsAdmin = true;
+        admin.AdminNames = new string[0];
+        admin.Buttons = new[] { lockCol, resetCol };
+        admin.StatusText = status;
+        admin.LockLabel = lockLabel;
+        made.Add(admin);
+        foreach (CanFridge f in rows) f.Admin = admin;
+    }
+
+    private static Collider AdminBtn(Transform parent, DrinksAdmin admin, int action, string name, string text, Vector3 pos, Material capMat, out TextMeshPro label)
+    {
+        var b = new GameObject(name);
+        b.transform.SetParent(parent, false);
+        b.transform.localPosition = pos;
+        var col = b.AddComponent<BoxCollider>();
+        col.center = new Vector3(0f, 0f, 0.02f);
+        col.size = new Vector3(0.17f, 0.07f, 0.04f);
+        // the cap and its label move in together when pressed
+        var press = new GameObject("Press").transform;
+        press.SetParent(b.transform, false);
+        Box(press, "Cap", new Vector3(0f, 0f, 0.018f), new Vector3(0.16f, 0.06f, 0.016f), capMat);
+        label = Label3D(press, "Label", text, new Vector3(0f, 0f, 0.0275f), new Vector2(0.14f, 0.032f), Hex("F0DDB0"));
+        var btn = Add<AdminButton>(b);
+        btn.Panel = admin;
+        btn.Action = action;
+        btn.Cap = press;
+        made.Add(btn);
+        var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
+        if (ub != null)
+        {
+            ub.interactText = action == 0 ? "Lock / unlock drinks" : "Reset all drinks";
+            ub.proximity = 2f;
+        }
+        return col;
+    }
+
+    private static TextMeshPro Label3D(Transform parent, string name, string text, Vector3 pos, Vector2 size, Color color)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = pos;
+        go.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        var t = go.AddComponent<TextMeshPro>();
+        t.font = font;
+        t.text = text;
+        t.color = color;
+        t.fontStyle = FontStyles.Bold;
+        t.alignment = TextAlignmentOptions.Center;
+        t.enableAutoSizing = true;
+        t.fontSizeMin = 0.05f;
+        t.fontSizeMax = 2f;
+        t.rectTransform.sizeDelta = size;
+        return t;
     }
 
     private static GameObject FindModel(string name)
@@ -360,7 +458,7 @@ public static class CanSystemBuilder
 
     private static void EnsurePrograms()
     {
-        Type[] types = { typeof(FBTCan), typeof(CanFridge), typeof(TrashBin), typeof(TransformSync) };
+        Type[] types = { typeof(FBTCan), typeof(CanFridge), typeof(TrashBin), typeof(TransformSync), typeof(DrinksAdmin), typeof(AdminButton) };
         var existing = new HashSet<Type>();
         foreach (string g in AssetDatabase.FindAssets("t:UdonSharpProgramAsset"))
         {
