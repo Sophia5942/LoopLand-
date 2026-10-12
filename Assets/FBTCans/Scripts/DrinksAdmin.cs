@@ -7,11 +7,12 @@ using VRC.Udon.Common;
 /// <summary>
 /// Admin panel for the drinks: lock / unlock getting new drinks (locking also clears every can), and reset (clear away)
 /// every can. The panel pops up in front of an admin, only on their screen: press the Toggle Key on desktop, or in VR
-/// hold both triggers (with empty hands) for a moment. Same again (or the X) closes it.
+/// hold both triggers (with empty hands) for a moment. Same again (or the X) closes it. The panel is a world-space UI
+/// canvas (point at it with the VRChat laser / mouse); its buttons call _ToggleLock, _ResetAll and _ClosePanel here.
 /// Admins = the instance owner (if ticked) and anyone whose display name is in Admin Names.
 /// Anti-abuse: only an admin can take ownership of the panel (the current owner refuses everyone else), and every
 /// player only accepts a lock or reset when the panel's owner is an admin, so a hacked client can't fake either.
-/// Non-admins can't even click the buttons (their colliders are switched off for them).
+/// Non-admins never see the panel, and the buttons do nothing for them anyway.
 /// Sync: Manual, one bool (locked) and one counter (resets), sent only when an admin presses a button.
 /// </summary>
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
@@ -22,10 +23,8 @@ public class DrinksAdmin : UdonSharpBehaviour {
 	public bool InstanceOwnerIsAdmin = true;
 	[Tooltip("Display names of extra admins (exact VRChat names, not case sensitive).")]
 	public string[] AdminNames;
-	[Tooltip("The button colliders; switched off for players who aren't admins.")]
-	public Collider[] Buttons;
-	public TextMeshPro StatusText;
-	public TextMeshPro LockLabel;
+	public TextMeshProUGUI StatusText;
+	public TextMeshProUGUI LockLabel;
 	[Header("Pop-up")]
 	[Tooltip("The panel itself; only ever shown to the admin who opens it (it's local, nobody else sees it).")]
 	public GameObject PanelUI;
@@ -47,12 +46,8 @@ public class DrinksAdmin : UdonSharpBehaviour {
 	private float BothSince;
 
 	private void Start() {
-		bool admin = _IsAdmin(Networking.LocalPlayer);
-		LocalAdmin = admin;
+		LocalAdmin = _IsAdmin(Networking.LocalPlayer);
 		if(PanelUI != null) PanelUI.SetActive(false);
-		if(Buttons != null) {
-			for(int i = 0; i < Buttons.Length; i++) if(Buttons[i] != null) Buttons[i].enabled = admin;
-		}
 		Refresh();
 	}
 
@@ -93,14 +88,14 @@ public class DrinksAdmin : UdonSharpBehaviour {
 	public void _TogglePanel() {
 		if(PanelUI == null || !LocalAdmin) return;
 		if(PanelUI.activeSelf) { PanelUI.SetActive(false); return; }
-		// put it in front of your head, facing you
+		// put it in front of your head, facing you (a UI canvas is read from its back, so it looks the same way you do)
 		VRCPlayerApi me = Networking.LocalPlayer;
 		VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
 		Vector3 fwd = head.rotation * Vector3.forward;
 		fwd.y = 0f;
 		if(fwd.sqrMagnitude < 0.001f) fwd = me.GetRotation() * Vector3.forward;
 		fwd.Normalize();
-		PanelUI.transform.SetPositionAndRotation(head.position + fwd * PanelDistance + Vector3.down * 0.12f, Quaternion.LookRotation(-fwd));
+		PanelUI.transform.SetPositionAndRotation(head.position + fwd * PanelDistance + Vector3.down * 0.12f, Quaternion.LookRotation(fwd));
 		PanelUI.SetActive(true);
 		Refresh();
 	}

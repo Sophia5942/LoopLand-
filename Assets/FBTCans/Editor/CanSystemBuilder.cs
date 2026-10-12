@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using TMPro;
+using UnityEditor.Events;
+using UnityEngine.Events;
+using UnityEngine.UI;
 using UdonSharp;
 using UdonSharpEditor;
 using UnityEditor;
@@ -297,96 +300,123 @@ public static class CanSystemBuilder
         return v;
     }
 
-    /// <summary>Admin pop-up panel: lock / unlock drinks (locking also clears them) and reset all drinks. Front faces +Z.
-    /// The controller stays active; the panel itself is hidden until an admin opens it (only on their screen).</summary>
+    /// <summary>Admin pop-up panel, as a world-space UI canvas: lock / unlock drinks (locking also clears them) and reset
+    /// all drinks. The controller stays active; the canvas is hidden until an admin opens it (only on their screen).</summary>
     private static void AdminPanel(Transform rt, Vector3 near)
     {
-        Material plate = LitMat("Admin_Plate", Hex("16100E"), 0.2f, 0.6f, Color.black);
-        Material goldMat = LitMat("Admin_Gold", Hex("C9A04A"), 1f, 0.8f, new Color(0.12f, 0.08f, 0.02f));
-        Material capMat = LitMat("Admin_Button", Hex("5A1424"), 0.3f, 0.7f, Color.black);
         var panel = new GameObject("Drinks Admin");
         panel.transform.SetParent(rt, false);
-        var ui = new GameObject("Admin Panel UI (pops up for admins only)");
-        ui.transform.SetParent(panel.transform, false);
-        ui.transform.position = near + new Vector3(-1f, 1.3f, 0f);
-        Transform pt = ui.transform;
-        Box(pt, "Plate", new Vector3(0f, 0f, 0f), new Vector3(0.46f, 0.3f, 0.02f), plate);
-        // gold frame
-        Box(pt, "Trim Top", new Vector3(0f, 0.145f, 0.011f), new Vector3(0.46f, 0.01f, 0.006f), goldMat);
-        Box(pt, "Trim Bottom", new Vector3(0f, -0.145f, 0.011f), new Vector3(0.46f, 0.01f, 0.006f), goldMat);
-        Box(pt, "Trim Left", new Vector3(-0.225f, 0f, 0.011f), new Vector3(0.01f, 0.3f, 0.006f), goldMat);
-        Box(pt, "Trim Right", new Vector3(0.225f, 0f, 0.011f), new Vector3(0.01f, 0.3f, 0.006f), goldMat);
-        Label3D(pt, "Title", "FBT  MAYFAIR", new Vector3(-0.02f, 0.105f, 0.012f), new Vector2(0.3f, 0.045f), Hex("D9B867"));
-        Label3D(pt, "Subtitle", "DRINKS  ADMIN", new Vector3(0f, 0.07f, 0.012f), new Vector2(0.3f, 0.025f), Hex("BFA88A"));
-        TextMeshPro status = Label3D(pt, "Status", "DRINKS  OPEN", new Vector3(0f, 0.025f, 0.012f), new Vector2(0.36f, 0.035f), Hex("E6C780"));
-        Label3D(pt, "Footer", "F7  /  VR: HOLD BOTH TRIGGERS  TO OPEN OR CLOSE", new Vector3(0f, -0.122f, 0.012f), new Vector2(0.4f, 0.016f), Hex("8F7A5E"));
-
         var admin = Add<DrinksAdmin>(panel);
-        TextMeshPro lockLabel;
-        Collider lockCol = AdminBtn(pt, admin, 0, "Lock Button", "LOCK", new Vector3(-0.1f, -0.06f, 0f), capMat, out lockLabel);
-        TextMeshPro resetLabel;
-        Collider resetCol = AdminBtn(pt, admin, 1, "Reset Button", "RESET ALL", new Vector3(0.1f, -0.06f, 0f), capMat, out resetLabel);
-        TextMeshPro closeLabel;
-        Collider closeCol = AdminBtn(pt, admin, 2, "Close Button", "X", new Vector3(0.19f, 0.115f, 0f), capMat, out closeLabel, 0.035f);
+        var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(admin);
+        if (ub == null) throw new Exception("UdonSharp could not set up the admin panel. Wait until Unity has finished compiling, then try again.");
+        Sprite round = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+
+        // canvas: 460 x 300 UI units at 1 mm each = 46 x 30 cm in the world
+        var cgo = new GameObject("Admin Panel UI (pops up for admins only)", typeof(RectTransform));
+        cgo.transform.SetParent(panel.transform, false);
+        cgo.layer = 0;   // Default layer, so the VRChat laser can use it
+        var canvas = cgo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        cgo.AddComponent<GraphicRaycaster>();
+        AddVrcUiShape(cgo);
+        var crt = (RectTransform)cgo.transform;
+        crt.sizeDelta = new Vector2(460f, 300f);
+        crt.localScale = Vector3.one * 0.001f;
+        crt.position = near + new Vector3(-1f, 1.3f, 0f);
+
+        Color gold = Hex("D9B867");
+        var bg = UiImage(crt, "Background", Vector2.zero, new Vector2(460f, 300f), new Color(0.086f, 0.063f, 0.055f, 0.97f), round);
+        UiOutline(bg.gameObject, gold, 2f);
+        UiImage(crt, "Gold Line", new Vector2(0f, 62f), new Vector2(360f, 2f), new Color(gold.r, gold.g, gold.b, 0.6f), null);
+        UiText(crt, "Title", "FBT  MAYFAIR", new Vector2(-12f, 112f), new Vector2(300f, 44f), gold, 34f, FontStyles.Bold);
+        UiText(crt, "Subtitle", "D R I N K S   A D M I N", new Vector2(-12f, 80f), new Vector2(300f, 22f), Hex("BFA88A"), 16f, FontStyles.Normal);
+        var status = UiText(crt, "Status", "DRINKS  OPEN", new Vector2(0f, 28f), new Vector2(380f, 40f), Hex("E6C780"), 28f, FontStyles.Bold);
+        var lockLabel = UiButton(crt, ub, "_ToggleLock", "Lock Button", "LOCK", new Vector2(-100f, -48f), new Vector2(170f, 62f), round, gold);
+        UiButton(crt, ub, "_ResetAll", "Reset Button", "RESET ALL", new Vector2(100f, -48f), new Vector2(170f, 62f), round, gold);
+        UiButton(crt, ub, "_ClosePanel", "Close Button", "X", new Vector2(196f, 116f), new Vector2(40f, 40f), round, gold);
+        UiText(crt, "Hint", "LOCK also clears every drink", new Vector2(0f, -98f), new Vector2(380f, 20f), Hex("A08C70"), 15f, FontStyles.Italic);
+        UiText(crt, "Footer", "F7   \u00B7   VR: HOLD BOTH TRIGGERS   \u00B7   ONLY YOU SEE THIS", new Vector2(0f, -128f), new Vector2(420f, 18f), Hex("7F6C54"), 13f, FontStyles.Normal);
+
         admin.Fridges = rows.ToArray();
         admin.InstanceOwnerIsAdmin = true;
         admin.AdminNames = new string[0];
-        admin.Buttons = new[] { lockCol, resetCol, closeCol };
-        admin.PanelUI = ui;
+        admin.StatusText = status;
+        admin.LockLabel = lockLabel;
+        admin.PanelUI = cgo;
         admin.ToggleKey = KeyCode.F7;
         admin.VRHoldSeconds = 1.5f;
         admin.PanelDistance = 0.55f;
-        admin.StatusText = status;
-        admin.LockLabel = lockLabel;
         made.Add(admin);
         foreach (CanFridge f in rows) f.Admin = admin;
     }
 
-    private static Collider AdminBtn(Transform parent, DrinksAdmin admin, int action, string name, string text, Vector3 pos, Material capMat, out TextMeshPro label, float width = 0.16f)
+    /// <summary>VRChat needs a VRC Ui Shape on a canvas for its laser/hand to click it (found by name so any SDK version works).</summary>
+    private static void AddVrcUiShape(GameObject go)
     {
-        float h = action == 2 ? width : 0.06f;
-        var b = new GameObject(name);
-        b.transform.SetParent(parent, false);
-        b.transform.localPosition = pos;
-        var col = b.AddComponent<BoxCollider>();
-        col.center = new Vector3(0f, 0f, 0.02f);
-        col.size = new Vector3(width + 0.01f, h + 0.01f, 0.04f);
-        // the cap and its label move in together when pressed
-        var press = new GameObject("Press").transform;
-        press.SetParent(b.transform, false);
-        Box(press, "Cap", new Vector3(0f, 0f, 0.018f), new Vector3(width, h, 0.016f), capMat);
-        label = Label3D(press, "Label", text, new Vector3(0f, 0f, 0.0275f), new Vector2(width - 0.02f, h * 0.55f), Hex("F0DDB0"));
-        var btn = Add<AdminButton>(b);
-        btn.Panel = admin;
-        btn.Action = action;
-        btn.Cap = press;
-        made.Add(btn);
-        var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
-        if (ub != null)
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
         {
-            ub.interactText = action == 0 ? "Lock (clears all drinks) / unlock" : action == 1 ? "Reset all drinks" : "Close";
-            ub.proximity = 2f;
+            Type[] types;
+            try { types = asm.GetTypes(); } catch { continue; }
+            foreach (Type t in types)
+            {
+                if (t.Name == "VRCUiShape" && typeof(Component).IsAssignableFrom(t) && !t.IsAbstract) { go.AddComponent(t); return; }
+            }
         }
-        return col;
+        Debug.LogWarning("[FBT Mayfair] VRC Ui Shape not found: add it to the admin panel canvas by hand so the buttons can be clicked.");
     }
 
-    private static TextMeshPro Label3D(Transform parent, string name, string text, Vector3 pos, Vector2 size, Color color)
+    private static RectTransform UiRect(Transform parent, string name, Vector2 pos, Vector2 size)
     {
         var go = new GameObject(name, typeof(RectTransform));
-        go.transform.SetParent(parent, false);
-        go.transform.localPosition = pos;
-        go.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-        var t = go.AddComponent<TextMeshPro>();
+        go.layer = 0;
+        var r = (RectTransform)go.transform;
+        r.SetParent(parent, false);
+        r.anchorMin = r.anchorMax = r.pivot = new Vector2(0.5f, 0.5f);
+        r.anchoredPosition = pos;
+        r.sizeDelta = size;
+        return r;
+    }
+
+    private static Image UiImage(Transform parent, string name, Vector2 pos, Vector2 size, Color color, Sprite sprite)
+    {
+        var img = UiRect(parent, name, pos, size).gameObject.AddComponent<Image>();
+        img.color = color;
+        if (sprite != null) { img.sprite = sprite; img.type = Image.Type.Sliced; }
+        return img;
+    }
+
+    private static void UiOutline(GameObject go, Color c, float width)
+    {
+        var o = go.AddComponent<Outline>();
+        o.effectColor = c;
+        o.effectDistance = new Vector2(width, -width);
+    }
+
+    private static TextMeshProUGUI UiText(Transform parent, string name, string text, Vector2 pos, Vector2 size, Color color, float maxSize, FontStyles style)
+    {
+        var t = UiRect(parent, name, pos, size).gameObject.AddComponent<TextMeshProUGUI>();
         t.font = font;
         t.text = text;
         t.color = color;
-        t.fontStyle = FontStyles.Bold;
+        t.fontStyle = style;
         t.alignment = TextAlignmentOptions.Center;
         t.enableAutoSizing = true;
-        t.fontSizeMin = 0.05f;
-        t.fontSizeMax = 2f;
-        t.rectTransform.sizeDelta = size;
+        t.fontSizeMin = 6f;
+        t.fontSizeMax = maxSize;
+        t.raycastTarget = false;
         return t;
+    }
+
+    /// <summary>Burgundy UI button with a gold edge; clicking it sends 'evt' to the admin script.</summary>
+    private static TextMeshProUGUI UiButton(Transform parent, VRC.Udon.UdonBehaviour target, string evt, string name, string text, Vector2 pos, Vector2 size, Sprite round, Color gold)
+    {
+        var img = UiImage(parent, name, pos, size, Hex("5A1424"), round);
+        UiOutline(img.gameObject, gold, 1.5f);
+        var b = img.gameObject.AddComponent<Button>();
+        b.targetGraphic = img;
+        b.navigation = new Navigation { mode = Navigation.Mode.None };
+        UnityEventTools.AddStringPersistentListener(b.onClick, new UnityAction<string>(target.SendCustomEvent), evt);
+        return UiText(img.transform, "Label", text, Vector2.zero, size - new Vector2(16f, 14f), Hex("F0DDB0"), 26f, FontStyles.Bold);
     }
 
     private static GameObject FindModel(string name)
@@ -469,7 +499,7 @@ public static class CanSystemBuilder
 
     private static void EnsurePrograms()
     {
-        Type[] types = { typeof(FBTCan), typeof(CanFridge), typeof(TrashBin), typeof(TransformSync), typeof(DrinksAdmin), typeof(AdminButton) };
+        Type[] types = { typeof(FBTCan), typeof(CanFridge), typeof(TrashBin), typeof(TransformSync), typeof(DrinksAdmin) };
         var existing = new HashSet<Type>();
         foreach (string g in AssetDatabase.FindAssets("t:UdonSharpProgramAsset"))
         {

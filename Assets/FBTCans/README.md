@@ -51,7 +51,7 @@ All six use **your can model** with a label painted to match the club: dark, war
 - **Desktop:** press **F7**.
 - **VR:** hold **both triggers** for 1.5 seconds with empty hands.
 
-It appears in front of you, facing you, and **only you can see it**. Close it with the same shortcut or its **X**.
+It's a proper **UI menu**: a dark, gold-edged panel with burgundy buttons. It appears in front of you, facing you, and **only you can see it**. Click it with the VRChat laser in VR or the mouse on desktop. Close it with the same shortcut or its **X**.
 
 It has two buttons:
 - **LOCK / UNLOCK**: locking **clears every drink** and stops anyone getting new ones. The rows can't be clicked, and the status shows **DRINKS LOCKED**. Unlock to open the drinks again.
