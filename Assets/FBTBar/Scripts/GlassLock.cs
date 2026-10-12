@@ -12,8 +12,8 @@ public class GlassLock : UdonSharpBehaviour {
 	public Transform SnapPointsParent;
 	[Tooltip("How close (meters, sideways) the glass must be to a spot to lock into it.")]
 	public float SnapRadius = 0.12f;
-	[Tooltip("Height of the glass pivot above the bottom of the glass (set by the builder).")]
-	public float BottomOffset;
+	[Tooltip("The glass mesh renderer: the lock lines up its visible bottom with the spot (works even if the pivot is elsewhere).")]
+	public Renderer Body;
 	public AudioSource Sound;
 	public AudioClip LockClip;
 	public AudioClip UnlockClip;
@@ -27,7 +27,7 @@ public class GlassLock : UdonSharpBehaviour {
 		for(int i = 0; i < n; i++) Points[i] = SnapPointsParent.GetChild(i);
 	}
 	public override void OnDrop() {
-		Vector3 bottom = transform.position - Vector3.up * BottomOffset;
+		Vector3 bottom = Bottom();
 		float best = SnapRadius * SnapRadius;
 		int bestIndex = -1;
 		for(int i = 0; i < Points.Length; i++) {
@@ -36,9 +36,16 @@ public class GlassLock : UdonSharpBehaviour {
 			if(Mathf.Abs(d.y) < 0.35f && sideways < best) { best = sideways; bestIndex = i; }
 		}
 		if(bestIndex < 0) { Locked = false; return; }
-		transform.SetPositionAndRotation(Points[bestIndex].position + Vector3.up * BottomOffset, Points[bestIndex].rotation);
+		// stand it upright, then move its visible bottom-center onto the spot
+		transform.rotation = Points[bestIndex].rotation;
+		transform.position += Points[bestIndex].position - Bottom();
 		Locked = true;
 		if(Sound != null && LockClip != null) Sound.PlayOneShot(LockClip);
+	}
+	private Vector3 Bottom() {
+		if(Body == null) return transform.position;
+		Bounds b = Body.bounds;
+		return new Vector3(b.center.x, b.min.y, b.center.z);
 	}
 	public override void OnPickup() {
 		if(Locked && Sound != null && UnlockClip != null) Sound.PlayOneShot(UnlockClip);

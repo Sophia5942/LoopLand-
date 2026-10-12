@@ -104,7 +104,7 @@ public static class BarMachineBuilder
             if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
             EditorUtility.ClearProgressBar();
             EditorUtility.DisplayDialog("FBT Mayfair", "Done! '" + RootName + "' is in your scene" + (onTarget ? " on top of '" + target.name + "'" : "") +
-                ".\n\nSave your scene (Ctrl+S). Then press Play: pick up a glass, put it under a spout (it locks in), press PUSH to pour, press PUSH again to stop, hold Use to drink.", "OK");
+                ", with " + glassCount + " of your glasses on the tray next to it.\n\nSave your scene (Ctrl+S). Then press Play: pick up a glass, put it under a spout (it locks in), press PUSH to pour, press PUSH again to stop, hold Use to drink.", "OK");
         }
         catch (Exception e)
         {
@@ -238,7 +238,7 @@ public static class BarMachineBuilder
             var gl = Add<GlassLock>(g.gameObject);
             gl.SnapPointsParent = snaps;
             gl.SnapRadius = 0.08f;
-            gl.BottomOffset = BottomOffset(g);
+            gl.Body = g.GetComponent<Renderer>();
             gl.Sound = Audio(g.gameObject, 0.9f, 5f);
             gl.LockClip = lockClip;
             gl.UnlockClip = unlockClip;
@@ -261,6 +261,8 @@ public static class BarMachineBuilder
         return root;
     }
 
+    private static int glassCount;
+
     private static GameObject InstantiateGlasses(Transform rt, out float tallest)
     {
         tallest = 0.2f;
@@ -274,24 +276,23 @@ public static class BarMachineBuilder
         var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
         inst.name = "Glasses (LiquidGlass)";
         inst.transform.SetParent(rt, false);
-        inst.transform.localPosition = new Vector3(Width * 0.5f + 0.32f + 0.13f, 0f, 0.02f);
+        inst.transform.localPosition = Vector3.zero;
         inst.transform.localRotation = Quaternion.identity;
-        // stand them on the glass tray
+        glassCount = 0;
+        foreach (Transform g in inst.transform) if (g.GetComponent<LiquidGlass>() != null) glassCount++;
+        if (glassCount == 0) throw new Exception("Your '" + GlassesPrefabName + "' prefab has no glasses with a LiquidGlass script on them.");
+        // stand them on the glass tray, by what you actually see (the models may sit away from their pivots)
         if (TryBounds(inst, out Bounds b))
         {
-            inst.transform.position += Vector3.up * (0.012f - b.min.y);
+            Vector3 trayCenter = rt.TransformPoint(new Vector3(Width * 0.5f + 0.32f, 0.012f, 0.02f));
+            inst.transform.position += new Vector3(trayCenter.x - b.center.x, trayCenter.y - b.min.y, trayCenter.z - b.center.z);
+            if (b.size.x > 3f || b.size.z > 3f)
+                Debug.LogWarning("[FBT Mayfair] Your glasses are spread over " + b.size.x.ToString("0.0") + " m. Move them onto the tray if they look scattered.");
             tallest = 0f;
             foreach (Transform g in inst.transform)
                 if (g.GetComponent<LiquidGlass>() != null && TryBounds(g.gameObject, out Bounds gb)) tallest = Mathf.Max(tallest, gb.size.y);
         }
         return inst;
-    }
-
-    private static float BottomOffset(Transform glass)
-    {
-        Renderer r = glass.GetComponent<Renderer>();
-        if (r == null) return 0f;
-        return glass.position.y - r.bounds.min.y;
     }
 
     /// <summary>Uses the drunk effect of a ManagerBar already in the scene (and offers to turn that one off), or a harmless placeholder.</summary>
