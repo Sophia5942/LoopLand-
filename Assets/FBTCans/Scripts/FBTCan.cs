@@ -7,12 +7,18 @@ using VRC.Udon.Common.Interfaces;
 /// A drink can. The fridge puts it on the shelf (it stays put there until someone grabs it), the first Use opens it (the tab lifts, "pssht"), holding Use after that sips,
 /// dropping it on the floor clanks, and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
 /// fridge needs it again.
-/// Sync: Manual, three bools (in use / opened / held), sent only when they change. Movement is synced by TransformSync
+/// Anti-abuse (hacked clients): ownership of a can is only handed over when the current owner agrees. They refuse if
+/// the can is in their hand, or if the asking player spawned a can too recently (everyone tracks spawns via SpawnCount).
+/// The clank is the only network event and it ignores spam. Everything internal starts with _ so it can't be called
+/// over the network.
+/// Sync: Manual, three bools (in use / opened / held) and a spawn counter, sent only when they change. Movement is synced by TransformSync
 /// (your script) on the same object, also Manual.
 /// </summary>
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 public class FBTCan : UdonSharpBehaviour {
 	// References
+	[Tooltip("The fridge that keeps track of who spawned recently (anti-spam).")]
+	public CanFridge Fridge;
 	public GameObject Visual;
 	public Transform Tab;
 	public Collider CanCollider;
@@ -31,6 +37,7 @@ public class FBTCan : UdonSharpBehaviour {
 	[UdonSynced] private bool Active;
 	[UdonSynced] private bool Opened;
 	[UdonSynced] private bool Held;
+	[UdonSynced] private int SpawnCount;
 	// Read by the fridge
 	[HideInInspector()] public float SpawnTime;
 	// Internal
@@ -43,6 +50,8 @@ public class FBTCan : UdonSharpBehaviour {
 	private float CleanupDue;
 	private float NextClank;
 	private bool Parked;
+	private int AppliedSpawnCount;
+	private float LastClankHeard;
 
 	private void Start() {
 		Pickup = (VRC_Pickup)GetComponent(typeof(VRC_Pickup));
@@ -60,6 +69,9 @@ public class FBTCan : UdonSharpBehaviour {
 		Opened = false;
 		Held = false;
 		Parked = true;
+		SpawnCount++;
+		AppliedSpawnCount = SpawnCount;
+		if(Fridge != null) Fridge._NoteSpawn(Networking.LocalPlayer.playerId);
 		SpawnTime = Time.time;
 		transform.SetPositionAndRotation(pos, rot);
 		if(RB != null) { RB.velocity = Vector3.zero; RB.angularVelocity = Vector3.zero; }
@@ -104,12 +116,31 @@ public class FBTCan : UdonSharpBehaviour {
 		SendCustomNetworkEvent(NetworkEventTarget.All, nameof(Clank));
 	}
 	public void Clank() {
-		if(!Active || Sound == null || DropClip == null) return;
+		// anyone can send this event, so ignore spam
+		if(!Active || Sound == null || DropClip == null || Time.time - LastClankHeard < 0.25f) return;
+		LastClankHeard = Time.time;
 		Sound.pitch = Random.Range(0.92f, 1.08f);
 		Sound.PlayOneShot(DropClip);
 	}
 	// Networking
-	public override void OnDeserialization() { ApplyState(true); }
+	public override void OnDeserialization() {
+		if(SpawnCount != AppliedSpawnCount) {
+			// someone spawned this can: remember who, for the anti-spam check
+			AppliedSpawnCount = SpawnCount;
+			SpawnTime = Time.time;
+			VRCPlayerApi owner = Networking.GetOwner(gameObject);
+			if(Fridge != null && owner != null && Active) Fridge._NoteSpawn(owner.playerId);
+		}
+		ApplyState(true);
+	}
+	public override bool OnOwnershipRequest(VRCPlayerApi requestingPlayer, VRCPlayerApi requestedOwner) {
+		// runs on the current owner: a modified client can skip its own checks, but not ours
+		if(requestingPlayer == null || requestedOwner == null || requestingPlayer != requestedOwner) return false;
+		if(Networking.IsOwner(gameObject) && Pickup != null && Pickup.IsHeld) return false;
+		// taking a can nobody is using = spawning it: only once per cooldown (with some slack for network lag)
+		if(!Active && Fridge != null && Fridge._SpawnedWithin(requestingPlayer.playerId, Fridge.CooldownSeconds * 0.7f)) return false;
+		return true;
+	}
 	public override void OnOwnershipTransferred(VRCPlayerApi player) { UpdatePhysics(); }
 	// Delayed events
 	public void _CleanupCheck() {

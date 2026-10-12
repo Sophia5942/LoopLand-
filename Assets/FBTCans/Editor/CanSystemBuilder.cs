@@ -162,6 +162,7 @@ public static class CanSystemBuilder
             pickup.InteractionText = "Can";
             pickup.proximity = 0.5f;
             pickup.orientation = VRC_Pickup.PickupOrientation.Any;
+            pickup.DisallowTheft = true; // nobody can snatch a can out of your hand
             GameObject vis = CanVisual(go.transform, "Visual", Vector3.zero, body, neck, bottom, top, labels[i % labels.Length], alu, aluDark, true);
             var sound = AudioOn(go, 0.9f, 6f);
             var sipSrc = AudioOn(go, 0.5f, 4f);
@@ -188,12 +189,13 @@ public static class CanSystemBuilder
         var fridgeScript = Add<CanFridge>(spawner);
         fridgeScript.Cans = cans;
         fridgeScript.SpawnPoint = spawnPoint;
-        fridgeScript.CooldownSeconds = 600f;
+        fridgeScript.CooldownSeconds = 10f;
+        foreach (FBTCan c in cans) c.Fridge = fridgeScript;
         made.Add(fridgeScript);
         var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(fridgeScript);
         if (ub != null)
         {
-            ub.interactText = "Get A New Can [10min Cooldown]";
+            ub.interactText = "Get A New Can";
             ub.proximity = 2f;
         }
 

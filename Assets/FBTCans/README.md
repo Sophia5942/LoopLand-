@@ -19,7 +19,7 @@ Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a
 7. Save the scene (Ctrl+S).
 
 ## In game
-- **Click inside the fridge** ("Get A New Can [10min Cooldown]"). A can appears on the shelf.
+- **Click inside the fridge** ("Get A New Can"). A can appears on the shelf. Each player can get one every 10 seconds.
   - It stays put until someone grabs it, so it can't fall through the fridge.
 - **Grab it** and press **Use** (trigger / left click) to open it. The tab flips up, with a real can-opening snap and fizz.
 - **Hold Use** to drink. You hear quiet gulps.
@@ -29,16 +29,23 @@ Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a
 
 ## Settings
 - **Get A New Can** (CanFridge):
-  - **Cooldown Seconds**: 600 (10 min) per player. If you change it, also change the text: select the object, then Udon Behaviour > Interaction Text.
+  - **Cooldown Seconds**: 10 per player.
   - To make the click box bigger or smaller, change the Box Collider's Size. The see-through box is only a guide.
 - **Cans** (FBTCan on each can):
   - **Cleanup After Seconds**: the auto clean-up time. 0 turns it off.
   - **Drop Sound Speed**: how hard a can has to hit something to clank.
 - There are **8 cans** in the pool. When all 8 are out, the oldest one nobody is holding is reused.
 
+## Anti-abuse (hacked / modded clients)
+- **There can never be more than 8 cans.** Spamming can't create new objects. Worst case, it moves the same 8 cans around.
+- **The cooldown is checked by other players too.** Every player sees who spawned a can and when. To take a free can, a player has to get it from its current owner, and that owner's game refuses if the player spawned one in the last ~7 seconds. So a hacked client that skips its own cooldown still gets refused.
+- **Nobody can snatch a can out of your hand.** The owner refuses, and the pickup has Disallow Theft on.
+- **Spamming the drop clank does nothing.** Each player's game plays it at most 4 times a second per can.
+- Internal script functions can't be called over the network (they start with `_`).
+
 ## Networking / performance
 - Everyone sees the same cans: appearing, opened, held, moved and binned.
-- Each can syncs 3 bools (Manual sync), and only when something changes. Movement uses your TransformSync.
+- Each can syncs 3 bools and a spawn counter (Manual sync), and only when something changes. Movement uses your TransformSync.
 - The floor clank is one small network event, at most about 3 per second per can.
 - The spawner and bin don't sync anything.
 - There's no Update loop. The tab animation only runs for a quarter of a second when a can opens.
