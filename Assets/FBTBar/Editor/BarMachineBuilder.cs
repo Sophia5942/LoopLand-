@@ -140,6 +140,7 @@ public static class BarMachineBuilder
         AudioClip lockClip = Wav("bar_glass_lock", 0.24f, t =>
             (Noise() * Env(t, 0.0005f, 0.006f) * 0.7f + (Sin(1650f, t) * 0.45f + Sin(2740f, t) * 0.3f) * Env(t, 0.001f, 0.05f) + Sin(160f - 60f * t, t) * Env(t, 0.002f, 0.04f) * 0.5f
              + (t > 0.05f ? (Noise() * 0.5f + Sin(3200f, t) * 0.45f) * Env(t - 0.05f, 0.0005f, 0.007f) : 0f)) * 0.75f);
+        AudioClip respawnClip = Wav("bar_glass_respawn", 0.2f, t => Sin(700f - 2500f * Mathf.Min(t, 0.09f), t) * Env(t, 0.001f, 0.035f) * 0.6f + Noise() * Env(t, 0.0005f, 0.004f) * 0.3f);
         AudioClip unlockClip = Wav("bar_glass_unlock", 0.15f, t => (Noise() * 0.4f + Sin(2900f, t) * 0.4f) * Env(t, 0.0005f, 0.006f));
 
         var root = new GameObject(RootName);
@@ -231,11 +232,16 @@ public static class BarMachineBuilder
             PushButton(body, s, x, labelY - 0.025f, lp, lampOn, lampOff, black, brass, click, pourSrc);
         }
 
-        // --- every glass locks under the spouts
+        // --- every glass locks under the spouts and respawns on the tray
+        var locks = new List<GlassLock>();
         foreach (Transform g in glasses.transform)
         {
             if (g.GetComponent<LiquidGlass>() == null) continue;
             var gl = Add<GlassLock>(g.gameObject);
+            gl.Glass = g.GetComponent<LiquidGlass>();
+            gl.RespawnAfterSeconds = 180f;
+            gl.RespawnClip = respawnClip;
+            locks.Add(gl);
             gl.SnapPointsParent = snaps;
             gl.SnapRadius = 0.08f;
             gl.Body = g.GetComponent<Renderer>();
@@ -244,6 +250,9 @@ public static class BarMachineBuilder
             gl.UnlockClip = unlockClip;
             made.Add(gl);
         }
+
+        // --- RESET GLASSES button on the front of the glass tray
+        ResetButton(body, locks.ToArray(), brass, click);
 
         // --- your ManagerBar connects taps and glasses
         var mgrGo = new GameObject("Bar Manager (ManagerBar)");
@@ -353,7 +362,7 @@ public static class BarMachineBuilder
         col.bounce = 0f;
         col.lifetimeLoss = 1f;
         col.sendCollisionMessages = true;
-        col.quality = ParticleSystemCollisionQuality.High;
+        col.quality = ParticleSystemCollisionQuality.Medium; // plenty for a pour, cheaper than High
         var r = go.GetComponent<ParticleSystemRenderer>();
         r.renderMode = ParticleSystemRenderMode.Stretch;
         r.velocityScale = 0.04f;
@@ -361,6 +370,31 @@ public static class BarMachineBuilder
         r.sharedMaterial = mat;
         r.shadowCastingMode = ShadowCastingMode.Off;
         r.receiveShadows = false;
+    }
+
+    private static void ResetButton(Transform parent, GlassLock[] locks, Material brass, AudioClip click)
+    {
+        var go = new GameObject("RESET GLASSES");
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = new Vector3(Width * 0.5f + 0.32f, 0.02f, 0.02f + 0.15f + 0.012f);
+        var box = go.AddComponent<BoxCollider>();
+        box.size = new Vector3(0.16f, 0.045f, 0.03f);
+        var cap = new GameObject("Cap").transform;
+        cap.SetParent(go.transform, false);
+        Box(cap, "Button", new Vector3(0f, 0f, 0f), new Vector3(0.15f, 0.036f, 0.012f), brass);
+        Label3D(cap, "Text", "RESET GLASSES", new Vector3(0f, 0f, 0.0065f), new Vector2(0.14f, 0.026f), Hex("1A1206"));
+        var btn = Add<GlassRespawnButton>(go);
+        btn.Glasses = locks;
+        btn.PressVisual = cap;
+        btn.ClickSound = Audio(go, 0.9f, 5f);
+        btn.ClickSound.clip = click;
+        made.Add(btn);
+        var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
+        if (ub != null)
+        {
+            ub.interactText = "Put all glasses back";
+            ub.proximity = 2f;
+        }
     }
 
     private static void PushButton(Transform parent, Spirit s, float x, float y, LiquidParticles tap, Material lampOn, Material lampOff, Material black, Material brass, AudioClip click, AudioSource pour)
@@ -406,7 +440,7 @@ public static class BarMachineBuilder
 
     private static void EnsurePrograms()
     {
-        Type[] types = { typeof(ManagerBar), typeof(LiquidParticles), typeof(LiquidGlass), typeof(TransformSync), typeof(BarTapButton), typeof(GlassLock) };
+        Type[] types = { typeof(ManagerBar), typeof(LiquidParticles), typeof(LiquidGlass), typeof(TransformSync), typeof(BarTapButton), typeof(GlassLock), typeof(GlassRespawnButton) };
         var existing = new HashSet<Type>();
         foreach (string g in AssetDatabase.FindAssets("t:UdonSharpProgramAsset"))
         {
