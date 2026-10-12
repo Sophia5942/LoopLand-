@@ -5,8 +5,10 @@ using UnityEngine;
 /// Put this next to LiquidGlass + TransformSync on a glass. When you let go of the glass near a spout, it locks
 /// upright onto the drip tray right under the spout (with a click), so the pour lands in it.
 /// TransformSync then sends the new position to everyone, as usual.
+/// Manual sync (no synced variables) so it matches LiquidGlass + TransformSync on the same glass: VRChat needs every
+/// UdonBehaviour on one object to use the same sync method.
 /// </summary>
-[UdonBehaviourSyncMode(BehaviourSyncMode.None)]
+[UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
 public class GlassLock : UdonSharpBehaviour {
 	[Tooltip("Parent of the spot under each spout (its children are the lock points).")]
 	public Transform SnapPointsParent;
