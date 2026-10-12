@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.1.6
+- Fix NullReferenceException in Profile: glass meshes are looked up again by name after the model is re-imported (Read/Write), and a glass that cannot be loaded is skipped instead of stopping the build.
+
 ## 2.1.5
 - Fix "Could not load the FBT Mayfair logo": the logo is always re-imported as a sprite, with a fallback that creates the sprite in code (same for the generated icons).
 

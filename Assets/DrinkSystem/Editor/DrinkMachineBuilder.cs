@@ -459,10 +459,19 @@ namespace DrinkSystem.EditorTools
 
         // ------------------------------------------------------------------ STEP 1: glasses
 
+        private sealed class GlassSource
+        {
+            public string Name, GlassPath, GlassMesh, LiquidPath, LiquidMesh;
+            public Material[] GlassMats, LiquidMats;
+            public Quaternion GlassRot, LiqRot;
+            public Vector3 GlassScale, LiqPos, LiqScale;
+        }
+
         /// <summary>Builds the rack glasses from your Glasses2025 prefab (or simple glasses if it isn't in the project). Returns the tallest height.</summary>
         private static float Glasses(Transform parent, Material cupMat, Material liquidMat, Material logoMat, Mesh strawMesh, Mesh discMesh)
         {
-            var sources = new List<Transform>();
+            // 1) read what we need from the prefab (by name and path, so it survives the re-import below)
+            var sources = new List<GlassSource>();
             GameObject prefab = null;
             foreach (string g in AssetDatabase.FindAssets(GlassesPrefabName + " t:Prefab"))
             {
@@ -471,27 +480,60 @@ namespace DrinkSystem.EditorTools
             }
             if (prefab != null)
             {
-                // Make the glass models readable: the liquid line is measured from the mesh
-                var paths = new HashSet<string>();
-                foreach (MeshFilter mf in prefab.GetComponentsInChildren<MeshFilter>(true))
-                    if (mf.sharedMesh != null) paths.Add(AssetDatabase.GetAssetPath(mf.sharedMesh));
-                foreach (string p in paths)
-                {
-                    if (AssetImporter.GetAtPath(p) is ModelImporter mi && !mi.isReadable)
-                    {
-                        mi.isReadable = true;
-                        mi.SaveAndReimport();
-                    }
-                }
-                prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GetAssetPath(prefab));
                 foreach (Transform t in prefab.transform)
                 {
-                    if (!t.name.StartsWith("Glass_") || t.GetComponent<MeshFilter>() == null) continue;
+                    if (!t.name.StartsWith("Glass_")) continue;
+                    MeshFilter gmf = t.GetComponent<MeshFilter>();
+                    MeshRenderer gmr = t.GetComponent<MeshRenderer>();
+                    if (gmf == null || gmr == null || gmf.sharedMesh == null) continue;
+                    Transform liq = null;
                     foreach (Transform c in t)
-                        if (c.GetComponent<MeshFilter>() != null) { sources.Add(t); break; }
+                    {
+                        MeshFilter lmf = c.GetComponent<MeshFilter>();
+                        if (lmf != null && lmf.sharedMesh != null && c.GetComponent<MeshRenderer>() != null) { liq = c; break; }
+                    }
+                    if (liq == null) { Debug.LogWarning("[DrinkSystem] " + t.name + " has no liquid mesh child, skipping it."); continue; }
+                    sources.Add(new GlassSource
+                    {
+                        Name = t.name.Replace("Glass_", ""),
+                        GlassPath = AssetDatabase.GetAssetPath(gmf.sharedMesh), GlassMesh = gmf.sharedMesh.name,
+                        LiquidPath = AssetDatabase.GetAssetPath(liq.GetComponent<MeshFilter>().sharedMesh), LiquidMesh = liq.GetComponent<MeshFilter>().sharedMesh.name,
+                        GlassMats = gmr.sharedMaterials, LiquidMats = liq.GetComponent<MeshRenderer>().sharedMaterials,
+                        GlassRot = t.localRotation, GlassScale = t.localScale,
+                        LiqPos = liq.localPosition, LiqRot = liq.localRotation, LiqScale = liq.localScale,
+                    });
                 }
             }
-            if (sources.Count == 0) Debug.LogWarning("[DrinkSystem] '" + GlassesPrefabName + "' prefab not found (or it has no Glass_* with a Liquid_* child). Using simple glasses.");
+            // 2) make the glass models readable: the liquid line is measured from the mesh
+            var paths = new HashSet<string>();
+            foreach (GlassSource src in sources) { paths.Add(src.GlassPath); paths.Add(src.LiquidPath); }
+            foreach (string p in paths)
+            {
+                if (AssetImporter.GetAtPath(p) is ModelImporter mi && !mi.isReadable)
+                {
+                    mi.isReadable = true;
+                    mi.SaveAndReimport();
+                }
+            }
+            // 3) load the (re-imported) meshes again by name
+            var glassMeshes = new List<Mesh>();
+            var liquidMeshes = new List<Mesh>();
+            for (int i = sources.Count - 1; i >= 0; i--)
+            {
+                Mesh gm = FindMesh(sources[i].GlassPath, sources[i].GlassMesh);
+                Mesh lm = FindMesh(sources[i].LiquidPath, sources[i].LiquidMesh);
+                if (gm == null || lm == null)
+                {
+                    Debug.LogWarning("[DrinkSystem] Could not load the meshes of Glass_" + sources[i].Name + ", skipping it.");
+                    sources.RemoveAt(i);
+                }
+            }
+            foreach (GlassSource src in sources)
+            {
+                glassMeshes.Add(FindMesh(src.GlassPath, src.GlassMesh));
+                liquidMeshes.Add(FindMesh(src.LiquidPath, src.LiquidMesh));
+            }
+            if (sources.Count == 0) Debug.LogWarning("[DrinkSystem] '" + GlassesPrefabName + "' prefab not found (or it has no usable Glass_* with a liquid child). Using simple glasses.");
 
             Mesh fbGlass = null, fbLiquid = null;
             if (sources.Count == 0)
@@ -513,13 +555,9 @@ namespace DrinkSystem.EditorTools
                     float h;
                     if (sources.Count > 0)
                     {
-                        Transform src = sources[k];
-                        Transform liq = null;
-                        foreach (Transform c in src) if (c.GetComponent<MeshFilter>() != null) { liq = c; break; }
-                        h = MakeGlass(parent, src.name.Replace("Glass_", "") + " " + (copy + 1), pos, src.GetComponent<MeshFilter>().sharedMesh,
-                            src.GetComponent<MeshRenderer>().sharedMaterials, src.localRotation, src.localScale,
-                            liq.GetComponent<MeshFilter>().sharedMesh, liq.GetComponent<MeshRenderer>().sharedMaterials,
-                            liq.localPosition, liq.localRotation, liq.localScale, logoMat, strawMesh, discMesh, id);
+                        GlassSource src = sources[k];
+                        h = MakeGlass(parent, src.Name + " " + (copy + 1), pos, glassMeshes[k], src.GlassMats, src.GlassRot, src.GlassScale,
+                            liquidMeshes[k], src.LiquidMats, src.LiqPos, src.LiqRot, src.LiqScale, logoMat, strawMesh, discMesh, id);
                     }
                     else
                     {
@@ -531,6 +569,19 @@ namespace DrinkSystem.EditorTools
                 }
             }
             return tallest;
+        }
+
+        private static Mesh FindMesh(string path, string name)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            Mesh first = null;
+            foreach (Object o in AssetDatabase.LoadAllAssetsAtPath(path))
+            {
+                if (!(o is Mesh m)) continue;
+                if (m.name == name) return m;
+                if (first == null) first = m;
+            }
+            return path.EndsWith(".asset") ? first : null;
         }
 
         private static float MakeGlass(Transform parent, string name, Vector3 pos, Mesh glassMesh, Material[] glassMats, Quaternion glassRot, Vector3 glassScale,
@@ -589,13 +640,14 @@ namespace DrinkSystem.EditorTools
 
             // straw: from near the bottom, leaning out over the rim
             float strawLen = Mathf.Max(0.08f, height * 1.15f);
-            var straw = Part(go.transform, "Straw", strawMesh, glassMats[0], new Vector3(rimR * 0.1f, liquidBottom + 0.004f, -rimR * 0.1f), Quaternion.Euler(4f, 0f, 9f));
+            Material placeholder = glassMats != null && glassMats.Length > 0 && glassMats[0] != null ? glassMats[0] : logoMat;
+            var straw = Part(go.transform, "Straw", strawMesh, placeholder, new Vector3(rimR * 0.1f, liquidBottom + 0.004f, -rimR * 0.1f), Quaternion.Euler(4f, 0f, 9f));
             straw.transform.localScale = new Vector3(1f, strawLen, 1f);
             straw.enabled = false;
             // fruit wheel on the rim, front right
             float gr = Mathf.Clamp(rimR * 0.55f, 0.012f, 0.022f);
             float a = 40f * Mathf.Deg2Rad;
-            var garnish = Part(go.transform, "Garnish", discMesh, glassMats[0], new Vector3(Mathf.Cos(a) * rimR, height - gr * 0.6f, Mathf.Sin(a) * rimR), Quaternion.Euler(0f, 50f, 90f));
+            var garnish = Part(go.transform, "Garnish", discMesh, placeholder, new Vector3(Mathf.Cos(a) * rimR, height - gr * 0.6f, Mathf.Sin(a) * rimR), Quaternion.Euler(0f, 50f, 90f));
             garnish.transform.localScale = Vector3.one * (gr / 0.021f);
             garnish.enabled = false;
             // FBT Mayfair logo decal, wrapped on the widest part of the glass
@@ -616,7 +668,7 @@ namespace DrinkSystem.EditorTools
         /// <summary>Max distance from the glass axis per height band, in the glass root's space (pivot = bottom center).</summary>
         private static float[] Profile(Mesh mesh, Transform model, Transform root, int bins, out float height)
         {
-            Vector3[] verts = mesh.vertices;
+            Vector3[] verts = mesh != null ? mesh.vertices : new Vector3[0];
             var pts = new Vector3[verts.Length];
             height = 0f;
             for (int i = 0; i < verts.Length; i++)
@@ -626,7 +678,7 @@ namespace DrinkSystem.EditorTools
             }
             if (verts.Length == 0)
             {
-                Bounds b = mesh.bounds;
+                Bounds b = mesh != null ? mesh.bounds : new Bounds(new Vector3(0f, 0.075f, 0f), new Vector3(0.07f, 0.15f, 0.07f));
                 height = b.size.y * model.lossyScale.y;
                 var flat = new float[bins];
                 for (int i = 0; i < bins; i++) flat[i] = Mathf.Max(b.extents.x, b.extents.z) * model.lossyScale.x;
@@ -1168,6 +1220,7 @@ namespace DrinkSystem.EditorTools
             db.ClickClip = click;
             made.Add(db);
             UdonBehaviour ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(db);
+            if (ub == null) throw new Exception("UdonSharp did not set up the button '" + hit.name + "'. Wait until Unity has finished compiling, then click Build again.");
             UnityEventTools.AddStringPersistentListener(btn.onClick, new UnityAction<string>(ub.SendCustomEvent), "Press");
         }
 
