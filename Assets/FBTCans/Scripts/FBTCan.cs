@@ -1,10 +1,11 @@
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
+using VRC.Udon.Common.Interfaces;
 
 /// <summary>
-/// A drink can. The fridge spawns it, the first Use opens it (the tab lifts, "pssht"), holding Use after that sips,
-/// and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
+/// A drink can. The fridge puts it on its shelf, the first Use opens it (the tab lifts, "pssht"), holding Use after that sips,
+/// dropping it on the floor clanks, and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
 /// fridge needs it again.
 /// Sync: Manual, three bools (in use / opened / held), sent only when they change. Movement is synced by TransformSync
 /// (your script) on the same object, also Manual.
@@ -21,6 +22,9 @@ public class FBTCan : UdonSharpBehaviour {
 	public AudioClip OpenClip;
 	public AudioClip TrashClip;
 	public AudioClip SpawnClip;
+	public AudioClip DropClip;
+	[Tooltip("How hard the can has to hit something to clank (m/s).")]
+	public float DropSoundSpeed = 1.2f;
 	[Tooltip("A can left alone is cleaned up by itself after this many seconds. 0 = never.")]
 	public float CleanupAfterSeconds = 300f;
 	// Sync
@@ -37,6 +41,7 @@ public class FBTCan : UdonSharpBehaviour {
 	private bool Ready;
 	private float TabT;
 	private float CleanupDue;
+	private float NextClank;
 
 	private void Start() {
 		Pickup = (VRC_Pickup)GetComponent(typeof(VRC_Pickup));
@@ -88,6 +93,18 @@ public class FBTCan : UdonSharpBehaviour {
 	public override void OnPickupUseUp() {
 		if(SipSound != null) SipSound.Stop();
 	}
+	// Hitting the floor (only the owner simulates the can, so only the owner hears the hit and tells everyone)
+	private void OnCollisionEnter(Collision collision) {
+		if(!Active || IsHeld() || DropClip == null || Time.time < NextClank) return;
+		if(collision.relativeVelocity.magnitude < DropSoundSpeed || !Networking.IsOwner(gameObject)) return;
+		NextClank = Time.time + 0.3f;
+		SendCustomNetworkEvent(NetworkEventTarget.All, nameof(Clank));
+	}
+	public void Clank() {
+		if(!Active || Sound == null || DropClip == null) return;
+		Sound.pitch = Random.Range(0.92f, 1.08f);
+		Sound.PlayOneShot(DropClip);
+	}
 	// Networking
 	public override void OnDeserialization() { ApplyState(true); }
 	public override void OnOwnershipTransferred(VRCPlayerApi player) { UpdatePhysics(); }
@@ -116,7 +133,7 @@ public class FBTCan : UdonSharpBehaviour {
 			AppliedActive = Active;
 			if(effects && Sound != null) {
 				AudioClip clip = Active ? SpawnClip : TrashClip;
-				if(clip != null) Sound.PlayOneShot(clip);
+				if(clip != null) { Sound.pitch = 1f; Sound.PlayOneShot(clip); }
 			}
 		}
 		if(Visual != null && Visual.activeSelf != Active) Visual.SetActive(Active);
@@ -126,7 +143,7 @@ public class FBTCan : UdonSharpBehaviour {
 		if(Opened != AppliedOpened) {
 			AppliedOpened = Opened;
 			if(Opened && effects) {
-				if(Sound != null && OpenClip != null) Sound.PlayOneShot(OpenClip);
+				if(Sound != null && OpenClip != null) { Sound.pitch = 1f; Sound.PlayOneShot(OpenClip); }
 				TabT = 0f;
 				SendCustomEventDelayedFrames(nameof(_TabStep), 1);
 			}
