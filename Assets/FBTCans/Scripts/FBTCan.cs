@@ -5,7 +5,7 @@ using VRC.Udon.Common.Interfaces;
 
 /// <summary>
 /// A drink can. The fridge puts it on the shelf (it stays put there until someone grabs it), Use opens it (animated: the ring-pull lifts, the can jolts,
-/// the hole punches open, the tab settles back down, "pssht"), Use again swishes it round in your hand with a can-squish sound,
+/// the hole punches open, the tab settles back down, "pssht"), Use again swishes it round in your hand,
 /// dropping it on the floor clunks, and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
 /// fridge needs it again.
 /// Anti-abuse (hacked clients): ownership of a can is only handed over when the current owner agrees. They refuse if

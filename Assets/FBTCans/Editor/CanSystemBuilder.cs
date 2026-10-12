@@ -142,7 +142,7 @@ public static class CanSystemBuilder
             hull = Hull("Can_Collider", CanR, CanH, 12);
         }
 
-        AudioClip open = Clip("Can_Open"), trash = Clip("Can_Trash"), drop = Clip("Can_Drop"), swish = Clip("Can_Swish");
+        AudioClip open = Clip("Can_Open"), trash = Clip("Can_Trash"), drop = Clip("Can_Drop");
 
         var root = new GameObject(RootName);
         Transform rt = root.transform;
@@ -203,7 +203,7 @@ public static class CanSystemBuilder
             can.Visual = vis;
             can.Tab = vis.transform.Find("Tab Pivot");
             if (can.Tab == null) can.Tab = vis.transform.Find("Lid Parts/Tab Pivot");
-            can.SwishClip = swish;
+            can.SwishClip = null; // only the recorded sounds: open, floor, bin
             can.Mouth = vis.transform.Find("Mouth").gameObject;
             can.CanCollider = col;
             can.HideSpot = hide;
