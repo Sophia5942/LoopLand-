@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.1.5
+- Fix "Could not load the FBT Mayfair logo": the logo is always re-imported as a sprite, with a fallback that creates the sprite in code (same for the generated icons).
+
 ## 2.1.4
 - Build errors now show as a pop-up, and a finished build moves the Scene view to the machine and says so.
 - The logo is found wherever the DrinkSystem folder is.

@@ -387,6 +387,7 @@ namespace DrinkSystem.EditorTools
 
         private static Sprite Logo()
         {
+            // find the logo wherever the DrinkSystem folder is
             string path = LogoPath;
             if (AssetDatabase.LoadAssetAtPath<Texture2D>(path) == null)
             {
@@ -396,8 +397,10 @@ namespace DrinkSystem.EditorTools
                     break;
                 }
             }
+            // make it a sprite (always re-applied, so a bad import setting can't stop the build)
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
             var imp = AssetImporter.GetAtPath(path) as TextureImporter;
-            if (imp != null && imp.textureType != TextureImporterType.Sprite)
+            if (imp != null)
             {
                 imp.textureType = TextureImporterType.Sprite;
                 imp.spriteImportMode = SpriteImportMode.Single;
@@ -407,7 +410,31 @@ namespace DrinkSystem.EditorTools
                 imp.SaveAndReimport();
             }
             Sprite s = AssetDatabase.LoadAssetAtPath<Sprite>(path);
-            if (s == null) throw new Exception("Could not find the FBT Mayfair logo (FBT_Mayfair_Logo.png). Make sure the whole DrinkSystem folder was imported.");
+            if (s == null)
+            {
+                foreach (Object o in AssetDatabase.LoadAllAssetsAtPath(path))
+                {
+                    if (o is Sprite sp) { s = sp; break; }
+                }
+            }
+            if (s == null)
+            {
+                // last resort: build a sprite asset from the texture
+                Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (tex != null)
+                {
+                    Dir(Gen + "/Textures");
+                    string spritePath = Gen + "/Textures/FBT_Mayfair_Logo_Sprite.asset";
+                    s = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
+                    if (s == null)
+                    {
+                        s = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                        s.name = "FBT_Mayfair_Logo";
+                        AssetDatabase.CreateAsset(s, spritePath);
+                    }
+                }
+            }
+            if (s == null) throw new Exception("Could not find the FBT Mayfair logo (FBT_Mayfair_Logo.png). Make sure the whole DrinkSystem folder was imported, including Textures.");
             return s;
         }
 
@@ -1325,7 +1352,18 @@ namespace DrinkSystem.EditorTools
                 imp.wrapMode = TextureWrapMode.Clamp;
                 imp.SaveAndReimport();
             }
-            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sprite != null) return sprite;
+            foreach (Object o in AssetDatabase.LoadAllAssetsAtPath(path)) if (o is Sprite sp) return sp;
+            // the importer didn't make a sprite: make one from the texture
+            Texture2D t = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (t == null) throw new Exception("Could not create the image " + path);
+            string spritePath = Gen + "/Textures/" + name + "_Sprite.asset";
+            if (AssetDatabase.LoadAssetAtPath<Sprite>(spritePath) != null) AssetDatabase.DeleteAsset(spritePath);
+            sprite = Sprite.Create(t, new Rect(0f, 0f, t.width, t.height), new Vector2(0.5f, 0.5f), 100f);
+            sprite.name = name;
+            AssetDatabase.CreateAsset(sprite, spritePath);
+            return sprite;
         }
 
         // ------------------------------------------------------------------ painted textures
