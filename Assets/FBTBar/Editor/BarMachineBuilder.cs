@@ -104,7 +104,7 @@ public static class BarMachineBuilder
             if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
             EditorUtility.ClearProgressBar();
             EditorUtility.DisplayDialog("FBT Mayfair", "Done! '" + RootName + "' is in your scene" + (onTarget ? " on top of '" + target.name + "'" : "") +
-                ".\n\nPress Play: pick up a glass, put it under a spout (it locks in), press PUSH to pour, press PUSH again to stop, hold Use to drink.", "OK");
+                ".\n\nSave your scene (Ctrl+S). Then press Play: pick up a glass, put it under a spout (it locks in), press PUSH to pour, press PUSH again to stop, hold Use to drink.", "OK");
         }
         catch (Exception e)
         {
@@ -433,18 +433,61 @@ public static class BarMachineBuilder
         UdonSharpProgramAsset.CompileAllCsPrograms(true);
     }
 
+    /// <summary>Copies every behaviour's settings into its Udon program. Brand-new scripts may still be compiling in
+    /// the background ("outdated script version"): then it finishes this step by itself once UdonSharp is ready.</summary>
     private static void Wire()
     {
         try
         {
-            foreach (UdonSharpBehaviour b in made) UdonSharpEditorUtility.CopyProxyToUdon(b);
+            CopyAll();
         }
         catch (Exception e)
         {
-            if (e.Message.IndexOf("outdated", StringComparison.OrdinalIgnoreCase) < 0 && e.Message.IndexOf("compile", StringComparison.OrdinalIgnoreCase) < 0) throw;
-            UdonSharpProgramAsset.CompileAllCsPrograms(true);
-            foreach (UdonSharpBehaviour b in made) UdonSharpEditorUtility.CopyProxyToUdon(b);
+            if (!IsOutdated(e)) throw;
+            Debug.Log("[FBT Mayfair] UdonSharp is still compiling the new scripts. The machine is built; its settings will be applied automatically in a moment.");
+            pendingTries = 0;
+            nextTry = EditorApplication.timeSinceStartup + 1.0;
+            EditorApplication.update -= RetryWire;
+            EditorApplication.update += RetryWire;
         }
+    }
+
+    private static int pendingTries;
+    private static double nextTry;
+
+    private static void RetryWire()
+    {
+        if (EditorApplication.isCompiling || EditorApplication.isUpdating || EditorApplication.timeSinceStartup < nextTry) return;
+        nextTry = EditorApplication.timeSinceStartup + 1.0;
+        try
+        {
+            CopyAll();
+            EditorApplication.update -= RetryWire;
+            GameObject root = GameObject.Find(RootName);
+            if (root != null) EditorSceneManager.MarkSceneDirty(root.scene);
+            Debug.Log("[FBT Mayfair] All settings applied. Save your scene (Ctrl+S), then press Play.");
+        }
+        catch (Exception e)
+        {
+            if (IsOutdated(e) && ++pendingTries < 120)
+            {
+                if (pendingTries % 10 == 0) UdonSharpProgramAsset.CompileAllCsPrograms(true);
+                return;
+            }
+            EditorApplication.update -= RetryWire;
+            Debug.LogWarning("[FBT Mayfair] Could not apply the settings yet (" + e.Message + "). Save the scene and click FBT Mayfair > Build Spirits Machine again once Unity is idle.");
+        }
+    }
+
+    private static void CopyAll()
+    {
+        foreach (UdonSharpBehaviour b in made)
+            if (b != null) UdonSharpEditorUtility.CopyProxyToUdon(b);
+    }
+
+    private static bool IsOutdated(Exception e)
+    {
+        return e.Message.IndexOf("outdated", StringComparison.OrdinalIgnoreCase) >= 0 || e.Message.IndexOf("compile", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     // ------------------------------------------------------------------ helpers
