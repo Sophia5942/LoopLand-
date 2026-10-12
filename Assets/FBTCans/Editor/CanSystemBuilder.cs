@@ -13,8 +13,9 @@ using Object = UnityEngine.Object;
 
 /// <summary>
 /// FBT Mayfair > Build Can Fridge + Bin.
-/// A "Get A New Can" click box for your fridge, a pool of Mayfair Energy cans (your can model; Use opens them with an
-/// animated ring-pull) and your trash can as the bin.
+/// Six drink rows for your fridge (Mayfair Energy, Velvet Rouge, Emerald G&T, Blanc Spritz, After Hours, Passion):
+/// each has a click box over a row of display cans, and clicking it puts that drink in front of the row. Cans use your
+/// can model with an animated ring-pull; your trash can is the bin.
 /// It's built where your Scene view is looking; move the "FBT Can Fridge + Bin" object wherever you like.
 /// </summary>
 public static class CanSystemBuilder
@@ -24,30 +25,31 @@ public static class CanSystemBuilder
     private const string RootName = "FBT Can Fridge + Bin";
     private const string BinModelName = "Trashcanfbx_2";
     private const string CanModelName = "MayfairEnergyCan";
-    private const string CanTextureName = "MayfairEnergy_Can";
-    private const int PoolSize = 8;
+    private const int PoolPerDrink = 4;     // cans of each drink that can be out at once (the oldest is reused after that)
+    private const int DisplayPerRow = 4;    // display cans standing in each row
 
-    // can size (a standard 330 ml can)
-    private const float CanR = 0.033f, CanBody = 0.112f, CanH = 0.122f, NeckR = 0.0275f;
-
-    private struct Design
+    private struct Drink
     {
-        public string Name, Base, Band, Accent, Text;
-        public Design(string name, string b, string band, string accent, string text) { Name = name; Base = b; Band = band; Accent = accent; Text = text; }
+        public string Key, Name, Texture;
+        public Drink(string key, string name, string texture) { Key = key; Name = name; Texture = texture; }
     }
 
-    private static readonly Design[] Designs =
+    // six drinks, all FBT Mayfair house brands
+    private static readonly Drink[] Drinks =
     {
-        new Design("Cola", "B0102A", "FFFFFF", "1A1A1A", "FFFFFF"),
-        new Design("Energy", "1E3A8C", "C9CED6", "D8202E", "FFFFFF"),
-        new Design("Lime", "3FAE4A", "F5E04A", "1F5E26", "FFFFFF"),
+        new Drink("MayfairEnergy", "Mayfair Energy", "MayfairEnergy_Can"),
+        new Drink("VelvetRouge", "Velvet Rouge", "VelvetRouge_Can"),
+        new Drink("Emerald", "Emerald Gin & Tonic", "Emerald_Can"),
+        new Drink("Blanc", "Blanc Spritz", "Blanc_Can"),
+        new Drink("AfterHours", "After Hours Espresso Martini", "AfterHours_Can"),
+        new Drink("Passion", "Passion Martini", "Passion_Can"),
     };
 
     private static Mesh mouthMesh;
     private static Material mouthMat;
-    // your can model (Mayfair Energy); null = fall back to the simple built-in can
+    // your can model, used for every drink
     private static GameObject canModel;
-    private static Material canMat, tabMat;
+    private static Material tabMat;
     private static Mesh pullMesh, rivetMesh;
     private static float modelTop, modelRadius;
 
@@ -93,8 +95,9 @@ public static class CanSystemBuilder
             if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
             EditorUtility.ClearProgressBar();
             EditorUtility.DisplayDialog("FBT Mayfair", "Done! '" + RootName + "' is in your scene.\n\n" +
-                "1. Move 'Get A New Can' onto a shelf inside your fridge, with the blue arrow pointing out of the fridge (towards the glass).\n" +
-                "   The see-through can shows where new cans appear; the see-through box is the click area. Both are invisible in game.\n" +
+                "1. There are 6 drink rows ('Get Mayfair Energy', 'Get Velvet Rouge', ...). Move each one onto a shelf inside your fridge,\n" +
+                "   with its blue arrow pointing out of the fridge (towards the glass).\n" +
+                "   The see-through box is the click area and the see-through can shows where the new drink appears. Both are invisible in game.\n" +
                 "2. Move 'Trash Bin' where you want it.\n3. Save the scene (Ctrl+S).", "OK");
         }
         catch (Exception e)
@@ -113,158 +116,118 @@ public static class CanSystemBuilder
 
     private static GameObject BuildAll()
     {
-        Material alu = LitMat("Can_Aluminium", Hex("C8CDD3"), 1f, 0.85f, Color.black);
-        Material aluDark = LitMat("Can_Top", Hex("9AA0A8"), 1f, 0.7f, Color.black);
         Material ghost = SaveMat("Editor_Ghost", Shader.Find("Legacy Shaders/Transparent/Diffuse"), m => m.color = new Color(0.3f, 0.9f, 1f, 0.3f));
-        var labels = new Material[Designs.Length];
-        for (int i = 0; i < Designs.Length; i++) labels[i] = LitMat("Can_" + Designs[i].Name, Color.white, 0.6f, 0.75f, Color.black, LabelTex(Designs[i]));
-
-        Mesh body = Tube("Can_Body", CanR, CanR, 0.006f, CanBody, 20);
-        Mesh neck = Tube("Can_Neck", CanR, NeckR, CanBody, CanH, 20);
-        Mesh bottom = Tube("Can_Bottom", CanR * 0.85f, CanR, 0f, 0.006f, 20);
-        Mesh top = Disc("Can_Lid", NeckR, CanH - 0.0015f, 20);
-        mouthMesh = Disc("Can_Mouth", 0.009f, CanH - 0.0011f, 14);
-        mouthMat = LitMat("Can_Mouth", Hex("101010"), 0f, 0.9f, Color.black);
-        Mesh hull = null;
         canModel = FindModel(CanModelName);
-        if (canModel != null)
-        {
-            Texture2D canTex = FindTexture(CanTextureName);
-            canMat = LitMat("Can_MayfairEnergy", Color.white, 0.55f, 0.75f, Color.black, canTex);
-            tabMat = LitMat("Can_PullTab", Hex("D2B97F"), 1f, 0.8f, Color.black);
-            pullMesh = PullTab("Can_PullTab");
-            rivetMesh = Disc("Can_Rivet", 0.0022f, 0.0009f, 10);
-            mouthMesh = Stadium("Can_Opening", 0.0035f, 0.0195f, 0.0075f, 0f);   // at the front, above the logo
-        }
-        else
-        {
-            Debug.LogWarning("[FBT Mayfair] Can model '" + CanModelName + "' not found, using the simple built-in can.");
-            hull = Hull("Can_Collider", CanR, CanH, 12);
-        }
+        if (canModel == null) throw new Exception("The can model '" + CanModelName + ".fbx' is missing. Make sure the whole FBTCans folder was imported (FBTCans/Models).");
+        mouthMat = LitMat("Can_Mouth", Hex("101010"), 0f, 0.9f, Color.black);
+        tabMat = LitMat("Can_PullTab", Hex("D2B97F"), 1f, 0.8f, Color.black);
+        pullMesh = PullTab("Can_PullTab");
+        rivetMesh = Disc("Can_Rivet", 0.0022f, 0.0009f, 10);
+        mouthMesh = Stadium("Can_Opening", 0.0035f, 0.0195f, 0.0075f, 0f);   // at the front, above the logo
+        Mesh hull = null;
 
         AudioClip open = Clip("Can_Open"), trash = Clip("Can_Trash"), drop = Clip("Can_Drop");
 
         var root = new GameObject(RootName);
         Transform rt = root.transform;
-
-        // --- "Get A New Can": a click box that goes on a shelf inside your fridge; the can appears in front of it
-        var spawner = new GameObject("Get A New Can");
-        spawner.transform.SetParent(rt, false);
-        Transform sp = spawner.transform;
-        var box = spawner.AddComponent<BoxCollider>();
-        box.isTrigger = true;
-        box.center = new Vector3(0f, 0.15f, -0.1f);
-        box.size = new Vector3(0.5f, 0.3f, 0.2f);
-        var spawnPoint = new GameObject("Can Spawn Point").transform;
-        spawnPoint.SetParent(sp, false);
-        spawnPoint.localPosition = new Vector3(0f, 0.002f, 0.07f);
-        var hide = new GameObject("Can Hide Spot").transform;
-        hide.SetParent(sp, false);
-        hide.localPosition = new Vector3(0f, 0f, -0.1f);
-        // see-through helpers so you can see where things are; tagged EditorOnly, so they are not in the uploaded world
-        var gb = Box(sp, "Click Area (editor only)", box.center, box.size, ghost);
-        gb.tag = "EditorOnly";
-        var gc = canModel != null
-            ? ModelVisual(spawnPoint, "New Can Appears Here (editor only)", ghost, false)
-            : CanVisual(spawnPoint, "New Can Appears Here (editor only)", Vector3.zero, body, neck, bottom, top, ghost, ghost, ghost, false);
-        foreach (Transform t in gc.GetComponentsInChildren<Transform>()) t.gameObject.tag = "EditorOnly";
-
-        // --- cans (pool)
         var cansParent = new GameObject("Cans (pool)").transform;
         cansParent.SetParent(rt, false);
-        var cans = new FBTCan[PoolSize];
-        for (int i = 0; i < PoolSize; i++)
-        {
-            var go = new GameObject(canModel != null ? "Can " + (i + 1) + " (Mayfair Energy)" : "Can " + (i + 1) + " (" + Designs[i % Designs.Length].Name + ")");
-            go.transform.SetParent(cansParent, false);
-            go.transform.position = hide.position;
-            var rb = go.AddComponent<Rigidbody>();
-            rb.mass = 0.35f;
-            rb.isKinematic = true;
-            rb.interpolation = RigidbodyInterpolation.Interpolate;
-            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-            GameObject vis = canModel != null
-                ? ModelVisual(go.transform, "Visual", canMat, true)
-                : CanVisual(go.transform, "Visual", Vector3.zero, body, neck, bottom, top, labels[i % labels.Length], alu, aluDark, true);
-            if (hull == null) hull = Hull("Can_Collider", modelRadius, modelTop, 14);
-            var col = go.AddComponent<MeshCollider>();
-            col.sharedMesh = hull;
-            col.convex = true;
-            var pickup = go.AddComponent<VRCPickup>();
-            pickup.AutoHold = VRC_Pickup.AutoHoldMode.Yes;
-            pickup.UseText = "Open / Swish";
-            pickup.InteractionText = "Can";
-            pickup.proximity = 0.5f;
-            pickup.orientation = VRC_Pickup.PickupOrientation.Any;
-            pickup.DisallowTheft = true; // nobody can snatch a can out of your hand
-            var sound = AudioOn(go, 0.9f, 6f);
-            made.Add(Add<TransformSync>(go));
-            var can = Add<FBTCan>(go);
-            can.Visual = vis;
-            can.Tab = vis.transform.Find("Tab Pivot");
-            if (can.Tab == null) can.Tab = vis.transform.Find("Lid Parts/Tab Pivot");
-            can.SwishClip = null; // only the recorded sounds: open, floor, bin
-            can.Mouth = vis.transform.Find("Mouth").gameObject;
-            can.CanCollider = col;
-            can.HideSpot = hide;
-            can.Sound = sound;
-            can.OpenClip = open;
-            can.TrashClip = trash;
-            can.SpawnClip = null; // no sound when it appears, like a real fridge
-            can.DropClip = drop;
-            can.DropSoundSpeed = 1.2f;
-            can.CleanupAfterSeconds = 300f;
-            made.Add(can);
-            cans[i] = can;
-        }
 
-        var fridgeScript = Add<CanFridge>(spawner);
-        fridgeScript.Cans = cans;
-        fridgeScript.SpawnPoint = spawnPoint;
-        fridgeScript.CooldownSeconds = 10f;
-        foreach (FBTCan c in cans) c.Fridge = fridgeScript;
-        made.Add(fridgeScript);
-        var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(fridgeScript);
-        if (ub != null)
+        for (int d = 0; d < Drinks.Length; d++)
         {
-            ub.interactText = "Get A New Can";
-            ub.proximity = 2f;
-        }
+            Drink drink = Drinks[d];
+            Material mat = LitMat("Can_" + drink.Key, Color.white, 0.55f, 0.75f, Color.black, FindTexture(drink.Texture));
 
+            // --- "Get <drink>": a click box over a row of display cans; the new can appears in front of the row.
+            // Laid out 3 x 2 to start with: move each row onto a shelf in your fridge.
+            var spawner = new GameObject("Get " + drink.Name);
+            spawner.transform.SetParent(rt, false);
+            spawner.transform.localPosition = new Vector3(((d % 3) - 1) * 0.4f, (d / 3) * 0.3f, 0f);
+            Transform sp = spawner.transform;
+            var box = spawner.AddComponent<BoxCollider>();
+            box.isTrigger = true;
+            box.center = new Vector3(0f, 0.1f, -0.06f);
+            box.size = new Vector3(0.34f, 0.2f, 0.14f);
+            var spawnPoint = new GameObject("Can Spawn Point").transform;
+            spawnPoint.SetParent(sp, false);
+            spawnPoint.localPosition = new Vector3(0f, 0.002f, 0.07f);
+            var hide = new GameObject("Can Hide Spot").transform;
+            hide.SetParent(sp, false);
+            hide.localPosition = new Vector3(0f, 0f, -0.06f);
+            // the row of display cans (just looks: no scripts, no colliders, static so they batch)
+            var row = new GameObject("Display Row").transform;
+            row.SetParent(sp, false);
+            for (int k = 0; k < DisplayPerRow; k++)
+            {
+                var dc = ModelVisual(row, "Display " + drink.Name, mat, true);
+                dc.transform.localPosition = new Vector3((k - (DisplayPerRow - 1) * 0.5f) * 0.078f, 0f, -0.06f);
+                dc.transform.localRotation = Quaternion.Euler(0f, (k * 37 % 30) - 15f, 0f);
+                foreach (Transform t in dc.GetComponentsInChildren<Transform>(true)) t.gameObject.isStatic = true;
+            }
+            // see-through helpers, tagged EditorOnly so they are not in the uploaded world
+            var gb = Box(sp, "Click Area (editor only)", box.center, box.size, ghost);
+            gb.tag = "EditorOnly";
+            var gc = ModelVisual(spawnPoint, "New Can Appears Here (editor only)", ghost, false);
+            foreach (Transform t in gc.GetComponentsInChildren<Transform>(true)) t.gameObject.tag = "EditorOnly";
+
+            // --- this drink's cans (pool)
+            var cans = new FBTCan[PoolPerDrink];
+            for (int i = 0; i < PoolPerDrink; i++)
+            {
+                var go = new GameObject(drink.Name + " " + (i + 1));
+                go.transform.SetParent(cansParent, false);
+                go.transform.position = hide.position;
+                var rb = go.AddComponent<Rigidbody>();
+                rb.mass = 0.35f;
+                rb.isKinematic = true;
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                GameObject vis = ModelVisual(go.transform, "Visual", mat, true);
+                if (hull == null) hull = Hull("Can_Collider", modelRadius, modelTop, 14);
+                var col = go.AddComponent<MeshCollider>();
+                col.sharedMesh = hull;
+                col.convex = true;
+                var pickup = go.AddComponent<VRCPickup>();
+                pickup.AutoHold = VRC_Pickup.AutoHoldMode.Yes;
+                pickup.UseText = "Open / Swish";
+                pickup.InteractionText = drink.Name;
+                pickup.proximity = 0.5f;
+                pickup.orientation = VRC_Pickup.PickupOrientation.Any;
+                pickup.DisallowTheft = true; // nobody can snatch a can out of your hand
+                var sound = AudioOn(go, 0.9f, 6f);
+                made.Add(Add<TransformSync>(go));
+                var can = Add<FBTCan>(go);
+                can.Visual = vis;
+                can.Tab = vis.transform.Find("Lid Parts/Tab Pivot");
+                can.Mouth = vis.transform.Find("Mouth").gameObject;
+                can.CanCollider = col;
+                can.HideSpot = hide;
+                can.Sound = sound;
+                can.OpenClip = open;
+                can.TrashClip = trash;
+                can.SpawnClip = null;  // no sound when it appears, like a real fridge
+                can.SwishClip = null;  // only the recorded sounds: open, floor, bin
+                can.DropClip = drop;
+                can.DropSoundSpeed = 1.2f;
+                can.CleanupAfterSeconds = 300f;
+                made.Add(can);
+                cans[i] = can;
+            }
+
+            var fridgeScript = Add<CanFridge>(spawner);
+            fridgeScript.Cans = cans;
+            fridgeScript.SpawnPoint = spawnPoint;
+            fridgeScript.CooldownSeconds = 10f;
+            foreach (FBTCan c in cans) c.Fridge = fridgeScript;
+            made.Add(fridgeScript);
+            var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(fridgeScript);
+            if (ub != null)
+            {
+                ub.interactText = "Get " + drink.Name;
+                ub.proximity = 2f;
+            }
+        }
         return root;
-    }
-
-    private static GameObject CanVisual(Transform parent, string name, Vector3 pos, Mesh body, Mesh neck, Mesh bottom, Mesh top, Material label, Material alu, Material aluDark, bool withTab)
-    {
-        var v = new GameObject(name);
-        v.transform.SetParent(parent, false);
-        v.transform.localPosition = pos;
-        Part(v.transform, "Body", body, label);
-        Part(v.transform, "Neck", neck, alu);
-        Part(v.transform, "Bottom", bottom, alu);
-        Part(v.transform, "Lid", top, aluDark);
-        // the ring-pull: rotates up around its rivet when opened
-        var pivot = new GameObject("Tab Pivot").transform;
-        pivot.SetParent(v.transform, false);
-        pivot.localPosition = new Vector3(0f, CanH - 0.0005f, -0.004f);
-        var tab = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        tab.name = "Tab";
-        Object.DestroyImmediate(tab.GetComponent<Collider>());
-        tab.transform.SetParent(pivot, false);
-        tab.transform.localPosition = new Vector3(0f, 0.001f, 0.011f);
-        tab.transform.localScale = new Vector3(0.013f, 0.002f, 0.026f);
-        tab.GetComponent<Renderer>().sharedMaterial = alu;
-        if (!withTab) pivot.name = "Tab";
-        else
-        {
-            // the hole in the lid, behind the rivet; hidden until the can is opened
-            Part(v.transform, "Mouth", mouthMesh, mouthMat);
-            Transform mouth = v.transform.Find("Mouth");
-            mouth.localPosition = new Vector3(0f, 0f, -0.015f);
-            mouth.localScale = new Vector3(1f, 1f, 0.75f);
-            mouth.gameObject.SetActive(false);
-        }
-        return v;
     }
 
     /// <summary>Your can model, standing with its bottom at y = 0, plus the ring-pull, rivet and opening on its lid.</summary>
@@ -573,68 +536,6 @@ public static class CanSystemBuilder
         });
     }
 
-    // ------------------------------------------------------------------ can label (painted: color bands + "FBT")
-
-    private static Texture2D LabelTex(Design d)
-    {
-        const int w = 256, h = 128;
-        Color basec = Hex(d.Base), band = Hex(d.Band), accent = Hex(d.Accent), text = Hex(d.Text);
-        var px = new Color[w * h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                Color c = basec;
-                float wave = 30f + 8f * Mathf.Sin(x / (float)w * Mathf.PI * 4f);
-                if (y > wave && y < wave + 12f) c = band;
-                if (y > wave + 12f && y < wave + 16f) c = accent;
-                if (y < 6 || y > h - 7) c = accent;
-                px[y * w + x] = c;
-            }
-        // "FBT" on the front (u = 0.25) and back (u = 0.75)
-        foreach (int cx in new[] { 64, 192 }) Letters(px, w, cx - 36, 62, text);
-        var tex = new Texture2D(w, h, TextureFormat.RGBA32, true);
-        tex.SetPixels(px);
-        tex.Apply();
-        Dir(Gen + "/Textures");
-        string path = Gen + "/Textures/Can_" + d.Name + ".png";
-        File.WriteAllBytes(path, tex.EncodeToPNG());
-        Object.DestroyImmediate(tex);
-        AssetDatabase.ImportAsset(path);
-        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-    }
-
-    private static void Letters(Color[] px, int w, int x0, int y0, Color c)
-    {
-        // block letters, 20 x 34 px each, 6 px apart; the texture wraps around the can, so draw them mirrored in X
-        // (u runs the other way when you look at the front of the can)
-        int lw = 20, lh = 34, t = 5;
-        // F
-        Rect(px, w, x0, y0, t, lh, c); Rect(px, w, x0, y0 + lh - t, lw, t, c); Rect(px, w, x0, y0 + lh / 2 - 2, lw - 5, t, c);
-        // B
-        int bx = x0 + lw + 6;
-        Rect(px, w, bx, y0, t, lh, c); Rect(px, w, bx, y0 + lh - t, lw - 4, t, c); Rect(px, w, bx, y0 + lh / 2 - 2, lw - 4, t, c); Rect(px, w, bx, y0, lw - 4, t, c);
-        Rect(px, w, bx + lw - t, y0 + 3, t, lh / 2 - 4, c); Rect(px, w, bx + lw - t, y0 + lh / 2 + 1, t, lh / 2 - 4, c);
-        // T
-        int tx = bx + lw + 6;
-        Rect(px, w, tx, y0 + lh - t, lw, t, c); Rect(px, w, tx + lw / 2 - t / 2, y0, t, lh, c);
-        // mirror the 3 letters in place so they read correctly on the can
-        int span = tx + lw - x0;
-        for (int y = y0; y < y0 + lh; y++)
-            for (int i = 0; i < span / 2; i++)
-            {
-                int a = y * w + x0 + i, b = y * w + x0 + span - 1 - i;
-                Color tmp = px[a]; px[a] = px[b]; px[b] = tmp;
-            }
-    }
-
-    private static void Rect(Color[] px, int w, int x, int y, int rw, int rh, Color c)
-    {
-        int h = px.Length / w;
-        for (int j = y; j < y + rh; j++)
-            for (int i = x; i < x + rw; i++)
-                if (i >= 0 && i < w && j >= 0 && j < h) px[j * w + i] = c;
-    }
-
     // ------------------------------------------------------------------ meshes
 
     private static Mesh SaveMesh(string name, Mesh mesh)
@@ -646,29 +547,6 @@ public static class CanSystemBuilder
         mesh.RecalculateBounds();
         AssetDatabase.CreateAsset(mesh, path);
         return mesh;
-    }
-
-    /// <summary>Open tapered tube from y0 (radius r0) to y1 (radius r1). UV: u around (0.25 faces +Z), v up.</summary>
-    private static Mesh Tube(string name, float r0, float r1, float y0, float y1, int sides)
-    {
-        var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var tri = new List<int>();
-        float slope = (r0 - r1) / (y1 - y0);
-        for (int i = 0; i <= sides; i++)
-        {
-            float a = i / (float)sides * Mathf.PI * 2f;
-            var dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
-            Vector3 nn = (dir + Vector3.up * slope).normalized;
-            v.Add(dir * r0 + Vector3.up * y0); n.Add(nn); uv.Add(new Vector2(i / (float)sides, 0f));
-            v.Add(dir * r1 + Vector3.up * y1); n.Add(nn); uv.Add(new Vector2(i / (float)sides, 1f));
-        }
-        for (int i = 0; i < sides; i++)
-        {
-            int k = i * 2;
-            tri.AddRange(new[] { k, k + 1, k + 3, k, k + 3, k + 2 });
-        }
-        var mesh = new Mesh();
-        mesh.SetVertices(v); mesh.SetNormals(n); mesh.SetUVs(0, uv); mesh.SetTriangles(tri, 0);
-        return SaveMesh(name, mesh);
     }
 
     private static Mesh Disc(string name, float r, float y, int sides)

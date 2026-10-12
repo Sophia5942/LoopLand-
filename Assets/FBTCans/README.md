@@ -1,54 +1,62 @@
-# FBT Mayfair – Can Fridge + Bin (Mayfair Energy)
+# FBT Mayfair – Drinks Fridge + Bin
 
-Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a can appears in front on the shelf, you grab it, open it, and bin it.
+Uses **your own fridge model**. Six drink rows: click a row and that drink appears in front of it. Grab it, open it, and bin it.
 
 ## Setup
-1. Drag the **FBTCans** folder into your project's **Assets** folder.
+1. Delete any older **FBTCans** folder, then drag this **FBTCans** folder into your project's **Assets** folder.
    - It needs your **TransformSync.cs** in the project. It's already there if your bar works.
-   - Already have an older FBTCans? Delete it first, then drag in this one.
 2. Wait for Unity to finish compiling.
 3. In the Hierarchy, **click your fridge** to select it.
-4. Click **FBT Mayfair > Build Can Fridge + Bin** in the top menu. If you built an older version, choose **Replace**.
-5. Select **Get A New Can** (inside "FBT Can Fridge + Bin") and move it onto a shelf inside your fridge:
-   - Its **blue arrow** must point **out of the fridge**, towards the glass.
-   - The **see-through box** is the click area.
-   - The **see-through can** shows where new cans appear, in front of the box.
-   - Both helpers are only visible in the editor. They aren't uploaded.
-   - Got two fridge doors? Duplicate the "Get A New Can" object (Ctrl+D) and put one behind each door. Both use the same cans.
-6. Move **Trash Bin** where you want it.
-7. Save the scene (Ctrl+S).
+4. Click **FBT Mayfair > Build Can Fridge + Bin**. If an older one exists, choose **Replace**.
+5. Inside "FBT Can Fridge + Bin" there are **6 drink rows**, laid out 3 x 2 to start with:
+   - Get Mayfair Energy
+   - Get Velvet Rouge
+   - Get Emerald Gin & Tonic
+   - Get Blanc Spritz
+   - Get After Hours Espresso Martini
+   - Get Passion Martini
+6. **Move each row onto a shelf in your fridge**, with its **blue arrow pointing out of the fridge**, towards the glass.
+   - Each row is a click box with 4 display cans of that drink.
+   - The **see-through can** shows where the new drink appears, in front of the row.
+   - The helpers are editor-only and aren't uploaded.
+7. Move **Trash Bin** where you want it, then save the scene (Ctrl+S).
 
-## The can
-- The cans are **your can model** (`Models/MayfairEnergyCan.fbx`) with the **Mayfair Energy** label (`Textures/MayfairEnergy_Can.png`):
-  - Styled to match the club: deep espresso-black with a burgundy velvet glow, a brushed-gold serif **M**, and **MAYFAIR** spaced out like the FBT MAYFAIR sign.
-  - Flowing gold light lines run round the can, like the ceiling strips.
-  - The back has a small M and some text.
-- On the lid there's a champagne-gold ring-pull and rivet. The drinking hole is at the front, above the logo, and appears when you open it.
-- The front of the label faces out of the fridge when a can appears.
+## The drinks
+All six use **your can model** with a label painted to match the club: dark, warm gold, burgundy and green.
+
+| Drink | Look |
+|---|---|
+| **Mayfair Energy** | Espresso-black, brushed-gold serif M, gold light lines |
+| **Velvet Rouge**, Rum & Black Cherry | Burgundy velvet, gold cherries |
+| **Emerald**, Gin & Tonic | Deep green, gold botanical sprigs |
+| **Blanc**, Elderflower Spritz | Champagne cream, rising gold bubbles |
+| **After Hours**, Espresso Martini | Espresso with a crema glow, gold coffee beans |
+| **Passion**, Passionfruit Martini | Amber-to-burgundy sunset, gold light waves |
+
+- The labels are in `Textures/`, one PNG per drink.
+- On the lid there's a champagne-gold ring-pull and rivet. The drinking hole is at the front and appears when you open it.
 
 ## In game
-- **Click inside the fridge** ("Get A New Can"). A can appears on the shelf. Each player can get one every 10 seconds.
-  - It stays put until someone grabs it, so it can't fall through the fridge.
-- **Grab it** and press **Use** (trigger / left click) to open it. Everyone sees the opening animation and hears the recorded can sound:
-  1. The ring-pull lifts and the can gives a little jolt.
-  2. The hole opens in the lid.
-  3. The tab settles back down.
-- Press **Use** again to **swish** it: the can swirls round in your hand (no sound). Everyone sees it.
-- **Drop it on the floor** and it lands with a drink-can clunk.
-- **Throw it in the bin** to clean it up. It lands with a muffled thunk.
+- **Click a row** in the fridge ("Get Velvet Rouge" and so on). That drink appears in front of the row.
+  - It stays put until someone grabs it.
+  - Each player can get one drink every 10 seconds per row.
+- **Grab it** and press **Use** to open it. Everyone sees the ring-pull animation and hears the can-opening sound.
+- Press **Use** again to **swish** it round in your hand. This has no sound.
+- **Drop it on the floor** and you hear the can landing.
+- **Throw it in the bin** to clean it up.
 - A can left lying around cleans itself up after 5 minutes.
 
 ## Settings
-- **Get A New Can** (CanFridge):
+- **Each drink row** (CanFridge on \"Get ...\"):
   - **Cooldown Seconds**: 10 per player.
   - To make the click box bigger or smaller, change the Box Collider's Size. The see-through box is only a guide.
 - **Cans** (FBTCan on each can):
   - **Cleanup After Seconds**: the auto clean-up time. 0 turns it off.
   - **Drop Sound Speed**: how hard a can has to hit something to make the floor sound.
-- There are **8 cans** in the pool. When all 8 are out, the oldest one nobody is holding is reused.
+- Each drink has **4 cans** in its pool. When all 4 are out, the oldest one nobody is holding is reused.
 
 ## Anti-abuse (hacked / modded clients)
-- **There can never be more than 8 cans.** Spamming can't create new objects. Worst case, it moves the same 8 cans around.
+- **There can never be more than 24 cans (4 per drink).** Spamming can't create new objects. Worst case, it moves the same cans around.
 - **The cooldown is checked by other players too.** Every player sees who spawned a can and when. To take a free can, a player has to get it from its current owner, and that owner's game refuses if the player spawned one in the last ~7 seconds. So a hacked client that skips its own cooldown still gets refused.
 - **Nobody can snatch a can out of your hand.** The owner refuses, and the pickup has Disallow Theft on.
 - **Spamming the floor sound does nothing.** Each player's game plays it at most 4 times a second per can.
