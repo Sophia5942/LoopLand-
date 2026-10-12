@@ -32,22 +32,33 @@ public static class CanSystemBuilder
     private const int PoolPerDrink = 4;     // cans of each drink that can be out at once (the oldest is reused after that)
     private const int DisplayPerRow = 4;    // display cans standing in each row
 
-    private struct Drink
+    public struct Drink
     {
-        public string Key, Name, Texture;
-        public Drink(string key, string name, string texture) { Key = key; Name = name; Texture = texture; }
+        public string Key, Name, Texture, Style;
+        public Drink(string key, string name, string texture, string style) { Key = key; Name = name; Texture = texture; Style = style; }
     }
 
-    // six drinks, all FBT Mayfair house brands
-    private static readonly Drink[] Drinks =
+    // every drink there is, all FBT Mayfair house brands; the picker window chooses which ones get a row
+    public static readonly Drink[] Drinks =
     {
-        new Drink("MayfairEnergy", "Mayfair Energy", "MayfairEnergy_Can"),
-        new Drink("VelvetRouge", "Velvet Rouge", "VelvetRouge_Can"),
-        new Drink("Emerald", "Emerald Gin & Tonic", "Emerald_Can"),
-        new Drink("Blanc", "Blanc Spritz", "Blanc_Can"),
-        new Drink("AfterHours", "After Hours Espresso Martini", "AfterHours_Can"),
-        new Drink("Passion", "Passion Martini", "Passion_Can"),
+        new Drink("MayfairEnergy", "Mayfair Energy", "MayfairEnergy_Can", "espresso black, gold M"),
+        new Drink("VelvetRouge", "Velvet Rouge", "VelvetRouge_Can", "burgundy velvet, gold cherries"),
+        new Drink("Emerald", "Emerald Gin & Tonic", "Emerald_Can", "deep green, gold botanicals"),
+        new Drink("Blanc", "Blanc Spritz", "Blanc_Can", "champagne cream, gold bubbles"),
+        new Drink("AfterHours", "After Hours Espresso Martini", "AfterHours_Can", "espresso & crema, coffee beans"),
+        new Drink("Passion", "Passion Martini", "Passion_Can", "amber sunset, light waves"),
+        new Drink("NeonNights", "Neon Nights", "NeonNights_Can", "synthwave neon, retro sun & grid"),
+        new Drink("Prism", "Prism Seltzer", "Prism_Can", "holographic rainbow foil"),
+        new Drink("Marbre", "Marbre Bellini", "Marbre_Can", "white marble, gold veins"),
+        new Drink("Deco", "Deco Gin Fizz", "Deco_Can", "teal & gold art deco fans"),
+        new Drink("PalmClub", "Palm Club Punch", "PalmClub_Can", "pastel pink, tropical leaves"),
+        new Drink("Groove", "Groove Spritz", "Groove_Can", "70s wavy stripes"),
+        new Drink("Cosmos", "Cosmos Energy", "Cosmos_Can", "deep space, ringed planet"),
+        new Drink("BlackLabel", "Black Label Whisky & Cola", "BlackLabel_Can", "oxblood croc leather, gold badge"),
+        new Drink("Pow", "Pow! Cherry Cola Sour", "Pow_Can", "pop-art comic, halftone"),
+        new Drink("Pure", "Pure Water", "Pure_Can", "minimal matte white"),
     };
+    private static Drink[] chosen = new Drink[0];
 
     private static Mesh mouthMesh;
     private static Material mouthMat;
@@ -62,8 +73,13 @@ public static class CanSystemBuilder
     private static TMP_FontAsset font;
 
     [MenuItem("FBT Mayfair/Build Can Fridge + Bin", priority = 30)]
-    public static void Build()
+    public static void Build() { FBTDrinkPicker.Open(); }
+
+    /// <summary>Builds a row for each of the given drinks (called by the picker window).</summary>
+    public static void BuildWith(Drink[] drinks)
     {
+        if (drinks == null || drinks.Length == 0) { EditorUtility.DisplayDialog("FBT Mayfair", "Pick at least one drink.", "OK"); return; }
+        chosen = drinks;
         if (EditorApplication.isCompiling || EditorApplication.isUpdating)
         {
             EditorUtility.DisplayDialog("FBT Mayfair", "Unity is still compiling or importing. Wait until it finishes, then try again.", "OK");
@@ -112,7 +128,7 @@ public static class CanSystemBuilder
             if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
             EditorUtility.ClearProgressBar();
             EditorUtility.DisplayDialog("FBT Mayfair", "Done! '" + RootName + "' is in your scene.\n\n" +
-                "1. There are 6 drink rows ('Get Mayfair Energy', 'Get Velvet Rouge', ...). Move each one onto a shelf inside your fridge,\n" +
+                "1. There is a row for each drink you picked ('Get Mayfair Energy', ...). Move each one onto a shelf inside your fridge,\n" +
                 "   with its blue arrow pointing out of the fridge (towards the glass).\n" +
                 "   The see-through box is the click area and the see-through can shows where the new drink appears. Both are invisible in game.\n" +
                 "2. Move 'Trash Bin' where you want it.\n" +
@@ -152,9 +168,9 @@ public static class CanSystemBuilder
         var cansParent = new GameObject("Cans (pool)").transform;
         cansParent.SetParent(rt, false);
 
-        for (int d = 0; d < Drinks.Length; d++)
+        for (int d = 0; d < chosen.Length; d++)
         {
-            Drink drink = Drinks[d];
+            Drink drink = chosen[d];
             Material mat = LitMat("Can_" + drink.Key, Color.white, 0.55f, 0.75f, Color.black, FindTexture(drink.Texture));
 
             // --- "Get <drink>": a click box over a row of display cans; the new can appears in front of the row.

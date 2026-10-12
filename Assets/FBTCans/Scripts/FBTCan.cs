@@ -1,16 +1,15 @@
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
-using VRC.Udon.Common.Interfaces;
 
 /// <summary>
 /// A drink can. The fridge puts it on the shelf (it stays put there until someone grabs it), Use opens it (animated: the ring-pull lifts, the can jolts,
 /// the hole punches open, the tab settles back down, "pssht"), Use again swishes it round in your hand,
-/// dropping it on the floor clunks, and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
+/// dropping it on the floor clunks (all sounds are local: only the player who did it hears them), and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
 /// fridge needs it again.
 /// Anti-abuse (hacked clients): ownership of a can is only handed over when the current owner agrees. They refuse if
 /// the can is in their hand, or if the asking player spawned a can too recently (everyone tracks spawns via SpawnCount).
-/// The clunk is the only network event and it ignores spam; a swish only plays when the last one has finished. Everything internal starts with _ so it can't be called
+/// There are no network events at all; a swish only plays when the last one has finished. Everything internal starts with _ so it can't be called
 /// over the network.
 /// Sync: Manual, three bools (in use / opened / held) and two counters (spawn, swish), sent only when they change. Movement is synced by TransformSync
 /// (your script) on the same object, also Manual.
@@ -57,7 +56,6 @@ public class FBTCan : UdonSharpBehaviour {
 	private float NextClank;
 	private bool Parked;
 	private int AppliedSpawnCount;
-	private float LastClankHeard;
 	private int AppliedSwishCount;
 	private bool GotFirstSync;
 	private bool Swishing;
@@ -128,19 +126,12 @@ public class FBTCan : UdonSharpBehaviour {
 		RequestSerialization();
 		StartSwish();
 	}
-	// Hitting the floor (only the owner simulates the can, so only the owner hears the hit and tells everyone)
+	// Hitting the floor (only the owner simulates the can, and only the owner hears it)
 	private void OnCollisionEnter(Collision collision) {
 		if(!Active || IsHeld() || DropClip == null || Time.time < NextClank) return;
 		if(collision.relativeVelocity.magnitude < DropSoundSpeed || !Networking.IsOwner(gameObject)) return;
 		NextClank = Time.time + 0.3f;
-		SendCustomNetworkEvent(NetworkEventTarget.All, nameof(Clank));
-	}
-	public void Clank() {
-		// anyone can send this event, so ignore spam
-		if(!Active || Sound == null || DropClip == null || Time.time - LastClankHeard < 0.25f) return;
-		LastClankHeard = Time.time;
-		Sound.pitch = Random.Range(0.92f, 1.08f);
-		Sound.PlayOneShot(DropClip);
+		PlayLocal(DropClip, Random.Range(0.92f, 1.08f));
 	}
 	// Networking
 	public override void OnDeserialization() {
@@ -195,8 +186,14 @@ public class FBTCan : UdonSharpBehaviour {
 		if(Swishing || Visual == null) return;
 		Swishing = true;
 		SwishT = 0f;
-		if(Sound != null && SwishClip != null) { Sound.pitch = 1f; Sound.PlayOneShot(SwishClip); }
+		PlayLocal(SwishClip, 1f);
 		SendCustomEventDelayedFrames(nameof(_SwishStep), 1);
+	}
+	/// <summary>Sounds are local: only the player who did it (the can's owner) hears them.</summary>
+	private void PlayLocal(AudioClip clip, float pitch) {
+		if(Sound == null || clip == null || !Networking.IsOwner(gameObject)) return;
+		Sound.pitch = pitch;
+		Sound.PlayOneShot(clip);
 	}
 	private void StopSwish() {
 		Swishing = false;
@@ -214,10 +211,7 @@ public class FBTCan : UdonSharpBehaviour {
 		if(!Ready) return;
 		if(Active != AppliedActive) {
 			AppliedActive = Active;
-			if(effects && Sound != null) {
-				AudioClip clip = Active ? SpawnClip : TrashClip;
-				if(clip != null) { Sound.pitch = 1f; Sound.PlayOneShot(clip); }
-			}
+			if(effects) PlayLocal(Active ? SpawnClip : TrashClip, 1f);
 		}
 		if(Visual != null && Visual.activeSelf != Active) Visual.SetActive(Active);
 		if(CanCollider != null) CanCollider.enabled = Active;
@@ -225,7 +219,7 @@ public class FBTCan : UdonSharpBehaviour {
 		if(Opened != AppliedOpened) {
 			AppliedOpened = Opened;
 			if(Opened && effects) {
-				if(Sound != null && OpenClip != null) { Sound.pitch = 1f; Sound.PlayOneShot(OpenClip); }
+				PlayLocal(OpenClip, 1f);
 				TabT = 0f;
 				SendCustomEventDelayedFrames(nameof(_TabStep), 1);
 			}
