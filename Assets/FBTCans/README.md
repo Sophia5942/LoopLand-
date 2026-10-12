@@ -1,4 +1,4 @@
-# FBT Mayfair – Can Fridge + Bin
+# FBT Mayfair – Can Fridge + Bin (Mayfair Energy)
 
 Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a can appears in front on the shelf, you grab it, open it, and bin it.
 
@@ -17,6 +17,13 @@ Uses **your own fridge model**. You click inside the fridge ("Get A New Can"), a
    - Got two fridge doors? Duplicate the "Get A New Can" object (Ctrl+D) and put one behind each door. Both use the same cans.
 6. Move **Trash Bin** where you want it.
 7. Save the scene (Ctrl+S).
+
+## The can
+- The cans are **your can model** (`Models/MayfairEnergyCan.fbx`) with the **Mayfair Energy** label (`Textures/MayfairEnergy_Can.png`):
+  - Black can with a torn neon-green **M** and **MAYFAIR ENERGY** on the front.
+  - The back has a small M and some text.
+- On the lid there's a ring-pull and rivet, and the opening appears when you open it.
+- The front of the label faces out of the fridge when a can appears.
 
 ## In game
 - **Click inside the fridge** ("Get A New Can"). A can appears on the shelf. Each player can get one every 10 seconds.

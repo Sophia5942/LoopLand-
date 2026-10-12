@@ -13,7 +13,8 @@ using Object = UnityEngine.Object;
 
 /// <summary>
 /// FBT Mayfair > Build Can Fridge + Bin.
-/// A mini fridge ("Get a new can"), a pool of cans (Use opens them with an animation) and your trash can as the bin.
+/// A "Get A New Can" click box for your fridge, a pool of Mayfair Energy cans (your can model; Use opens them with an
+/// animated ring-pull) and your trash can as the bin.
 /// It's built where your Scene view is looking; move the "FBT Can Fridge + Bin" object wherever you like.
 /// </summary>
 public static class CanSystemBuilder
@@ -22,6 +23,8 @@ public static class CanSystemBuilder
     private const string Gen = Root + "/Generated";
     private const string RootName = "FBT Can Fridge + Bin";
     private const string BinModelName = "Trashcanfbx_2";
+    private const string CanModelName = "MayfairEnergyCan";
+    private const string CanTextureName = "MayfairEnergy_Can";
     private const int PoolSize = 8;
 
     // can size (a standard 330 ml can)
@@ -42,6 +45,11 @@ public static class CanSystemBuilder
 
     private static Mesh mouthMesh;
     private static Material mouthMat;
+    // your can model (Mayfair Energy); null = fall back to the simple built-in can
+    private static GameObject canModel;
+    private static Material canMat, tabMat;
+    private static Mesh pullMesh, rivetMesh;
+    private static float modelTop, modelRadius;
 
     private static readonly List<UdonSharpBehaviour> made = new List<UdonSharpBehaviour>();
 
@@ -117,7 +125,22 @@ public static class CanSystemBuilder
         Mesh top = Disc("Can_Lid", NeckR, CanH - 0.0015f, 20);
         mouthMesh = Disc("Can_Mouth", 0.009f, CanH - 0.0011f, 14);
         mouthMat = LitMat("Can_Mouth", Hex("101010"), 0f, 0.9f, Color.black);
-        Mesh hull = Hull("Can_Collider", CanR, CanH, 12);
+        Mesh hull = null;
+        canModel = FindModel(CanModelName);
+        if (canModel != null)
+        {
+            Texture2D canTex = FindTexture(CanTextureName);
+            canMat = LitMat("Can_MayfairEnergy", Color.white, 0.55f, 0.75f, Color.black, canTex);
+            tabMat = LitMat("Can_PullTab", Hex("C9CED6"), 1f, 0.8f, Color.black);
+            pullMesh = PullTab("Can_PullTab");
+            rivetMesh = Disc("Can_Rivet", 0.0022f, 0.0009f, 10);
+            mouthMesh = Stadium("Can_Opening", -0.0195f, -0.0035f, 0.0075f, 0f);
+        }
+        else
+        {
+            Debug.LogWarning("[FBT Mayfair] Can model '" + CanModelName + "' not found, using the simple built-in can.");
+            hull = Hull("Can_Collider", CanR, CanH, 12);
+        }
 
         AudioClip open = Clip("Can_Open"), trash = Clip("Can_Trash"), drop = Clip("Can_Drop");
 
@@ -141,7 +164,9 @@ public static class CanSystemBuilder
         // see-through helpers so you can see where things are; tagged EditorOnly, so they are not in the uploaded world
         var gb = Box(sp, "Click Area (editor only)", box.center, box.size, ghost);
         gb.tag = "EditorOnly";
-        var gc = CanVisual(spawnPoint, "New Can Appears Here (editor only)", Vector3.zero, body, neck, bottom, top, ghost, ghost, ghost, false);
+        var gc = canModel != null
+            ? ModelVisual(spawnPoint, "New Can Appears Here (editor only)", ghost, false)
+            : CanVisual(spawnPoint, "New Can Appears Here (editor only)", Vector3.zero, body, neck, bottom, top, ghost, ghost, ghost, false);
         foreach (Transform t in gc.GetComponentsInChildren<Transform>()) t.gameObject.tag = "EditorOnly";
 
         // --- cans (pool)
@@ -150,7 +175,7 @@ public static class CanSystemBuilder
         var cans = new FBTCan[PoolSize];
         for (int i = 0; i < PoolSize; i++)
         {
-            var go = new GameObject("Can " + (i + 1) + " (" + Designs[i % Designs.Length].Name + ")");
+            var go = new GameObject(canModel != null ? "Can " + (i + 1) + " (Mayfair Energy)" : "Can " + (i + 1) + " (" + Designs[i % Designs.Length].Name + ")");
             go.transform.SetParent(cansParent, false);
             go.transform.position = hide.position;
             var rb = go.AddComponent<Rigidbody>();
@@ -158,6 +183,10 @@ public static class CanSystemBuilder
             rb.isKinematic = true;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            GameObject vis = canModel != null
+                ? ModelVisual(go.transform, "Visual", canMat, true)
+                : CanVisual(go.transform, "Visual", Vector3.zero, body, neck, bottom, top, labels[i % labels.Length], alu, aluDark, true);
+            if (hull == null) hull = Hull("Can_Collider", modelRadius, modelTop, 14);
             var col = go.AddComponent<MeshCollider>();
             col.sharedMesh = hull;
             col.convex = true;
@@ -168,7 +197,6 @@ public static class CanSystemBuilder
             pickup.proximity = 0.5f;
             pickup.orientation = VRC_Pickup.PickupOrientation.Any;
             pickup.DisallowTheft = true; // nobody can snatch a can out of your hand
-            GameObject vis = CanVisual(go.transform, "Visual", Vector3.zero, body, neck, bottom, top, labels[i % labels.Length], alu, aluDark, true);
             var sound = AudioOn(go, 0.9f, 6f);
             made.Add(Add<TransformSync>(go));
             var can = Add<FBTCan>(go);
@@ -235,6 +263,73 @@ public static class CanSystemBuilder
             mouth.gameObject.SetActive(false);
         }
         return v;
+    }
+
+    /// <summary>Your can model, standing with its bottom at y = 0, plus the ring-pull, rivet and opening on its lid.</summary>
+    private static GameObject ModelVisual(Transform parent, string name, Material mat, bool withTab)
+    {
+        // build at the world origin first so measuring is simple, then move it under its parent
+        var v = new GameObject(name);
+        var m = (GameObject)Object.Instantiate(canModel);
+        m.name = "Can Model";
+        m.transform.SetParent(v.transform, false);
+        foreach (Collider c in m.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+        foreach (Renderer r in m.GetComponentsInChildren<Renderer>(true))
+        {
+            var mats = new Material[Mathf.Max(1, r.sharedMaterials.Length)];
+            for (int k = 0; k < mats.Length; k++) mats[k] = mat;
+            r.sharedMaterials = mats;
+            r.shadowCastingMode = ShadowCastingMode.Off;
+        }
+        Bounds b = BoundsOf(m);
+        // if the import units are off, bring it back to a real 500 ml can size
+        if (b.size.y < 0.08f || b.size.y > 0.4f)
+        {
+            m.transform.localScale *= 0.167f / Mathf.Max(0.0001f, b.size.y);
+            b = BoundsOf(m);
+        }
+        m.transform.localPosition += new Vector3(-b.center.x, -b.min.y, -b.center.z);
+        modelTop = b.size.y;
+        modelRadius = Mathf.Max(b.extents.x, b.extents.z);
+        if (withTab)
+        {
+            // ring-pull: rotates up around its rivet when opened (ring end towards +Z, the label's front)
+            var pivot = new GameObject("Tab Pivot").transform;
+            pivot.SetParent(v.transform, false);
+            pivot.localPosition = new Vector3(0f, modelTop + 0.0004f, -0.001f);
+            Part(pivot, "Tab", pullMesh, tabMat);
+            Part(pivot, "Rivet", rivetMesh, tabMat);
+            // the opening, behind the rivet; hidden until the can is opened
+            Part(v.transform, "Mouth", mouthMesh, mouthMat);
+            Transform mouth = v.transform.Find("Mouth");
+            mouth.localPosition = new Vector3(0f, modelTop + 0.00015f, 0f);
+            mouth.gameObject.SetActive(false);
+        }
+        v.transform.SetParent(parent, false);
+        v.transform.localPosition = Vector3.zero;
+        v.transform.localRotation = Quaternion.identity;
+        return v;
+    }
+
+    private static GameObject FindModel(string name)
+    {
+        foreach (string g in AssetDatabase.FindAssets(name + " t:Model"))
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(g));
+            if (go != null && go.name == name) return go;
+        }
+        return null;
+    }
+
+    private static Texture2D FindTexture(string name)
+    {
+        foreach (string g in AssetDatabase.FindAssets(name + " t:Texture2D"))
+        {
+            var t = AssetDatabase.LoadAssetAtPath<Texture2D>(AssetDatabase.GUIDToAssetPath(g));
+            if (t != null && t.name == name) return t;
+        }
+        Debug.LogWarning("[FBT Mayfair] Texture '" + name + "' not found. Make sure the FBTCans/Textures folder was imported.");
+        return null;
     }
 
     private static void Bin(Transform rt, Vector3 near)
@@ -581,6 +676,106 @@ public static class CanSystemBuilder
         for (int i = 0; i < sides; i++) tri.AddRange(new[] { 0, i + 2, i + 1 });
         var mesh = new Mesh();
         mesh.SetVertices(v); mesh.SetNormals(n); mesh.SetUVs(0, uv); mesh.SetTriangles(tri, 0);
+        return SaveMesh(name, mesh);
+    }
+
+    // --- ring-pull and opening shapes (flat, in the XZ plane; ring end towards +Z)
+
+    private static float SegDist(Vector2 p, float z0, float z1)
+    {
+        float z = Mathf.Clamp(p.y, z0, z1);
+        return new Vector2(p.x, p.y - z).magnitude;
+    }
+
+    /// <summary>Where a ray from c (inside) leaves a stadium (segment on the Z axis from z0 to z1, radius r).</summary>
+    private static Vector2 StadiumHit(Vector2 c, Vector2 dir, float z0, float z1, float r)
+    {
+        float lo = 0f, hi = 0.06f;
+        for (int k = 0; k < 40; k++)
+        {
+            float mid = (lo + hi) * 0.5f;
+            if (SegDist(c + dir * mid, z0, z1) < r) lo = mid; else hi = mid;
+        }
+        return c + dir * lo;
+    }
+
+    /// <summary>Adds a triangle, flipped if needed so its front faces 'want'.</summary>
+    private static void Tri(List<int> t, List<Vector3> v, int a, int b, int c, Vector3 want)
+    {
+        if (Vector3.Dot(Vector3.Cross(v[b] - v[a], v[c] - v[a]), want) < 0f) { int x = b; b = c; c = x; }
+        t.Add(a); t.Add(b); t.Add(c);
+    }
+
+    /// <summary>Flat stadium plate (the opening): from zMin to zMax, half width r, at height y.</summary>
+    private static Mesh Stadium(string name, float zMin, float zMax, float r, float y)
+    {
+        var v = new List<Vector3>(); var t = new List<int>();
+        float z0 = zMin + r, z1 = zMax - r;
+        var c = new Vector2(0f, (zMin + zMax) * 0.5f);
+        const int n = 28;
+        v.Add(new Vector3(c.x, y, c.y));
+        for (int i = 0; i < n; i++)
+        {
+            float a = i / (float)n * Mathf.PI * 2f;
+            Vector2 p = StadiumHit(c, new Vector2(Mathf.Cos(a), Mathf.Sin(a)), z0, z1, r);
+            v.Add(new Vector3(p.x, y, p.y));
+        }
+        for (int i = 0; i < n; i++) Tri(t, v, 0, 1 + i, 1 + (i + 1) % n, Vector3.up);
+        var mesh = new Mesh();
+        mesh.SetVertices(v); mesh.SetTriangles(t, 0);
+        mesh.RecalculateNormals();
+        return SaveMesh(name, mesh);
+    }
+
+    /// <summary>The ring-pull: a rounded plate with a finger hole, 0.8 mm thick. The rivet is at the origin.</summary>
+    private static Mesh PullTab(string name)
+    {
+        const float h = 0.0004f;                       // half thickness
+        const float oz0 = -0.0002f, oz1 = 0.0142f, or = 0.0068f;   // outline: z -0.007 .. 0.021
+        const float iz0 = 0.0122f, iz1 = 0.0128f, ir = 0.0047f;    // finger hole
+        var c = new Vector2(0f, 0.0125f);
+        const int n = 36;
+        var outer = new Vector2[n]; var inner = new Vector2[n];
+        for (int i = 0; i < n; i++)
+        {
+            float a = i / (float)n * Mathf.PI * 2f;
+            var d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+            outer[i] = StadiumHit(c, d, oz0, oz1, or);
+            inner[i] = StadiumHit(c, d, iz0, iz1, ir);
+        }
+        var v = new List<Vector3>(); var t = new List<int>();
+        // top and bottom faces (ring between outline and hole)
+        foreach (float side in new[] { 1f, -1f })
+        {
+            int b0 = v.Count;
+            for (int i = 0; i < n; i++) { v.Add(new Vector3(outer[i].x, h * side, outer[i].y)); v.Add(new Vector3(inner[i].x, h * side, inner[i].y)); }
+            for (int i = 0; i < n; i++)
+            {
+                int j = (i + 1) % n;
+                int o0 = b0 + i * 2, i0 = o0 + 1, o1 = b0 + j * 2, i1 = o1 + 1;
+                Tri(t, v, o0, o1, i1, Vector3.up * side);
+                Tri(t, v, o0, i1, i0, Vector3.up * side);
+            }
+        }
+        // outer edge and hole edge
+        foreach (bool isOuter in new[] { true, false })
+        {
+            Vector2[] loop = isOuter ? outer : inner;
+            for (int i = 0; i < n; i++)
+            {
+                int j = (i + 1) % n;
+                int b0 = v.Count;
+                v.Add(new Vector3(loop[i].x, h, loop[i].y)); v.Add(new Vector3(loop[j].x, h, loop[j].y));
+                v.Add(new Vector3(loop[j].x, -h, loop[j].y)); v.Add(new Vector3(loop[i].x, -h, loop[i].y));
+                Vector2 mid = (loop[i] + loop[j]) * 0.5f - c;
+                Vector3 want = new Vector3(mid.x, 0f, mid.y) * (isOuter ? 1f : -1f);
+                Tri(t, v, b0, b0 + 1, b0 + 2, want);
+                Tri(t, v, b0, b0 + 2, b0 + 3, want);
+            }
+        }
+        var mesh = new Mesh();
+        mesh.SetVertices(v); mesh.SetTriangles(t, 0);
+        mesh.RecalculateNormals();
         return SaveMesh(name, mesh);
     }
 
