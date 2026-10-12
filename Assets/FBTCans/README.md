@@ -47,7 +47,7 @@ All six use **your can model** with a label painted to match the club: dark, war
 - A can left lying around cleans itself up after 5 minutes.
 
 ## Settings
-- **Each drink row** (CanFridge on \"Get ...\"):
+- **Each drink row** (CanFridge on "Get ..."):
   - **Cooldown Seconds**: 10 per player.
   - To make the click box bigger or smaller, change the Box Collider's Size. The see-through box is only a guide.
 - **Cans** (FBTCan on each can):
