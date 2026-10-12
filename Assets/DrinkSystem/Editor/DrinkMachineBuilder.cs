@@ -135,6 +135,12 @@ namespace DrinkSystem.EditorTools
                 Undo.DestroyObjectImmediate(old);
             }
 
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                EditorUtility.DisplayDialog("Drink System", "Unity is still compiling or importing (spinner bottom-right).\n\nWait until it finishes, then click Build again.", "OK");
+                return;
+            }
+
             made.Clear();
             logoMeshes.Clear();
             Debug.Log("[DrinkSystem] Building the drink station...");
@@ -151,7 +157,7 @@ namespace DrinkSystem.EditorTools
                     root.transform.position = new Vector3(p.x, 1.0f, p.z);
                 }
                 EditorUtility.DisplayProgressBar("Drink System", "Wiring Udon behaviours...", 0.9f);
-                foreach (UdonSharpBehaviour b in made) UdonSharpEditorUtility.CopyProxyToUdon(b);
+                Wire();
                 Undo.RegisterCreatedObjectUndo(root, "Build Drink Machine");
                 EditorSceneManager.MarkSceneDirty(root.scene);
                 AssetDatabase.SaveAssets();
@@ -201,6 +207,23 @@ namespace DrinkSystem.EditorTools
 
         // ------------------------------------------------------------------ programs
 
+        /// <summary>Copies every behaviour's settings into its Udon program. If UdonSharp says a program is out of date
+        /// (scripts were just imported or changed), it compiles everything and tries once more.</summary>
+        private static void Wire()
+        {
+            try
+            {
+                foreach (UdonSharpBehaviour b in made) UdonSharpEditorUtility.CopyProxyToUdon(b);
+            }
+            catch (Exception e)
+            {
+                if (e.Message.IndexOf("outdated", StringComparison.OrdinalIgnoreCase) < 0 && e.Message.IndexOf("compile", StringComparison.OrdinalIgnoreCase) < 0) throw;
+                Debug.Log("[DrinkSystem] UdonSharp programs were out of date, compiling them and trying again...");
+                UdonSharpProgramAsset.CompileAllCsPrograms(true);
+                foreach (UdonSharpBehaviour b in made) UdonSharpEditorUtility.CopyProxyToUdon(b);
+            }
+        }
+
         private static void EnsurePrograms()
         {
             Type[] types = { typeof(DrinkMachine), typeof(DrinkSlot), typeof(DrinkCup), typeof(DrinkFlavor), typeof(DrinkButton) };
@@ -227,8 +250,8 @@ namespace DrinkSystem.EditorTools
                 AssetDatabase.CreateAsset(asset, Gen + "/Programs/" + t.Name + ".asset");
                 created = true;
             }
-            if (!created) return;
-            AssetDatabase.SaveAssets();
+            if (created) AssetDatabase.SaveAssets();
+            // always compile first, so freshly imported scripts are never "outdated" when we wire them up
             UdonSharpProgramAsset.CompileAllCsPrograms(true);
         }
 

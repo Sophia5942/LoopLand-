@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.1.7
+- Fix "outdated script version, wait until program assets have compiled": UdonSharp programs are always compiled before building, wiring retries once after a compile, and Build waits if Unity is still compiling.
+
 ## 2.1.6
 - Fix NullReferenceException in Profile: glass meshes are looked up again by name after the model is re-imported (Read/Write), and a glass that cannot be loaded is skipped instead of stopping the build.
 
