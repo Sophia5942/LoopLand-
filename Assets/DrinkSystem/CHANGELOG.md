@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.4
+- Build errors now show as a pop-up, and a finished build moves the Scene view to the machine and says so.
+- The logo is found wherever the DrinkSystem folder is.
+
 ## 2.1.1
 - Now a regular `.unitypackage` that imports into `Assets/DrinkSystem`. There are no assembly definitions or UdonSharp
   assembly files, so it compiles together with your own UdonSharp scripts. Fresh file IDs, so nothing clashes with

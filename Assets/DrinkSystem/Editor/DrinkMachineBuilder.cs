@@ -137,6 +137,7 @@ namespace DrinkSystem.EditorTools
 
             made.Clear();
             logoMeshes.Clear();
+            Debug.Log("[DrinkSystem] Building the drink station...");
             try
             {
                 EditorUtility.DisplayProgressBar("Drink System", "Preparing UdonSharp programs...", 0.05f);
@@ -156,12 +157,34 @@ namespace DrinkSystem.EditorTools
                 AssetDatabase.SaveAssets();
                 PrefabUtility.SaveAsPrefabAssetAndConnect(root, Root + "/Drink Machine.prefab", InteractionMode.AutomatedAction);
                 Selection.activeGameObject = root;
+                if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
                 Debug.Log("[DrinkSystem] FBT Mayfair drink station built" + (onTarget ? " on top of '" + target.name + "'" : "") + ". Prefab: " + Root + "/Drink Machine.prefab");
+                EditorUtility.ClearProgressBar();
+                EditorUtility.DisplayDialog("FBT Mayfair Drink System",
+                    "Done! The drink station is in your scene as '" + RootName + "'" + (onTarget ? ", on top of '" + target.name + "'" : "") +
+                    " and the Scene view is now looking at it.\n\nPress Play to try it.", "OK");
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+                EditorUtility.ClearProgressBar();
+                EditorUtility.DisplayDialog("Drink System - build failed",
+                    "The drink station could not be built:\n\n" + e.Message +
+                    "\n\nPlease screenshot this message (and the red error in Window > General > Console) and send it.", "OK");
             }
             finally
             {
                 EditorUtility.ClearProgressBar();
             }
+        }
+
+        private static T Add<T>(GameObject go) where T : UdonSharpBehaviour
+        {
+            T c = UdonSharpUndo.AddComponent<T>(go);
+            if (c == null)
+                throw new Exception("UdonSharp could not add " + typeof(T).Name + ". Wait until Unity has finished compiling (no spinner bottom-right), " +
+                    "check the Console for UdonSharp errors, then click Build again.");
+            return c;
         }
 
         private static bool TryBounds(GameObject go, out Bounds b)
@@ -280,7 +303,7 @@ namespace DrinkSystem.EditorTools
             // --- root + machine brain
             var root = new GameObject(RootName);
             Transform rt = root.transform;
-            var mb = UdonSharpUndo.AddComponent<DrinkMachine>(root);
+            var mb = Add<DrinkMachine>(root);
             made.Add(mb);
             Sounds(mb);
             WireDrunkEffect(mb);
@@ -348,7 +371,7 @@ namespace DrinkSystem.EditorTools
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
-            var f = UdonSharpUndo.AddComponent<DrinkFlavor>(go);
+            var f = Add<DrinkFlavor>(go);
             f.DisplayName = name;
             f.FillSpeed = 0.2f;
             f.Transparency = transparency;
@@ -364,7 +387,16 @@ namespace DrinkSystem.EditorTools
 
         private static Sprite Logo()
         {
-            var imp = AssetImporter.GetAtPath(LogoPath) as TextureImporter;
+            string path = LogoPath;
+            if (AssetDatabase.LoadAssetAtPath<Texture2D>(path) == null)
+            {
+                foreach (string g in AssetDatabase.FindAssets("FBT_Mayfair_Logo t:Texture2D"))
+                {
+                    path = AssetDatabase.GUIDToAssetPath(g);
+                    break;
+                }
+            }
+            var imp = AssetImporter.GetAtPath(path) as TextureImporter;
             if (imp != null && imp.textureType != TextureImporterType.Sprite)
             {
                 imp.textureType = TextureImporterType.Sprite;
@@ -374,8 +406,8 @@ namespace DrinkSystem.EditorTools
                 imp.wrapMode = TextureWrapMode.Clamp;
                 imp.SaveAndReimport();
             }
-            Sprite s = AssetDatabase.LoadAssetAtPath<Sprite>(LogoPath);
-            if (s == null) throw new Exception("[DrinkSystem] Could not load the FBT Mayfair logo at " + LogoPath);
+            Sprite s = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (s == null) throw new Exception("Could not find the FBT Mayfair logo (FBT_Mayfair_Logo.png). Make sure the whole DrinkSystem folder was imported.");
             return s;
         }
 
@@ -542,7 +574,7 @@ namespace DrinkSystem.EditorTools
             // FBT Mayfair logo decal, wrapped on the widest part of the glass
             MeshRenderer logo = LogoDecal(go.transform, name, prof, height, logoMat);
 
-            var cup = UdonSharpUndo.AddComponent<DrinkCup>(go);
+            var cup = Add<DrinkCup>(go);
             cup.LiquidRenderer = liquidR;
             cup.BodyRenderer = bodyR;
             cup.LogoRenderer = logo;
@@ -776,7 +808,7 @@ namespace DrinkSystem.EditorTools
             AudioSource loop = Audio(nozzle.gameObject, 0.55f, 5f);
             AudioSource shot = Audio(nozzle.gameObject, 0.9f, 6f);
 
-            var slot = UdonSharpUndo.AddComponent<DrinkSlot>(go);
+            var slot = Add<DrinkSlot>(go);
             slot.FlavorIndex = i;
             slot.SnapPoint = snap;
             slot.Highlight = guide;
@@ -842,7 +874,7 @@ namespace DrinkSystem.EditorTools
             go.transform.localPosition = new Vector3((FinishX0 + FinishX1) * 0.5f, GrateTop, NozzleZ);
             var snap = new GameObject("SnapPoint").transform;
             snap.SetParent(go.transform, false);
-            var slot = UdonSharpUndo.AddComponent<DrinkSlot>(go);
+            var slot = Add<DrinkSlot>(go);
             slot.IsCustomizer = true;
             slot.SnapPoint = snap;
             slot.Highlight = Guide(go.transform, guideMat);
@@ -1099,7 +1131,7 @@ namespace DrinkSystem.EditorTools
             var btn = hit.AddComponent<UnityEngine.UI.Button>();
             btn.transition = Selectable.Transition.None;
             btn.navigation = new Navigation { mode = Navigation.Mode.None };
-            var db = UdonSharpUndo.AddComponent<DrinkButton>(hit);
+            var db = Add<DrinkButton>(hit);
             db.Target = target;
             db.EventName = evt;
             db.SendArg = sendArg;
