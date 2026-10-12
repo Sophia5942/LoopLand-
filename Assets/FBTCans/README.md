@@ -48,8 +48,8 @@ All six use **your can model** with a label painted to match the club: dark, war
 
 ## Admin panel (pops up only for you)
 **Open or close it from anywhere:**
-- **Desktop:** press **F7**.
-- **VR:** hold **both triggers** for 1.5 seconds with empty hands.
+- **Desktop:** hold **Tab**.
+- **VR:** **grab with both hands**, as if picking something up, and **pull them apart**. Your hands must be empty.
 
 It's a proper **UI menu**: a dark, gold-edged panel with burgundy buttons. It appears in front of you, facing you, and **only you can see it**. Click it with the VRChat laser in VR or the mouse on desktop. Close it with the same shortcut or its **X**.
 
@@ -62,8 +62,8 @@ It has two buttons:
 - In public or group instances there's no instance owner, so add names there.
 
 **Settings on Drinks Admin:**
-- **Toggle Key**: the desktop shortcut.
-- **VR Hold Seconds**: how long to hold both triggers.
+- **Toggle Key** and **Key Hold Seconds**: the desktop shortcut, and how long to hold it.
+- **VR Pull Distance**: how far apart to pull your hands, in metres.
 - **Panel Distance**: how far in front of you the panel appears.
 
 **Safe from hacked clients:**

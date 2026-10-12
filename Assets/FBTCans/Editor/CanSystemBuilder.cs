@@ -116,7 +116,7 @@ public static class CanSystemBuilder
                 "   with its blue arrow pointing out of the fridge (towards the glass).\n" +
                 "   The see-through box is the click area and the see-through can shows where the new drink appears. Both are invisible in game.\n" +
                 "2. Move 'Trash Bin' where you want it.\n" +
-                "3. Admin panel: in game press F7 (VR: hold both triggers with empty hands) and it pops up in front of you, only for you.\n" +
+                "3. Admin panel: in game hold Tab (VR: grab with both hands and pull them apart) and it pops up in front of you, only for you.\n" +
                 "   Instance owner is admin; add more on 'Drinks Admin' > Admin Names.\n4. Save the scene (Ctrl+S).", "OK");
         }
         catch (Exception e)
@@ -335,7 +335,7 @@ public static class CanSystemBuilder
         UiButton(crt, ub, "_ResetAll", "Reset Button", "RESET ALL", new Vector2(100f, -48f), new Vector2(170f, 62f), round, gold);
         UiButton(crt, ub, "_ClosePanel", "Close Button", "X", new Vector2(196f, 116f), new Vector2(40f, 40f), round, gold);
         UiText(crt, "Hint", "LOCK also clears every drink", new Vector2(0f, -98f), new Vector2(380f, 20f), Hex("A08C70"), 15f, FontStyles.Italic);
-        UiText(crt, "Footer", "F7   \u00B7   VR: HOLD BOTH TRIGGERS   \u00B7   ONLY YOU SEE THIS", new Vector2(0f, -128f), new Vector2(420f, 18f), Hex("7F6C54"), 13f, FontStyles.Normal);
+        UiText(crt, "Footer", "HOLD TAB   \u00B7   VR: GRAB WITH BOTH HANDS & PULL APART", new Vector2(0f, -128f), new Vector2(420f, 18f), Hex("7F6C54"), 13f, FontStyles.Normal);
 
         admin.Fridges = rows.ToArray();
         admin.InstanceOwnerIsAdmin = true;
@@ -343,8 +343,9 @@ public static class CanSystemBuilder
         admin.StatusText = status;
         admin.LockLabel = lockLabel;
         admin.PanelUI = cgo;
-        admin.ToggleKey = KeyCode.F7;
-        admin.VRHoldSeconds = 1.5f;
+        admin.ToggleKey = KeyCode.Tab;
+        admin.KeyHoldSeconds = 0.4f;
+        admin.VRPullDistance = 0.25f;
         admin.PanelDistance = 0.55f;
         made.Add(admin);
         foreach (CanFridge f in rows) f.Admin = admin;

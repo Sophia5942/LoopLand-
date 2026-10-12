@@ -6,8 +6,8 @@ using VRC.Udon.Common;
 
 /// <summary>
 /// Admin panel for the drinks: lock / unlock getting new drinks (locking also clears every can), and reset (clear away)
-/// every can. The panel pops up in front of an admin, only on their screen: press the Toggle Key on desktop, or in VR
-/// hold both triggers (with empty hands) for a moment. Same again (or the X) closes it. The panel is a world-space UI
+/// every can. The panel pops up in front of an admin, only on their screen: hold Tab on desktop, or in VR grab with both
+/// hands (as if picking something up) and pull them apart. Same again (or the X) closes it. The panel is a world-space UI
 /// canvas (point at it with the VRChat laser / mouse); its buttons call _ToggleLock, _ResetAll and _ClosePanel here.
 /// Admins = the instance owner (if ticked) and anyone whose display name is in Admin Names.
 /// Anti-abuse: only an admin can take ownership of the panel (the current owner refuses everyone else), and every
@@ -28,10 +28,12 @@ public class DrinksAdmin : UdonSharpBehaviour {
 	[Header("Pop-up")]
 	[Tooltip("The panel itself; only ever shown to the admin who opens it (it's local, nobody else sees it).")]
 	public GameObject PanelUI;
-	[Tooltip("Desktop shortcut that opens / closes the panel.")]
-	public KeyCode ToggleKey = KeyCode.F7;
-	[Tooltip("VR: hold both triggers (hands empty) this long to open / close the panel.")]
-	public float VRHoldSeconds = 1.5f;
+	[Tooltip("Desktop: hold this key to open / close the panel.")]
+	public KeyCode ToggleKey = KeyCode.Tab;
+	[Tooltip("Desktop: how long to hold the key (seconds).")]
+	public float KeyHoldSeconds = 0.4f;
+	[Tooltip("VR: grab with both hands and pull them this far apart (metres) to open / close the panel.")]
+	public float VRPullDistance = 0.25f;
 	[Tooltip("How far in front of you the panel appears (metres).")]
 	public float PanelDistance = 0.55f;
 	// Sync
@@ -42,11 +44,12 @@ public class DrinksAdmin : UdonSharpBehaviour {
 	private int AppliedReset;
 	private bool GotFirstSync;
 	private bool LocalAdmin;
-	private bool LeftUse, RightUse, GestureFired;
-	private float BothSince;
+	private bool LeftGrab, RightGrab, GestureFired, KeyFired;
+	private float StartSpread, KeySince;
 
 	private void Start() {
 		LocalAdmin = _IsAdmin(Networking.LocalPlayer);
+		KeySince = -1f;
 		if(PanelUI != null) PanelUI.SetActive(false);
 		Refresh();
 	}
@@ -67,23 +70,31 @@ public class DrinksAdmin : UdonSharpBehaviour {
 	// Opening the panel
 	private void Update() {
 		if(!LocalAdmin) return;
-		if(Input.GetKeyDown(ToggleKey)) _TogglePanel();
-		// VR: both triggers held, nothing in either hand
-		if(LeftUse && RightUse && !GestureFired && Time.time - BothSince >= VRHoldSeconds) {
+		// desktop: hold the key
+		if(Input.GetKey(ToggleKey)) {
+			if(KeySince < 0f) KeySince = Time.time;
+			if(!KeyFired && Time.time - KeySince >= KeyHoldSeconds) { KeyFired = true; _TogglePanel(); }
+		} else { KeySince = -1f; KeyFired = false; }
+		// VR: both hands grabbing (nothing in them), pulled apart
+		if(LeftGrab && RightGrab && !GestureFired) {
 			VRCPlayerApi me = Networking.LocalPlayer;
-			if(me != null && me.IsUserInVR() && me.GetPickupInHand(VRC_Pickup.PickupHand.Left) == null && me.GetPickupInHand(VRC_Pickup.PickupHand.Right) == null) {
-				GestureFired = true;
-				_TogglePanel();
-			}
+			if(me == null || me.GetPickupInHand(VRC_Pickup.PickupHand.Left) != null || me.GetPickupInHand(VRC_Pickup.PickupHand.Right) != null) return;
+			if(HandSpread(me) - StartSpread >= VRPullDistance) { GestureFired = true; _TogglePanel(); }
 		}
 	}
-	public override void InputUse(bool value, UdonInputEventArgs args) {
+	public override void InputGrab(bool value, UdonInputEventArgs args) {
 		if(!LocalAdmin) return;
-		bool before = LeftUse && RightUse;
-		if(args.handType == HandType.LEFT) LeftUse = value; else RightUse = value;
-		bool both = LeftUse && RightUse;
-		if(both && !before) BothSince = Time.time;
+		bool before = LeftGrab && RightGrab;
+		if(args.handType == HandType.LEFT) LeftGrab = value; else RightGrab = value;
+		bool both = LeftGrab && RightGrab;
+		VRCPlayerApi me = Networking.LocalPlayer;
+		if(both && !before && me != null && me.IsUserInVR()) StartSpread = HandSpread(me);
 		if(!both) GestureFired = false;
+	}
+	private float HandSpread(VRCPlayerApi me) {
+		Vector3 l = me.GetTrackingData(VRCPlayerApi.TrackingDataType.LeftHand).position;
+		Vector3 r = me.GetTrackingData(VRCPlayerApi.TrackingDataType.RightHand).position;
+		return Vector3.Distance(l, r);
 	}
 	public void _TogglePanel() {
 		if(PanelUI == null || !LocalAdmin) return;
