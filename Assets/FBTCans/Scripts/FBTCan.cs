@@ -5,14 +5,14 @@ using VRC.Udon.Common.Interfaces;
 
 /// <summary>
 /// A drink can. The fridge puts it on the shelf (it stays put there until someone grabs it), Use opens it (animated: the ring-pull lifts, the can jolts,
-/// the hole punches open, the tab settles back down, "pssht"),
-/// dropping it on the floor clanks, and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
+/// the hole punches open, the tab settles back down, "pssht"), Use again swishes it round in your hand (to finish it off),
+/// dropping it on the floor clunks, and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
 /// fridge needs it again.
 /// Anti-abuse (hacked clients): ownership of a can is only handed over when the current owner agrees. They refuse if
 /// the can is in their hand, or if the asking player spawned a can too recently (everyone tracks spawns via SpawnCount).
-/// The clank is the only network event and it ignores spam. Everything internal starts with _ so it can't be called
+/// The clunk is the only network event and it ignores spam; a swish only plays when the last one has finished. Everything internal starts with _ so it can't be called
 /// over the network.
-/// Sync: Manual, three bools (in use / opened / held) and a spawn counter, sent only when they change. Movement is synced by TransformSync
+/// Sync: Manual, three bools (in use / opened / held) and two counters (spawn, swish), sent only when they change. Movement is synced by TransformSync
 /// (your script) on the same object, also Manual.
 /// </summary>
 [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
@@ -31,6 +31,7 @@ public class FBTCan : UdonSharpBehaviour {
 	public AudioClip TrashClip;
 	public AudioClip SpawnClip;
 	public AudioClip DropClip;
+	public AudioClip SwishClip;
 	[Tooltip("How hard the can has to hit something to clank (m/s).")]
 	public float DropSoundSpeed = 1.2f;
 	[Tooltip("A can left alone is cleaned up by itself after this many seconds. 0 = never.")]
@@ -40,6 +41,7 @@ public class FBTCan : UdonSharpBehaviour {
 	[UdonSynced] private bool Opened;
 	[UdonSynced] private bool Held;
 	[UdonSynced] private int SpawnCount;
+	[UdonSynced] private int SwishCount;
 	// Read by the fridge
 	[HideInInspector()] public float SpawnTime;
 	// Internal
@@ -56,6 +58,12 @@ public class FBTCan : UdonSharpBehaviour {
 	private bool Parked;
 	private int AppliedSpawnCount;
 	private float LastClankHeard;
+	private int AppliedSwishCount;
+	private bool GotFirstSync;
+	private bool Swishing;
+	private float SwishT;
+	// swish animation length (seconds)
+	private const float SwishTime = 1.1f;
 
 	private void Start() {
 		Pickup = (VRC_Pickup)GetComponent(typeof(VRC_Pickup));
@@ -105,7 +113,14 @@ public class FBTCan : UdonSharpBehaviour {
 			Opened = true;
 			RequestSerialization();
 			ApplyState(true);
+			return;
 		}
+		// opened: swish it round (once the opening animation and the last swish are done)
+		if(Swishing || TabT < 1f) return;
+		SwishCount++;
+		AppliedSwishCount = SwishCount;
+		RequestSerialization();
+		StartSwish();
 	}
 	// Hitting the floor (only the owner simulates the can, so only the owner hears the hit and tells everyone)
 	private void OnCollisionEnter(Collision collision) {
@@ -130,6 +145,12 @@ public class FBTCan : UdonSharpBehaviour {
 			VRCPlayerApi owner = Networking.GetOwner(gameObject);
 			if(Fridge != null && owner != null && Active) Fridge._NoteSpawn(owner.playerId);
 		}
+		if(SwishCount != AppliedSwishCount) {
+			AppliedSwishCount = SwishCount;
+			// joining: don't replay an old swish
+			if(GotFirstSync && Active && Opened) StartSwish();
+		}
+		GotFirstSync = true;
 		ApplyState(true);
 	}
 	public override bool OnOwnershipRequest(VRCPlayerApi requestingPlayer, VRCPlayerApi requestedOwner) {
@@ -151,7 +172,28 @@ public class FBTCan : UdonSharpBehaviour {
 		SetTab(TabT);
 		if(TabT < 1f) SendCustomEventDelayedFrames(nameof(_TabStep), 1);
 	}
+	public void _SwishStep() {
+		if(!Active || Visual == null) { StopSwish(); return; }
+		SwishT += Time.deltaTime / SwishTime;
+		if(SwishT >= 1f) { StopSwish(); return; }
+		// swirl the can round in small circles, building up then easing off
+		float env = Mathf.Sin(SwishT * Mathf.PI);
+		float ph = SwishT * SwishTime * Mathf.PI * 2f * 2.6f;
+		Visual.transform.localRotation = Quaternion.Euler(Mathf.Sin(ph) * 13f * env, 0f, Mathf.Cos(ph) * 13f * env);
+		SendCustomEventDelayedFrames(nameof(_SwishStep), 1);
+	}
 	// Internal
+	private void StartSwish() {
+		if(Swishing || Visual == null) return;
+		Swishing = true;
+		SwishT = 0f;
+		if(Sound != null && SwishClip != null) { Sound.pitch = 1f; Sound.PlayOneShot(SwishClip); }
+		SendCustomEventDelayedFrames(nameof(_SwishStep), 1);
+	}
+	private void StopSwish() {
+		Swishing = false;
+		if(Visual != null) Visual.transform.localRotation = Quaternion.identity;
+	}
 	private void Despawn(bool trashed) {
 		Active = false;
 		Opened = false;
@@ -179,7 +221,7 @@ public class FBTCan : UdonSharpBehaviour {
 				TabT = 0f;
 				SendCustomEventDelayedFrames(nameof(_TabStep), 1);
 			}
-			else SetTab(Opened ? 1f : 0f);
+			else { TabT = Opened ? 1f : 0f; SetTab(TabT); }
 		}
 		UpdatePhysics();
 	}

@@ -131,10 +131,10 @@ public static class CanSystemBuilder
         {
             Texture2D canTex = FindTexture(CanTextureName);
             canMat = LitMat("Can_MayfairEnergy", Color.white, 0.55f, 0.75f, Color.black, canTex);
-            tabMat = LitMat("Can_PullTab", Hex("C9CED6"), 1f, 0.8f, Color.black);
+            tabMat = LitMat("Can_PullTab", Hex("D2B97F"), 1f, 0.8f, Color.black);
             pullMesh = PullTab("Can_PullTab");
             rivetMesh = Disc("Can_Rivet", 0.0022f, 0.0009f, 10);
-            mouthMesh = Stadium("Can_Opening", -0.0195f, -0.0035f, 0.0075f, 0f);
+            mouthMesh = Stadium("Can_Opening", 0.0035f, 0.0195f, 0.0075f, 0f);   // at the front, above the logo
         }
         else
         {
@@ -142,7 +142,7 @@ public static class CanSystemBuilder
             hull = Hull("Can_Collider", CanR, CanH, 12);
         }
 
-        AudioClip open = Clip("Can_Open"), trash = Clip("Can_Trash"), drop = Clip("Can_Drop");
+        AudioClip open = Clip("Can_Open"), trash = Clip("Can_Trash"), drop = Clip("Can_Drop"), swish = Clip("Can_Swish");
 
         var root = new GameObject(RootName);
         Transform rt = root.transform;
@@ -192,7 +192,7 @@ public static class CanSystemBuilder
             col.convex = true;
             var pickup = go.AddComponent<VRCPickup>();
             pickup.AutoHold = VRC_Pickup.AutoHoldMode.Yes;
-            pickup.UseText = "Open";
+            pickup.UseText = "Open / Swish";
             pickup.InteractionText = "Can";
             pickup.proximity = 0.5f;
             pickup.orientation = VRC_Pickup.PickupOrientation.Any;
@@ -202,6 +202,8 @@ public static class CanSystemBuilder
             var can = Add<FBTCan>(go);
             can.Visual = vis;
             can.Tab = vis.transform.Find("Tab Pivot");
+            if (can.Tab == null) can.Tab = vis.transform.Find("Lid Parts/Tab Pivot");
+            can.SwishClip = swish;
             can.Mouth = vis.transform.Find("Mouth").gameObject;
             can.CanCollider = col;
             can.HideSpot = hide;
@@ -293,13 +295,17 @@ public static class CanSystemBuilder
         modelRadius = Mathf.Max(b.extents.x, b.extents.z);
         if (withTab)
         {
-            // ring-pull: rotates up around its rivet when opened (ring end towards +Z, the label's front)
+            // ring-pull: rotates up around its rivet when opened. Turned round so the drinking hole is at the front
+            // (+Z, above the logo) and the finger ring at the back.
+            var lid = new GameObject("Lid Parts").transform;
+            lid.SetParent(v.transform, false);
+            lid.localPosition = new Vector3(0f, modelTop + 0.0004f, 0.001f);
+            lid.localRotation = Quaternion.Euler(0f, 180f, 0f);
             var pivot = new GameObject("Tab Pivot").transform;
-            pivot.SetParent(v.transform, false);
-            pivot.localPosition = new Vector3(0f, modelTop + 0.0004f, -0.001f);
+            pivot.SetParent(lid, false);
             Part(pivot, "Tab", pullMesh, tabMat);
             Part(pivot, "Rivet", rivetMesh, tabMat);
-            // the opening, behind the rivet; hidden until the can is opened
+            // the opening, in front of the rivet; hidden until the can is opened
             Part(v.transform, "Mouth", mouthMesh, mouthMat);
             Transform mouth = v.transform.Find("Mouth");
             mouth.localPosition = new Vector3(0f, modelTop + 0.00015f, 0f);
