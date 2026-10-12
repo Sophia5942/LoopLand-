@@ -2,9 +2,12 @@ using TMPro;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
+using VRC.Udon.Common;
 
 /// <summary>
-/// Admin panel for the drinks: lock / unlock getting new drinks, and reset (clear away) every can.
+/// Admin panel for the drinks: lock / unlock getting new drinks (locking also clears every can), and reset (clear away)
+/// every can. The panel pops up in front of an admin, only on their screen: press the Toggle Key on desktop, or in VR
+/// hold both triggers (with empty hands) for a moment. Same again (or the X) closes it.
 /// Admins = the instance owner (if ticked) and anyone whose display name is in Admin Names.
 /// Anti-abuse: only an admin can take ownership of the panel (the current owner refuses everyone else), and every
 /// player only accepts a lock or reset when the panel's owner is an admin, so a hacked client can't fake either.
@@ -23,6 +26,15 @@ public class DrinksAdmin : UdonSharpBehaviour {
 	public Collider[] Buttons;
 	public TextMeshPro StatusText;
 	public TextMeshPro LockLabel;
+	[Header("Pop-up")]
+	[Tooltip("The panel itself; only ever shown to the admin who opens it (it's local, nobody else sees it).")]
+	public GameObject PanelUI;
+	[Tooltip("Desktop shortcut that opens / closes the panel.")]
+	public KeyCode ToggleKey = KeyCode.F7;
+	[Tooltip("VR: hold both triggers (hands empty) this long to open / close the panel.")]
+	public float VRHoldSeconds = 1.5f;
+	[Tooltip("How far in front of you the panel appears (metres).")]
+	public float PanelDistance = 0.55f;
 	// Sync
 	[UdonSynced] private bool Locked;
 	[UdonSynced] private int ResetCount;
@@ -30,9 +42,14 @@ public class DrinksAdmin : UdonSharpBehaviour {
 	private bool AcceptedLocked;
 	private int AppliedReset;
 	private bool GotFirstSync;
+	private bool LocalAdmin;
+	private bool LeftUse, RightUse, GestureFired;
+	private float BothSince;
 
 	private void Start() {
 		bool admin = _IsAdmin(Networking.LocalPlayer);
+		LocalAdmin = admin;
+		if(PanelUI != null) PanelUI.SetActive(false);
 		if(Buttons != null) {
 			for(int i = 0; i < Buttons.Length; i++) if(Buttons[i] != null) Buttons[i].enabled = admin;
 		}
@@ -52,11 +69,54 @@ public class DrinksAdmin : UdonSharpBehaviour {
 		return false;
 	}
 
+	// Opening the panel
+	private void Update() {
+		if(!LocalAdmin) return;
+		if(Input.GetKeyDown(ToggleKey)) _TogglePanel();
+		// VR: both triggers held, nothing in either hand
+		if(LeftUse && RightUse && !GestureFired && Time.time - BothSince >= VRHoldSeconds) {
+			VRCPlayerApi me = Networking.LocalPlayer;
+			if(me != null && me.IsUserInVR() && me.GetPickupInHand(VRC_Pickup.PickupHand.Left) == null && me.GetPickupInHand(VRC_Pickup.PickupHand.Right) == null) {
+				GestureFired = true;
+				_TogglePanel();
+			}
+		}
+	}
+	public override void InputUse(bool value, UdonInputEventArgs args) {
+		if(!LocalAdmin) return;
+		bool before = LeftUse && RightUse;
+		if(args.handType == HandType.LEFT) LeftUse = value; else RightUse = value;
+		bool both = LeftUse && RightUse;
+		if(both && !before) BothSince = Time.time;
+		if(!both) GestureFired = false;
+	}
+	public void _TogglePanel() {
+		if(PanelUI == null || !LocalAdmin) return;
+		if(PanelUI.activeSelf) { PanelUI.SetActive(false); return; }
+		// put it in front of your head, facing you
+		VRCPlayerApi me = Networking.LocalPlayer;
+		VRCPlayerApi.TrackingData head = me.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
+		Vector3 fwd = head.rotation * Vector3.forward;
+		fwd.y = 0f;
+		if(fwd.sqrMagnitude < 0.001f) fwd = me.GetRotation() * Vector3.forward;
+		fwd.Normalize();
+		PanelUI.transform.SetPositionAndRotation(head.position + fwd * PanelDistance + Vector3.down * 0.12f, Quaternion.LookRotation(-fwd));
+		PanelUI.SetActive(true);
+		Refresh();
+	}
+	public void _ClosePanel() { if(PanelUI != null) PanelUI.SetActive(false); }
+
 	// Buttons
 	public void _ToggleLock() {
 		if(!TakeControl()) return;
 		Locked = !AcceptedLocked;
 		AcceptedLocked = Locked;
+		if(Locked) {
+			// locking clears every drink too
+			ResetCount++;
+			AppliedReset = ResetCount;
+			ClearMyCans();
+		}
 		RequestSerialization();
 		Refresh();
 	}

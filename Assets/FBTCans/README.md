@@ -46,14 +46,25 @@ All six use **your can model** with a label painted to match the club: dark, war
 - **Throw it in the bin** to clean it up.
 - A can left lying around cleans itself up after 5 minutes.
 
-## Admin panel
-"Drinks Admin Panel" is a dark plaque with gold trim. It has two buttons:
-- **LOCK / UNLOCK**: while locked, nobody can get new drinks. The rows can't be clicked, and the status shows **DRINKS LOCKED**. Drinks people already have still work.
-- **RESET ALL**: clears every drink out of the world, including ones people are holding.
+## Admin panel (pops up only for you)
+**Open or close it from anywhere:**
+- **Desktop:** press **F7**.
+- **VR:** hold **both triggers** for 1.5 seconds with empty hands.
 
-**Who can use it:** the **instance owner**. To add more admins, select the panel and type their VRChat display names into **Admin Names**. Untick **Instance Owner Is Admin** if you only want the named people.
-- Everyone else can't click the buttons at all.
-- In public or group instances there's no instance owner, so add names if you want the panel to work there.
+It appears in front of you, facing you, and **only you can see it**. Close it with the same shortcut or its **X**.
+
+It has two buttons:
+- **LOCK / UNLOCK**: locking **clears every drink** and stops anyone getting new ones. The rows can't be clicked, and the status shows **DRINKS LOCKED**. Unlock to open the drinks again.
+- **RESET ALL**: clears every drink out of the world, including ones people are holding. Drinks stay open.
+
+**Who can use it:** the **instance owner**. To add more admins, select **Drinks Admin** and type their VRChat display names into **Admin Names**. Untick **Instance Owner Is Admin** if you only want the named people.
+- For everyone else the shortcut does nothing.
+- In public or group instances there's no instance owner, so add names there.
+
+**Settings on Drinks Admin:**
+- **Toggle Key**: the desktop shortcut.
+- **VR Hold Seconds**: how long to hold both triggers.
+- **Panel Distance**: how far in front of you the panel appears.
 
 **Safe from hacked clients:**
 - Only an admin can take control of the panel. Whoever has it refuses everyone else.

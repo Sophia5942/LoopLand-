@@ -1,7 +1,7 @@
 using UdonSharp;
 using UnityEngine;
 
-/// <summary>A button on the drinks admin panel. Action 0 = lock / unlock, 1 = reset all drinks.</summary>
+/// <summary>A button on the drinks admin panel. Action 0 = lock / unlock, 1 = reset all drinks, 2 = close the panel.</summary>
 [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
 public class AdminButton : UdonSharpBehaviour {
 	public DrinksAdmin Panel;
@@ -14,7 +14,8 @@ public class AdminButton : UdonSharpBehaviour {
 	public override void Interact() {
 		if(Panel == null) return;
 		if(Action == 0) Panel._ToggleLock();
-		else Panel._ResetAll();
+		else if(Action == 1) Panel._ResetAll();
+		else { Panel._ClosePanel(); return; }
 		if(Cap != null) {
 			if(!HaveRest) { CapRest = Cap.localPosition; HaveRest = true; }
 			Cap.localPosition = CapRest - new Vector3(0f, 0f, 0.006f);   // pushed in (the front faces +Z)

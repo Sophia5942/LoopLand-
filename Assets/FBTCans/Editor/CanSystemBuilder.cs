@@ -112,8 +112,9 @@ public static class CanSystemBuilder
                 "1. There are 6 drink rows ('Get Mayfair Energy', 'Get Velvet Rouge', ...). Move each one onto a shelf inside your fridge,\n" +
                 "   with its blue arrow pointing out of the fridge (towards the glass).\n" +
                 "   The see-through box is the click area and the see-through can shows where the new drink appears. Both are invisible in game.\n" +
-                "2. Move 'Trash Bin' and 'Drinks Admin Panel' where you want them.\n" +
-                "   The panel works for the instance owner; add more admins in its Admin Names list.\n3. Save the scene (Ctrl+S).", "OK");
+                "2. Move 'Trash Bin' where you want it.\n" +
+                "3. Admin panel: in game press F7 (VR: hold both triggers with empty hands) and it pops up in front of you, only for you.\n" +
+                "   Instance owner is admin; add more on 'Drinks Admin' > Admin Names.\n4. Save the scene (Ctrl+S).", "OK");
         }
         catch (Exception e)
         {
@@ -296,55 +297,65 @@ public static class CanSystemBuilder
         return v;
     }
 
-    /// <summary>Wall panel for admins: lock / unlock drinks and reset all drinks. Front faces +Z.</summary>
+    /// <summary>Admin pop-up panel: lock / unlock drinks (locking also clears them) and reset all drinks. Front faces +Z.
+    /// The controller stays active; the panel itself is hidden until an admin opens it (only on their screen).</summary>
     private static void AdminPanel(Transform rt, Vector3 near)
     {
         Material plate = LitMat("Admin_Plate", Hex("16100E"), 0.2f, 0.6f, Color.black);
         Material goldMat = LitMat("Admin_Gold", Hex("C9A04A"), 1f, 0.8f, new Color(0.12f, 0.08f, 0.02f));
         Material capMat = LitMat("Admin_Button", Hex("5A1424"), 0.3f, 0.7f, Color.black);
-        var panel = new GameObject("Drinks Admin Panel");
+        var panel = new GameObject("Drinks Admin");
         panel.transform.SetParent(rt, false);
-        panel.transform.position = near + new Vector3(-1f, 1.3f, 0f);
-        Transform pt = panel.transform;
+        var ui = new GameObject("Admin Panel UI (pops up for admins only)");
+        ui.transform.SetParent(panel.transform, false);
+        ui.transform.position = near + new Vector3(-1f, 1.3f, 0f);
+        Transform pt = ui.transform;
         Box(pt, "Plate", new Vector3(0f, 0f, 0f), new Vector3(0.46f, 0.3f, 0.02f), plate);
         // gold frame
         Box(pt, "Trim Top", new Vector3(0f, 0.145f, 0.011f), new Vector3(0.46f, 0.01f, 0.006f), goldMat);
         Box(pt, "Trim Bottom", new Vector3(0f, -0.145f, 0.011f), new Vector3(0.46f, 0.01f, 0.006f), goldMat);
         Box(pt, "Trim Left", new Vector3(-0.225f, 0f, 0.011f), new Vector3(0.01f, 0.3f, 0.006f), goldMat);
         Box(pt, "Trim Right", new Vector3(0.225f, 0f, 0.011f), new Vector3(0.01f, 0.3f, 0.006f), goldMat);
-        Label3D(pt, "Title", "FBT  MAYFAIR", new Vector3(0f, 0.105f, 0.012f), new Vector2(0.38f, 0.045f), Hex("D9B867"));
+        Label3D(pt, "Title", "FBT  MAYFAIR", new Vector3(-0.02f, 0.105f, 0.012f), new Vector2(0.3f, 0.045f), Hex("D9B867"));
         Label3D(pt, "Subtitle", "DRINKS  ADMIN", new Vector3(0f, 0.07f, 0.012f), new Vector2(0.3f, 0.025f), Hex("BFA88A"));
         TextMeshPro status = Label3D(pt, "Status", "DRINKS  OPEN", new Vector3(0f, 0.025f, 0.012f), new Vector2(0.36f, 0.035f), Hex("E6C780"));
-        Label3D(pt, "Footer", "INSTANCE OWNER & ADMINS ONLY", new Vector3(0f, -0.122f, 0.012f), new Vector2(0.36f, 0.018f), Hex("8F7A5E"));
+        Label3D(pt, "Footer", "F7  /  VR: HOLD BOTH TRIGGERS  TO OPEN OR CLOSE", new Vector3(0f, -0.122f, 0.012f), new Vector2(0.4f, 0.016f), Hex("8F7A5E"));
 
         var admin = Add<DrinksAdmin>(panel);
         TextMeshPro lockLabel;
         Collider lockCol = AdminBtn(pt, admin, 0, "Lock Button", "LOCK", new Vector3(-0.1f, -0.06f, 0f), capMat, out lockLabel);
         TextMeshPro resetLabel;
         Collider resetCol = AdminBtn(pt, admin, 1, "Reset Button", "RESET ALL", new Vector3(0.1f, -0.06f, 0f), capMat, out resetLabel);
+        TextMeshPro closeLabel;
+        Collider closeCol = AdminBtn(pt, admin, 2, "Close Button", "X", new Vector3(0.19f, 0.115f, 0f), capMat, out closeLabel, 0.035f);
         admin.Fridges = rows.ToArray();
         admin.InstanceOwnerIsAdmin = true;
         admin.AdminNames = new string[0];
-        admin.Buttons = new[] { lockCol, resetCol };
+        admin.Buttons = new[] { lockCol, resetCol, closeCol };
+        admin.PanelUI = ui;
+        admin.ToggleKey = KeyCode.F7;
+        admin.VRHoldSeconds = 1.5f;
+        admin.PanelDistance = 0.55f;
         admin.StatusText = status;
         admin.LockLabel = lockLabel;
         made.Add(admin);
         foreach (CanFridge f in rows) f.Admin = admin;
     }
 
-    private static Collider AdminBtn(Transform parent, DrinksAdmin admin, int action, string name, string text, Vector3 pos, Material capMat, out TextMeshPro label)
+    private static Collider AdminBtn(Transform parent, DrinksAdmin admin, int action, string name, string text, Vector3 pos, Material capMat, out TextMeshPro label, float width = 0.16f)
     {
+        float h = action == 2 ? width : 0.06f;
         var b = new GameObject(name);
         b.transform.SetParent(parent, false);
         b.transform.localPosition = pos;
         var col = b.AddComponent<BoxCollider>();
         col.center = new Vector3(0f, 0f, 0.02f);
-        col.size = new Vector3(0.17f, 0.07f, 0.04f);
+        col.size = new Vector3(width + 0.01f, h + 0.01f, 0.04f);
         // the cap and its label move in together when pressed
         var press = new GameObject("Press").transform;
         press.SetParent(b.transform, false);
-        Box(press, "Cap", new Vector3(0f, 0f, 0.018f), new Vector3(0.16f, 0.06f, 0.016f), capMat);
-        label = Label3D(press, "Label", text, new Vector3(0f, 0f, 0.0275f), new Vector2(0.14f, 0.032f), Hex("F0DDB0"));
+        Box(press, "Cap", new Vector3(0f, 0f, 0.018f), new Vector3(width, h, 0.016f), capMat);
+        label = Label3D(press, "Label", text, new Vector3(0f, 0f, 0.0275f), new Vector2(width - 0.02f, h * 0.55f), Hex("F0DDB0"));
         var btn = Add<AdminButton>(b);
         btn.Panel = admin;
         btn.Action = action;
@@ -353,7 +364,7 @@ public static class CanSystemBuilder
         var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(btn);
         if (ub != null)
         {
-            ub.interactText = action == 0 ? "Lock / unlock drinks" : "Reset all drinks";
+            ub.interactText = action == 0 ? "Lock (clears all drinks) / unlock" : action == 1 ? "Reset all drinks" : "Close";
             ub.proximity = 2f;
         }
         return col;
