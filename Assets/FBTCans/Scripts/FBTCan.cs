@@ -63,7 +63,7 @@ public class FBTCan : UdonSharpBehaviour {
 	private bool Swishing;
 	private float SwishT;
 	// swish animation length (seconds)
-	private const float SwishTime = 1.1f;
+	private const float SwishTime = 0.7f;
 
 	private void Start() {
 		Pickup = (VRC_Pickup)GetComponent(typeof(VRC_Pickup));
