@@ -16,7 +16,6 @@ public static class CurtainOpenerSetup
 {
     private const string Gen = "Assets/FBTCurtain/Generated";
     private const string ShapeName = "Key 1";
-    private static readonly System.Random rng = new System.Random(3);
 
     [MenuItem("FBT Mayfair/Add Curtain Opener To Selected Curtain", priority = 20)]
     public static void Setup()
@@ -63,8 +62,8 @@ public static class CurtainOpenerSetup
             opener.OpenDistance = 3f;
             opener.OpenSeconds = 2.5f;
             opener.Sound = src;
-            opener.OpenClip = CurtainSound("curtain_open", 2.4f, 1f);
-            opener.CloseClip = CurtainSound("curtain_close", 2.4f, 0.85f);
+            opener.OpenClip = FindClip("Curtain_Open");
+            opener.CloseClip = FindClip("Curtain_Close");
             Wire(opener);
 
             // Start closed in the editor too (in game the script does this itself)
@@ -140,50 +139,16 @@ public static class CurtainOpenerSetup
         }
     }
 
-    // ------------------------------------------------------------------ sound: fabric swish + curtain rings sliding on the rail
-
-    private static AudioClip CurtainSound(string name, float dur, float pitch)
+    // The sounds ship with the package (FBTCurtain/Sounds): a smooth theatrical "whoosh" with a soft settle at the end.
+    private static AudioClip FindClip(string name)
     {
-        Dir(Gen);
-        string path = Gen + "/" + name + ".wav";
-        const int sr = 44100;
-        int count = (int)(sr * dur);
-        var s = new float[count];
-        float lp1 = 0f, lp2 = 0f, ring = 0f, ringHz = 0f, ringT = 1f;
-        for (int i = 0; i < count; i++)
+        foreach (string g in AssetDatabase.FindAssets(name + " t:AudioClip"))
         {
-            float t = i / (float)sr;
-            float n = (float)(rng.NextDouble() * 2.0 - 1.0);
-            lp1 += 0.05f * pitch * (n - lp1);
-            lp2 += 0.35f * pitch * (n - lp2);
-            float fabric = (lp2 - lp1);
-            // swell: quick start, long soft tail, with a slight flutter of the fabric
-            float env = Mathf.Clamp01(t / 0.25f) * Mathf.Exp(-Mathf.Max(0f, t - 0.6f) / 0.7f) * (0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 5.5f * t));
-            // metal rings clicking along the rail now and then
-            if (t < dur * 0.7f && rng.NextDouble() < 0.0009) { ringT = 0f; ringHz = (2600f + (float)rng.NextDouble() * 1800f) * pitch; }
-            ringT += 1f / sr;
-            ring = Mathf.Sin(2f * Mathf.PI * ringHz * ringT) * Mathf.Exp(-ringT / 0.03f) * 0.18f;
-            float fade = Mathf.Clamp01((dur - t) / 0.05f);
-            s[i] = (fabric * 1.6f * env + ring) * fade;
+            var c = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(g));
+            if (c != null && c.name == name) return c;
         }
-        using (var bw = new BinaryWriter(File.Create(path)))
-        {
-            bw.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
-            bw.Write(36 + count * 2);
-            bw.Write(System.Text.Encoding.ASCII.GetBytes("WAVEfmt "));
-            bw.Write(16);
-            bw.Write((short)1);
-            bw.Write((short)1);
-            bw.Write(sr);
-            bw.Write(sr * 2);
-            bw.Write((short)2);
-            bw.Write((short)16);
-            bw.Write(System.Text.Encoding.ASCII.GetBytes("data"));
-            bw.Write(count * 2);
-            foreach (float v in s) bw.Write((short)(Mathf.Clamp(v, -1f, 1f) * 30000f));
-        }
-        AssetDatabase.ImportAsset(path);
-        return AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+        Debug.LogWarning("[FBT Mayfair] Sound '" + name + "' not found. Make sure the FBTCurtain/Sounds folder was imported.");
+        return null;
     }
 
     private static void Dir(string path)

@@ -14,7 +14,7 @@ It adds a separate "Curtain Opener" object next to your curtain. Settings on it:
 - `Open Seconds` (2.5): how long it takes to open or close.
 - `Open Weight` (50) and `Closed Weight` (0).
 - `Any Player Opens It`: on = anyone near opens it for everyone; off = it only opens for you when you're near.
-- `Open Clip` / `Close Clip`: swap in your own sounds any time.
+- `Open Clip` / `Close Clip`: the sounds in `FBTCurtain/Sounds`. Swap in your own any time.
 
 There's no networking: every player's game checks where the players are, so everyone sees the same thing. It checks
 4 times a second and only animates while the curtain is moving.
