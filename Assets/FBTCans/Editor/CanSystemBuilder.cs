@@ -26,8 +26,6 @@ public static class CanSystemBuilder
 
     // can size (a standard 330 ml can)
     private const float CanR = 0.033f, CanBody = 0.112f, CanH = 0.122f, NeckR = 0.0275f;
-    // fridge
-    private const float FW = 0.6f, FH = 0.85f, FD = 0.5f;
 
     private struct Design
     {
@@ -63,12 +61,19 @@ public static class CanSystemBuilder
         {
             EditorUtility.DisplayProgressBar("FBT Mayfair", "Compiling UdonSharp programs...", 0.1f);
             EnsurePrograms();
-            EditorUtility.DisplayProgressBar("FBT Mayfair", "Building the fridge, cans and bin...", 0.4f);
+            // put it in your fridge if it's selected, otherwise where the Scene view is looking
+            GameObject sel = Selection.activeGameObject;
+            Vector3 p;
+            if (sel != null && sel.scene.IsValid() && sel.GetComponentInChildren<Renderer>(true) != null) p = BoundsOf(sel).center;
+            else
+            {
+                p = SceneView.lastActiveSceneView != null ? SceneView.lastActiveSceneView.pivot : Vector3.zero;
+                if (Physics.Raycast(p + Vector3.up * 3f, Vector3.down, out RaycastHit hit, 20f)) p = hit.point;
+            }
+            EditorUtility.DisplayProgressBar("FBT Mayfair", "Building the can spawner, cans and bin...", 0.4f);
             GameObject root = BuildAll();
-            // stand it on the floor where the Scene view is looking
-            Vector3 p = SceneView.lastActiveSceneView != null ? SceneView.lastActiveSceneView.pivot : Vector3.zero;
-            if (Physics.Raycast(p + Vector3.up * 3f, Vector3.down, out RaycastHit hit, 20f)) p = hit.point;
             root.transform.position = p;
+            Bin(root.transform, p);
             Wire();
             Undo.RegisterCreatedObjectUndo(root, "Build Can Fridge + Bin");
             EditorSceneManager.MarkSceneDirty(root.scene);
@@ -76,8 +81,10 @@ public static class CanSystemBuilder
             Selection.activeGameObject = root;
             if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
             EditorUtility.ClearProgressBar();
-            EditorUtility.DisplayDialog("FBT Mayfair", "Done! '" + RootName + "' is in your scene. Move it where you want it.\n\n" +
-                "In game: click the fridge door to open it and grab the can, Use to open the can, hold Use to sip, drop it in the bin to clean up.\n\nSave the scene (Ctrl+S).", "OK");
+            EditorUtility.DisplayDialog("FBT Mayfair", "Done! '" + RootName + "' is in your scene.\n\n" +
+                "1. Move 'Get A New Can' onto a shelf inside your fridge, with the blue arrow pointing out of the fridge (towards the glass).\n" +
+                "   The see-through can shows where new cans appear; the see-through box is the click area. Both are invisible in game.\n" +
+                "2. Move 'Trash Bin' where you want it.\n3. Save the scene (Ctrl+S).", "OK");
         }
         catch (Exception e)
         {
@@ -95,13 +102,9 @@ public static class CanSystemBuilder
 
     private static GameObject BuildAll()
     {
-        Material fridgeMat = LitMat("Fridge_Black", Hex("0F0E12"), 0.4f, 0.85f, Color.black);
-        Material trim = LitMat("Fridge_Trim", Hex("C9A04A"), 1f, 0.85f, new Color(0.15f, 0.1f, 0.03f));
-        Material light = LitMat("Fridge_Light", Hex("CFE6FF"), 0f, 0.5f, Hex("9FD0FF") * 2f);
-        Material shelf = LitMat("Fridge_Shelf", Hex("B8C2CC"), 0.8f, 0.8f, Color.black);
         Material alu = LitMat("Can_Aluminium", Hex("C8CDD3"), 1f, 0.85f, Color.black);
         Material aluDark = LitMat("Can_Top", Hex("9AA0A8"), 1f, 0.7f, Color.black);
-        Material glass = SaveMat("Fridge_Glass", Shader.Find("Legacy Shaders/Transparent/Diffuse"), m => m.color = new Color(0.55f, 0.7f, 0.85f, 0.22f));
+        Material ghost = SaveMat("Editor_Ghost", Shader.Find("Legacy Shaders/Transparent/Diffuse"), m => m.color = new Color(0.3f, 0.9f, 1f, 0.3f));
         var labels = new Material[Designs.Length];
         for (int i = 0; i < Designs.Length; i++) labels[i] = LitMat("Can_" + Designs[i].Name, Color.white, 0.6f, 0.75f, Color.black, LabelTex(Designs[i]));
 
@@ -111,59 +114,30 @@ public static class CanSystemBuilder
         Mesh top = Disc("Can_Lid", NeckR, CanH - 0.0015f, 20);
         Mesh hull = Hull("Can_Collider", CanR, CanH, 12);
 
-        AudioClip open = Clip("Can_Open"), sip = Clip("Can_Sip"), trash = Clip("Can_Trash"), spawn = Clip("Can_Spawn"), drop = Clip("Can_Drop");
-        AudioClip fridgeOpen = Clip("Fridge_Open"), fridgeClose = Clip("Fridge_Close");
+        AudioClip open = Clip("Can_Open"), sip = Clip("Can_Sip"), trash = Clip("Can_Trash"), drop = Clip("Can_Drop");
 
         var root = new GameObject(RootName);
         Transform rt = root.transform;
 
-        // --- fridge
-        var fridge = new GameObject("Can Fridge");
-        fridge.transform.SetParent(rt, false);
-        Transform f = fridge.transform;
-        // body: solid walls and shelves, so cans can stand inside and bounce off it
-        Solid(Box(f, "Back", new Vector3(0f, FH * 0.5f, -FD * 0.5f + 0.02f), new Vector3(FW, FH, 0.04f), fridgeMat));
-        Solid(Box(f, "Left", new Vector3(-FW * 0.5f + 0.02f, FH * 0.5f, 0f), new Vector3(0.04f, FH, FD), fridgeMat));
-        Solid(Box(f, "Right", new Vector3(FW * 0.5f - 0.02f, FH * 0.5f, 0f), new Vector3(0.04f, FH, FD), fridgeMat));
-        Solid(Box(f, "Top", new Vector3(0f, FH - 0.02f, 0f), new Vector3(FW, 0.04f, FD), fridgeMat));
-        Solid(Box(f, "Base", new Vector3(0f, 0.04f, 0f), new Vector3(FW, 0.08f, FD), fridgeMat));
-        Box(f, "Light", new Vector3(0f, FH - 0.05f, 0f), new Vector3(FW - 0.1f, 0.006f, 0.03f), light);
-        float[] shelves = { 0.09f, 0.36f, 0.6f };
-        foreach (float y in shelves) Solid(Box(f, "Shelf", new Vector3(0f, y, 0f), new Vector3(FW - 0.04f, 0.008f, FD - 0.06f), shelf));
-        // cans on display inside (just looks, no scripts); the front of the middle shelf is kept free for the new can
-        int d = 0;
-        for (int s = 0; s < shelves.Length; s++)
-            for (int k = 0; k < 6; k++)
-            {
-                if (s == 1 && k % 2 == 1) continue;
-                var c = CanVisual(f, "Display Can", new Vector3(-0.2f + k * 0.08f, shelves[s] + 0.004f, (k % 2) * 0.07f - 0.1f), body, neck, bottom, top, labels[(d++) % labels.Length], alu, aluDark, false);
-                c.transform.localRotation = Quaternion.Euler(0f, (k * 47) % 360, 0f);
-            }
-        foreach (Transform t in f.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = true;
-
-        // door: hinged on the left, swings open when clicked. It is the "Open fridge" button.
-        var door = new GameObject("Fridge Door");
-        door.transform.SetParent(f, false);
-        door.transform.localPosition = new Vector3(-FW * 0.5f + 0.01f, 0f, FD * 0.5f);
-        Transform dt = door.transform;
-        float dw = FW - 0.02f;
-        Box(dt, "Door Glass", new Vector3(dw * 0.5f, FH * 0.5f + 0.02f, -0.005f), new Vector3(dw - 0.04f, FH - 0.12f, 0.006f), glass);
-        Box(dt, "Door Frame Top", new Vector3(dw * 0.5f, FH - 0.045f, -0.004f), new Vector3(dw, 0.02f, 0.014f), trim);
-        Box(dt, "Door Frame Bottom", new Vector3(dw * 0.5f, 0.09f, -0.004f), new Vector3(dw, 0.02f, 0.014f), trim);
-        Box(dt, "Door Frame Left", new Vector3(0.01f, FH * 0.5f + 0.02f, -0.004f), new Vector3(0.02f, FH - 0.12f, 0.014f), trim);
-        Box(dt, "Door Frame Right", new Vector3(dw - 0.01f, FH * 0.5f + 0.02f, -0.004f), new Vector3(0.02f, FH - 0.12f, 0.014f), trim);
-        Box(dt, "Handle", new Vector3(dw - 0.05f, FH * 0.5f, 0.015f), new Vector3(0.015f, 0.3f, 0.02f), trim);
-        var dc = door.AddComponent<BoxCollider>();
-        dc.center = new Vector3(dw * 0.5f, FH * 0.5f + 0.01f, 0f);
-        dc.size = new Vector3(dw, FH - 0.1f, 0.03f);
-        // the new can appears at the front of the middle shelf
+        // --- "Get A New Can": a click box that goes on a shelf inside your fridge; the can appears in front of it
+        var spawner = new GameObject("Get A New Can");
+        spawner.transform.SetParent(rt, false);
+        Transform sp = spawner.transform;
+        var box = spawner.AddComponent<BoxCollider>();
+        box.isTrigger = true;
+        box.center = new Vector3(0f, 0.15f, -0.1f);
+        box.size = new Vector3(0.5f, 0.3f, 0.2f);
         var spawnPoint = new GameObject("Can Spawn Point").transform;
-        spawnPoint.SetParent(f, false);
-        spawnPoint.localPosition = new Vector3(0f, shelves[1] + 0.006f, FD * 0.5f - 0.1f);
+        spawnPoint.SetParent(sp, false);
+        spawnPoint.localPosition = new Vector3(0f, 0.002f, 0.07f);
         var hide = new GameObject("Can Hide Spot").transform;
-        hide.SetParent(f, false);
-        hide.localPosition = new Vector3(0f, 0.02f, 0f);
-        var fridgeAudio = AudioOn(door, 0.8f, 6f);
+        hide.SetParent(sp, false);
+        hide.localPosition = new Vector3(0f, 0f, -0.1f);
+        // see-through helpers so you can see where things are; tagged EditorOnly, so they are not in the uploaded world
+        var gb = Box(sp, "Click Area (editor only)", box.center, box.size, ghost);
+        gb.tag = "EditorOnly";
+        var gc = CanVisual(spawnPoint, "New Can Appears Here (editor only)", Vector3.zero, body, neck, bottom, top, ghost, ghost, ghost, false);
+        foreach (Transform t in gc.GetComponentsInChildren<Transform>()) t.gameObject.tag = "EditorOnly";
 
         // --- cans (pool)
         var cansParent = new GameObject("Cans (pool)").transform;
@@ -203,7 +177,7 @@ public static class CanSystemBuilder
             can.SipSound = sipSrc;
             can.OpenClip = open;
             can.TrashClip = trash;
-            can.SpawnClip = spawn;
+            can.SpawnClip = null; // no sound when it appears, like a real fridge
             can.DropClip = drop;
             can.DropSoundSpeed = 1.2f;
             can.CleanupAfterSeconds = 300f;
@@ -211,25 +185,18 @@ public static class CanSystemBuilder
             cans[i] = can;
         }
 
-        var fridgeScript = Add<CanFridge>(door);
+        var fridgeScript = Add<CanFridge>(spawner);
         fridgeScript.Cans = cans;
         fridgeScript.SpawnPoint = spawnPoint;
-        fridgeScript.CooldownSeconds = 5f;
-        fridgeScript.AutoCloseSeconds = 8f;
-        fridgeScript.OpenAngle = -105f;
-        fridgeScript.Sound = fridgeAudio;
-        fridgeScript.OpenClip = fridgeOpen;
-        fridgeScript.CloseClip = fridgeClose;
+        fridgeScript.CooldownSeconds = 600f;
         made.Add(fridgeScript);
         var ub = UdonSharpEditorUtility.GetBackingUdonBehaviour(fridgeScript);
         if (ub != null)
         {
-            ub.interactText = "Open / close fridge";
+            ub.interactText = "Get A New Can [10min Cooldown]";
             ub.proximity = 2f;
         }
 
-        // --- your bin
-        Bin(rt);
         return root;
     }
 
@@ -257,7 +224,7 @@ public static class CanSystemBuilder
         return v;
     }
 
-    private static void Bin(Transform rt)
+    private static void Bin(Transform rt, Vector3 near)
     {
         GameObject prefab = null;
         foreach (string g in AssetDatabase.FindAssets(BinModelName + " t:Model"))
@@ -284,8 +251,10 @@ public static class CanSystemBuilder
             Object.DestroyImmediate(c.GetComponent<Collider>());
         }
         // stand it on the floor, next to the fridge
+        Vector3 at = near + Vector3.right * 1f;
+        if (Physics.Raycast(at + Vector3.up * 0.1f, Vector3.down, out RaycastHit floor, 20f)) at = floor.point;
         Bounds b = BoundsOf(bin);
-        bin.transform.position += new Vector3(FW * 0.5f + 0.15f + b.extents.x - b.center.x, -b.min.y, -b.center.z);
+        bin.transform.position += new Vector3(at.x - b.center.x, at.y - b.min.y, at.z - b.center.z);
         b = BoundsOf(bin);
         // walls cans can hit
         foreach (MeshFilter mf in bin.GetComponentsInChildren<MeshFilter>())
@@ -411,11 +380,6 @@ public static class CanSystemBuilder
         go.GetComponent<Renderer>().sharedMaterial = m;
         Object.DestroyImmediate(go.GetComponent<Collider>());
         return go;
-    }
-
-    private static void Solid(GameObject go)
-    {
-        go.AddComponent<BoxCollider>();
     }
 
     private static void Part(Transform parent, string name, Mesh mesh, Material mat)

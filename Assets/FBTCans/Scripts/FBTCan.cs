@@ -4,7 +4,7 @@ using VRC.SDKBase;
 using VRC.Udon.Common.Interfaces;
 
 /// <summary>
-/// A drink can. The fridge puts it on its shelf, the first Use opens it (the tab lifts, "pssht"), holding Use after that sips,
+/// A drink can. The fridge puts it on the shelf (it stays put there until someone grabs it), the first Use opens it (the tab lifts, "pssht"), holding Use after that sips,
 /// dropping it on the floor clanks, and dropping it in the bin cleans it up. Cans are reused (pooled): a cleaned-up can is just hidden until the
 /// fridge needs it again.
 /// Sync: Manual, three bools (in use / opened / held), sent only when they change. Movement is synced by TransformSync
@@ -42,6 +42,7 @@ public class FBTCan : UdonSharpBehaviour {
 	private float TabT;
 	private float CleanupDue;
 	private float NextClank;
+	private bool Parked;
 
 	private void Start() {
 		Pickup = (VRC_Pickup)GetComponent(typeof(VRC_Pickup));
@@ -58,6 +59,7 @@ public class FBTCan : UdonSharpBehaviour {
 		Active = true;
 		Opened = false;
 		Held = false;
+		Parked = true;
 		SpawnTime = Time.time;
 		transform.SetPositionAndRotation(pos, rot);
 		if(RB != null) { RB.velocity = Vector3.zero; RB.angularVelocity = Vector3.zero; }
@@ -72,6 +74,7 @@ public class FBTCan : UdonSharpBehaviour {
 	}
 	// Pickup
 	public override void OnPickup() {
+		Parked = false;
 		TakeOwnership();
 		Held = true;
 		RequestSerialization();
@@ -152,8 +155,8 @@ public class FBTCan : UdonSharpBehaviour {
 		UpdatePhysics();
 	}
 	private void UpdatePhysics() {
-		// only the owner simulates; everyone else follows TransformSync
-		if(RB != null) RB.isKinematic = !Active || !Networking.IsOwner(gameObject);
+		// only the owner simulates; everyone else follows TransformSync. A can waiting in the fridge doesn't move.
+		if(RB != null) RB.isKinematic = !Active || Parked || !Networking.IsOwner(gameObject);
 	}
 	private void SetTab(float t) {
 		if(Tab == null) return;
