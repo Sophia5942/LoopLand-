@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- Art/Rug: round Persian-style rug in Burgundy (oxblood, chocolate and antique gold, matching the lounge) and Brown colourways on the 4.87 m rug.
+- Art/Rug: round Art Deco rug (charcoal wool, antique-gold sunburst, fan arches and double border, wine accents) on the 4.87 m rug.
 - Art/Frames: ornate frame model with three PBR finishes (Antique Gold, Dark Bronze, Black & Gold)
   and five painting canvas sets, plus the scripts that generate them.
 - Art/WineBottle: rebuilt Bordeaux wine bottle (LOD0 720 / LOD1 240 / LOD2 96 tris, pivot at the base)
