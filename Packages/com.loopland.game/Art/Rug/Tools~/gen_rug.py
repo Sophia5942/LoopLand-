@@ -22,7 +22,7 @@ def fbm(x, y, o=4, s=0):
     return t / w
 def C(*c): return np.array(c, float) / 255
 
-IVORY, CREAM, RED, DRED, NAVY, TAN, BROWN = C(214, 200, 172), C(196, 178, 146), C(138, 38, 32), C(92, 24, 22), C(38, 36, 48), C(168, 128, 78), C(70, 46, 32)
+IVORY, CREAM, RED, DRED, NAVY, TAN, BROWN = C(118, 80, 50), C(150, 114, 78), C(92, 46, 24), C(60, 32, 18), C(36, 22, 14), C(196, 164, 116), C(70, 46, 32)
 col = np.zeros((N, N, 3)) + IVORY
 def paint(mask, c):
     global col
