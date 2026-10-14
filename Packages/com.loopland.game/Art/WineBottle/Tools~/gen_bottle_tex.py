@@ -10,6 +10,7 @@ from bottle_profile import *  # noqa
 
 OUT = sys.argv[1]
 N = int(sys.argv[2]) if len(sys.argv) > 2 else 2048
+LOGO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alias_logo.png')
 os.makedirs(OUT, exist_ok=True)
 FD = '/usr/share/fonts/truetype/liberation/'
 F_BOLD, F_REG, F_IT = FD + 'LiberationSerif-Bold.ttf', FD + 'LiberationSerif-Regular.ttf', FD + 'LiberationSerif-Italic.ttf'
@@ -141,8 +142,16 @@ def front_label(v):
     chateau(ImageDraw.Draw(g2), W / 2, 17 * m, 62 * m, 25 * m, 0, 255, int(0.45 * m))
     gold = Image.fromarray(np.maximum(np.asarray(gold), np.asarray(g2)))
     dg = ImageDraw.Draw(gold)
-    text_c(dc, 54.5, 'CHÂTEAU', font(F_REG, 5.2), ink, W, spacing=1.6)
-    both(lambda d, c: text_c(d, 66.0, 'LOOPLAND', font(F_BOLD, 10.5), c, W, spacing=0.5))
+    text_c(dc, 53.2, 'CHÂTEAU', font(F_REG, 5.2), ink, W, spacing=1.6)
+    # ALIAS logo keeps its own baked gold shading; its gold faces are metallic
+    logo = Image.open(LOGO).convert('RGBA')
+    lw = int(64 * m); lh = int(lw * logo.height / logo.width)
+    logo = logo.resize((lw, lh), Image.LANCZOS)
+    lx, ly = (W - lw) // 2, int(55.4 * m)
+    col.paste(logo, (lx, ly), logo)
+    la = np.asarray(logo, np.float64)
+    face = la[..., 3] / 255 * np.clip((la[..., :3].mean(2) - 30) / 30, 0, 1)
+    logo_metal = np.zeros((H, W)); logo_metal[ly:ly + lh, lx:lx + lw] = face
     for d, c in ((dc, acc), (dg, 255)):
         d.line([(W / 2 - 26 * m, 70 * m), (W / 2 - 3 * m, 70 * m)], fill=c, width=int(0.35 * m))
         d.line([(W / 2 + 3 * m, 70 * m), (W / 2 + 26 * m, 70 * m)], fill=c, width=int(0.35 * m))
@@ -154,7 +163,7 @@ def front_label(v):
     dc.text((9 * m, 91.2 * m), '13,5% VOL', font=f, fill=ink, anchor='ls')
     dc.text((W - 9 * m, 91.2 * m), '750 ML', font=f, fill=ink, anchor='rs')
     text_c(dc, 91.2, 'MIS EN BOUTEILLE AU CHÂTEAU', font(F_IT, 1.9), ink, W)
-    return col, gold, Wmm, Hmm
+    return col, gold, Image.fromarray((logo_metal * 255).astype(np.uint8)), Wmm, Hmm
 
 
 def back_label(v):
@@ -166,7 +175,7 @@ def back_label(v):
     dc = ImageDraw.Draw(col); m = PXMM; ink = v['ink']
     dc.rectangle([2 * m, 2 * m, W - 2 * m, H - 2 * m], outline=v['accent'], width=int(0.4 * m))
     ImageDraw.Draw(gold).rectangle([2 * m, 2 * m, W - 2 * m, H - 2 * m], outline=255, width=int(0.4 * m))
-    text_c(dc, 8, 'CHÂTEAU LOOPLAND', font(F_BOLD, 3.0), ink, W, spacing=0.3)
+    text_c(dc, 8, 'CHÂTEAU ALIAS', font(F_BOLD, 3.0), ink, W, spacing=0.3)
     text_c(dc, 11.5, v['appellation'] + ' · ' + v['vintage'], font(F_REG, 2.0), ink, W)
     lines = ['Issu de vieilles vignes et élevé', 'dix-huit mois en fût de chêne,', 'ce vin révèle des arômes de cassis,',
              'de cèdre et de tabac blond.', '', 'Servir entre 16 et 18 °C.', 'Produit de France — Contient des sulfites']
@@ -247,13 +256,14 @@ n_paper = fbm(xx / 3.0, yy / 3.0, 3, 9)
 n_crinkle = fbm(U * 26, Z / 2.2, 4, 13) + 0.5 * fbm(U * 70, Z / 0.8, 3, 17)
 
 for name, v in VARIANTS.items():
-    fc, fg, _, _ = front_label(v)
+    fc, fg, flm, _, _ = front_label(v)
     bc, bg, _, _ = back_label(v)
     lab_mask = place(Image.new('L', fc.size, 255), FRONT_U[0], FRONT_U[1], *LABEL_Z_MM, 'L') * side
     back_mask = place(Image.new('L', bc.size, 255), BACK_U[0], BACK_U[1], *BACK_Z_MM, 'L') * side
     lab_col = place(fc, FRONT_U[0], FRONT_U[1], *LABEL_Z_MM, 'RGB') + place(bc, BACK_U[0], BACK_U[1], *BACK_Z_MM, 'RGB')
     lab_gold = place(fg, FRONT_U[0], FRONT_U[1], *LABEL_Z_MM, 'L') + place(bg, BACK_U[0], BACK_U[1], *BACK_Z_MM, 'L')
     lab_a = np.clip(lab_mask + back_mask, 0, 1)
+    logo_m = place(flm, FRONT_U[0], FRONT_U[1], *LABEL_Z_MM, 'L')
 
     # ---- glass
     glass = to_lin(v['glass']) * (0.85 + 0.3 * n_glass)[..., None]
@@ -278,9 +288,11 @@ for name, v in VARIANTS.items():
     paper_mix = paper_lin * grain
     paper_mix = paper_mix * (1 - lab_gold[..., None]) + gold_lin * lab_gold[..., None]
     col = col * (1 - lab_a[..., None]) + paper_mix * lab_a[..., None]
-    metal = metal * (1 - lab_a) + lab_gold * lab_a
-    smooth = smooth * (1 - lab_a) + (0.28 + 0.08 * n_paper + 0.42 * lab_gold) * lab_a
-    height = height * (1 - lab_a) + (0.25 + 0.06 * lab_gold + 0.02 * n_paper) * lab_a
+    shiny = np.clip(lab_gold + logo_m, 0, 1)
+    # the logo has its gold shading baked in, so it is a glossy print rather than a mirror
+    metal = metal * (1 - lab_a) + np.clip(lab_gold + 0.2 * logo_m, 0, 1) * lab_a
+    smooth = smooth * (1 - lab_a) + (0.28 + 0.08 * n_paper + 0.5 * shiny) * lab_a
+    height = height * (1 - lab_a) + (0.25 + 0.06 * shiny + 0.02 * n_paper) * lab_a
 
     # ---- capsule (foil) on the side + top disc
     cap = side & (Z >= CAPSULE_Z_MM)
@@ -301,7 +313,7 @@ for name, v in VARIANTS.items():
     mono = Image.new('L', (512, 512), 0); dm = ImageDraw.Draw(mono)
     dm.ellipse([40, 40, 472, 472], outline=255, width=14)
     dm.ellipse([78, 78, 434, 434], outline=255, width=5)
-    dm.text((256, 270), 'LL', font=ImageFont.truetype(F_BOLD, 230), fill=255, anchor='mm')
+    dm.text((256, 262), 'A', font=ImageFont.truetype(F_BOLD, 250), fill=255, anchor='mm')
     mono = np.asarray(mono.resize((int(2 * TOP_DISC[2] * N), int(2 * TOP_DISC[2] * N)), Image.LANCZOS), np.float64) / 255
     mfull = np.zeros((N, N)); s0 = int((1 - TOP_DISC[1] - TOP_DISC[2]) * N); s1 = int((TOP_DISC[0] - TOP_DISC[2]) * N)
     mfull[s0:s0 + mono.shape[0], s1:s1 + mono.shape[1]] = mono

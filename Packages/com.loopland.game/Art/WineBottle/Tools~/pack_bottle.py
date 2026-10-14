@@ -37,7 +37,7 @@ open(fbx + '.meta', 'w').write(meta)
 
 shutil.copyfile(os.path.join(OUTD, 'WineBottle_Textured.blend'), os.path.join(TL, 'WineBottle.blend'))
 for f in ('bottle_profile.py', 'build_bottle.py', 'gen_bottle_tex.py', 'textured_blend.py', 'render.py',
-          'render_lods.py', 'pack_bottle.py'):
+          'render_lods.py', 'pack_bottle.py', 'clean_logo.py', 'alias_logo.png'):
     shutil.copyfile(os.path.join(TOOLS, f), os.path.join(TL, f))
 for d in (DEST, TEX, MAT, MOD):
     ns['folder_meta'](d)
