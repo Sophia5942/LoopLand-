@@ -1,8 +1,10 @@
-"""Planar-UV the round rug, assign the Persian material, export FBX + .blend, render a preview.
+"""Planar-UV the round rug, assign the rug material, export FBX + .blend, render a preview.
 Usage: python build_rug.py -- <rug.fbx> <texdir> <outdir>"""
 import bpy, sys, os, math
 from mathutils import Vector
-src, tex, out = sys.argv[sys.argv.index('--') + 1:][:3]
+args = sys.argv[sys.argv.index('--') + 1:]
+src, tex, out = args[:3]
+VAR = args[3] if len(args) > 3 else 'Burgundy'
 os.makedirs(out, exist_ok=True)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.fbx(filepath=src)
@@ -21,12 +23,12 @@ uv = me.uv_layers.active or me.uv_layers.new(name='UVMap')
 for l in me.loops:
     co = me.vertices[l.vertex_index].co
     uv.data[l.index].uv = (0.5 + co.x / rad * 0.4975, 0.5 + co.y / rad * 0.4975)
-m = bpy.data.materials.new('Rug_Persian'); m.use_nodes = True
+m = bpy.data.materials.new(f'Rug_{VAR}'); m.use_nodes = True
 nt = m.node_tree; b = nt.nodes['Principled BSDF']
 def img(fn, cs):
     t = nt.nodes.new('ShaderNodeTexImage'); t.image = bpy.data.images.load(os.path.join(tex, fn)); t.image.colorspace_settings.name = cs; return t
-nt.links.new(img('Rug_Persian_Albedo.png', 'sRGB').outputs['Color'], b.inputs['Base Color'])
-nm = nt.nodes.new('ShaderNodeNormalMap'); nt.links.new(img('Rug_Persian_Normal.png', 'Non-Color').outputs['Color'], nm.inputs['Color'])
+nt.links.new(img(f'Rug_{VAR}_Albedo.png', 'sRGB').outputs['Color'], b.inputs['Base Color'])
+nm = nt.nodes.new('ShaderNodeNormalMap'); nt.links.new(img(f'Rug_{VAR}_Normal.png', 'Non-Color').outputs['Color'], nm.inputs['Color'])
 nt.links.new(nm.outputs['Normal'], b.inputs['Normal']); b.inputs['Roughness'].default_value = 0.88
 me.materials.clear(); me.materials.append(m)
 for p in me.polygons: p.use_smooth = False
@@ -46,4 +48,4 @@ bpy.ops.object.camera_add(location=(0, -5.5, 3.2)); cam = bpy.context.object; sc
 cam.rotation_euler = (Vector((0, -0.3, 0)) - cam.location).to_track_quat('-Z', 'Y').to_euler(); cam.data.lens = 30
 sc.render.engine = 'CYCLES'; sc.cycles.samples = 32; sc.cycles.use_denoising = True
 sc.render.resolution_x, sc.render.resolution_y = 1200, 800; sc.view_settings.view_transform = 'AgX'
-sc.render.filepath = os.path.join(out, 'rug_preview.png'); bpy.ops.render.render(write_still=True)
+sc.render.filepath = os.path.join(out, f'rug_preview_{VAR}.png'); bpy.ops.render.render(write_still=True)

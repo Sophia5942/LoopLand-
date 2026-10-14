@@ -7,8 +7,8 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Rug_Persian
-    second: {fileID: 2100000, guid: c7005318a11b50c0898726c6b72103bd, type: 2}
+      name: Rug_Burgundy
+    second: {fileID: 2100000, guid: 36b5bb6dd4015686a54e871ee606cae8, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

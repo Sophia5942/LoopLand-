@@ -22,7 +22,13 @@ def fbm(x, y, o=4, s=0):
     return t / w
 def C(*c): return np.array(c, float) / 255
 
-IVORY, CREAM, RED, DRED, NAVY, TAN, BROWN = C(118, 80, 50), C(150, 114, 78), C(92, 46, 24), C(60, 32, 18), C(36, 22, 14), C(196, 164, 116), C(70, 46, 32)
+PALETTES = {
+    'Brown': (C(118, 80, 50), C(150, 114, 78), C(92, 46, 24), C(60, 32, 18), C(36, 22, 14), C(196, 164, 116), C(70, 46, 32)),
+    # matches the ALIAS lounge: oxblood like the chesterfields, chocolate wood, antique gold like the logo
+    'Burgundy': (C(104, 24, 26), C(48, 24, 18), C(150, 112, 56), C(66, 14, 18), C(30, 14, 12), C(186, 146, 76), C(70, 46, 32)),
+}
+NAME = sys.argv[3] if len(sys.argv) > 3 else 'Brown'
+IVORY, CREAM, RED, DRED, NAVY, TAN, BROWN = PALETTES[NAME]
 col = np.zeros((N, N, 3)) + IVORY
 def paint(mask, c):
     global col
@@ -82,12 +88,12 @@ col = col * (0.86 + 0.24 * pile)[..., None] * (0.9 + 0.15 * wear)[..., None]
 col = col * 0.82 + col.mean(-1, keepdims=True) * 0.18           # muted, aged
 col = np.clip(col, 0, 1)
 img = Image.fromarray((col * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.6))
-img.save(os.path.join(OUT, 'Rug_Persian_Albedo.png'), optimize=True)
+img.save(os.path.join(OUT, f'Rug_{NAME}_Albedo.png'), optimize=True)
 
 h = pile + 0.3 * fbm(X * 700, Y * 700, 2, 7)
 gx = (np.roll(h, -1, 1) - np.roll(h, 1, 1)) * 2; gy = (np.roll(h, 1, 0) - np.roll(h, -1, 0)) * 2
 ln = np.sqrt(gx ** 2 + gy ** 2 + 1)
-Image.fromarray((((np.stack([-gx / ln, -gy / ln, 1 / ln], -1)) + 1) * 127.5).astype(np.uint8)).save(os.path.join(OUT, 'Rug_Persian_Normal.png'), optimize=True)
+Image.fromarray((((np.stack([-gx / ln, -gy / ln, 1 / ln], -1)) + 1) * 127.5).astype(np.uint8)).save(os.path.join(OUT, f'Rug_{NAME}_Normal.png'), optimize=True)
 ms = np.zeros((N, N, 4), np.uint8); ms[..., 3] = (np.clip(0.12 + 0.06 * pile, 0, 1) * 255).astype(np.uint8)
-Image.fromarray(ms, 'RGBA').save(os.path.join(OUT, 'Rug_Persian_MetallicSmoothness.png'), optimize=True)
+Image.fromarray(ms, 'RGBA').save(os.path.join(OUT, f'Rug_{NAME}_MetallicSmoothness.png'), optimize=True)
 print('ok')
