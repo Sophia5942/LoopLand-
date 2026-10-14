@@ -4,7 +4,7 @@ import bpy, sys, os, math
 from mathutils import Vector
 args = sys.argv[sys.argv.index('--') + 1:]
 src, tex, out = args[:3]
-VAR = args[3] if len(args) > 3 else 'Deco'
+VAR = args[3] if len(args) > 3 else 'Persian'
 os.makedirs(out, exist_ok=True)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.fbx(filepath=src)
